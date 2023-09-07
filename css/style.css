@@ -1,7 +1,34 @@
 
 .card {
     width: 100px;
+    width: 100vw;
     height: 100px;
-    background-color: lightgray;
-    border: 1px solid black;
+    height: 96vh;
+    box-sizing: border-box;
+    color: white;
+    font-weight: bold;
+    font-size: xx-large;
+    font-family: Helvetica, Arial, sans-serif;
+    padding: 10px;
+    background-color: orange;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.card-1{
+    background-color: blue;
+}
+.card-2{
+    background-color: magenta;
+}
+
+.card .content{
+    width: 850px;
+    height: 700px;
+    max-height: 100%;
+    border: 5px solid white;
+    padding: 10px;
+    box-sizing: border-box;
+    margin: auto;
 }
