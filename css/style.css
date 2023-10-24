@@ -1,3 +1,6 @@
+body{
+    font-family: "Radio Canada", Arial, Helvetica, sans-serif;
+}
 
 .card {
     width: 100px;
@@ -5,23 +8,24 @@
     height: 100px;
     height: 96vh;
     box-sizing: border-box;
-    color: white;
+    color: black;
     font-weight: bold;
     font-size: xx-large;
-    font-family: Helvetica, Arial, sans-serif;
     padding: 10px;
-    background-color: blue;
+    background-color: yellow;
     display: flex;
     flex-direction: column;
     justify-content: center;
 }
 
 .card .content{
-    width: 850px;
+    width: 350px;
     height: 700px;
     max-height: 100%;
-    border: 5px solid white;
-    padding: 10px;
+    border: 5px solid black;
+    padding: 10px 30px;
     box-sizing: border-box;
     margin: auto;
+    overflow-y: scroll;
+    font-size: small;
 }
