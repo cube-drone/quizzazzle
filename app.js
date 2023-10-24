@@ -3,6 +3,7 @@ import { useState } from 'preact/hooks'
 import htm from 'htm';
 import { marked } from 'marked';
 import insane from 'insane';
+import { hash128 } from './lib/murmurhash3.js'
 
 const text = `
 ## The Skewered Dragon, Old Xoblob's Shop, and The Crime Scene
@@ -166,13 +167,20 @@ let Quiz = () => {
     let counter = 0;
     return html`<div class="card">
         <div class="content">
-            <div class="everything">
-            <h2>Hi!</h2>
-            <${Rendered} />
+            <div class="header">
+                <div class="prev">«</div>
+                <div class="next">»</div>
             </div>
+            <div class="bump"></div>
+            <div class="everything">
+                <h2>Hi!</h2>
+                <${Rendered} />
+            </div>
+            <div class="bump"></div>
+            <div class="footer"></div>
         </div>
     </div>`
 }
-console.log("Marts ahoy")
+console.log(hash128(rendered));
 
 render(html`<${Quiz} name="World" />`, document.getElementById('app'));
