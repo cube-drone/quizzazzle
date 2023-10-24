@@ -4,6 +4,8 @@ import htm from 'htm';
 import { marked } from 'marked';
 import insane from 'insane';
 import { hash128 } from './lib/murmurhash3.js'
+import { anime } from 'animejs'
+import ZingTouch from 'zingtouch';
 
 const text = `
 ## The Skewered Dragon, Old Xoblob's Shop, and The Crime Scene
