@@ -169,6 +169,7 @@ let Quiz = () => {
         <div class="content">
             <div class="header">
                 <div class="prev">«</div>
+                <div class="more">…</div>
                 <div class="next">»</div>
             </div>
             <div class="bump"></div>
