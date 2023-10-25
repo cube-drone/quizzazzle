@@ -2,6 +2,14 @@ body{
     font-family: "Radio Canada", Arial, Helvetica, sans-serif;
 }
 
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+}
+
+p, li{
+    font-weight: 300;
+}
+
 .card {
     width: 100px;
     width: 100vw;
@@ -30,7 +38,7 @@ body{
     padding: 0;
     margin: auto;
     overflow: hidden;
-    background: rgba(255, 255, 255, 0.1)
+    background: rgba(255, 255, 255, 0.2)
 }
 
 .card .content .everything {
