@@ -4,19 +4,22 @@
   "description": "",
   "main": "index.js",
   "dependencies": {
+    "@preact/compat": "^17.1.2",
+    "animejs": "^3.2.1",
     "esbuild": "^0.19.2",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-elastic-carousel": "^0.11.5",
-    "styled-components": "^6.0.7"
+    "htm": "^3.1.1",
+    "insane": "^2.6.2",
+    "marked": "^9.1.2",
+    "preact": "^10.18.1",
+    "zingtouch": "^1.0.6"
   },
   "author": "",
   "license": "COPYRIGHT",
   "scripts": {
     "help": "npm run",
-    "build": "esbuild app.jsx --bundle --outfile=build/out.js",
-    "prod": "esbuild app.jsx --minify --sourcemap --bundle --outfile=build/out.js",
-    "watch": "esbuild app.jsx --bundle --watch --outfile=build/out.js",
+    "build": "esbuild app.js --bundle --outfile=build/out.js",
+    "prod": "esbuild app.js --minify --sourcemap --bundle --outfile=build/out.js",
+    "watch": "esbuild app.js --bundle --watch --outfile=build/out.js",
     "serve": "npx http-server -c-1 -p 3000"
   }
 }
