@@ -1,0 +1,31 @@
+services:
+  some-scylla:
+    image: scylladb/scylla
+    container_name: some-scylla
+    ports:
+      -  "127.0.0.1:9042:9042"
+    networks:
+      - orchestr8
+  some-scylla2:
+    image: scylladb/scylla
+    container_name: some-scylla2
+    command: --seeds=some-scylla
+    networks:
+      - orchestr8
+  some-scylla3:
+    image: scylladb/scylla
+    container_name: some-scylla3
+    command: --seeds=some-scylla
+    networks:
+      - orchestr8
+  redis:
+    image: redis
+    container_name: redis
+    ports:
+      -  "127.0.0.1:5432:5432"
+    networks:
+      - orchestr8
+networks:
+  orchestr8:
+    name: orchestr8
+    external: true
