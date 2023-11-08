@@ -18,11 +18,32 @@ services:
     command: --seeds=some-scylla
     networks:
       - orchestr8
-  redis:
+  auth-redis:
     image: redis
-    container_name: redis
+    container_name: auth-redis
     ports:
-      -  "127.0.0.1:5432:5432"
+      -  "127.0.0.1:6032:5432"
+    networks:
+      - orchestr8
+  cache-redis:
+    image: redis
+    container_name: cache-redis
+    ports:
+      -  "127.0.0.1:6033:5432"
+    networks:
+      - orchestr8
+  search-redis:
+    image: redis
+    container_name: search-redis
+    ports:
+      -  "127.0.0.1:6034:5432"
+    networks:
+      - orchestr8
+  message-redis:
+    image: redis
+    container_name: message-redis
+    ports:
+      -  "127.0.0.1:6035:5432"
     networks:
       - orchestr8
 networks:
