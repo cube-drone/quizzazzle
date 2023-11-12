@@ -4,7 +4,7 @@ import htm from 'htm';
 import { marked } from 'marked';
 import insane from 'insane';
 import { hash128 } from './lib/murmurhash3.js'
-import { anime } from 'animejs'
+import anime from 'animejs'
 import ZingTouch from 'zingtouch';
 
 const text = `
