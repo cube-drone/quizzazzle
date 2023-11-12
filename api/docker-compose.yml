@@ -1,52 +1,46 @@
 services:
-  some-scylla:
-    image: scylladb/scylla
-    container_name: some-scylla
-    ports:
-      -  "127.0.0.1:9042:9042"
-    networks:
-      - orchestr8
-  some-scylla2:
-    image: scylladb/scylla
-    container_name: some-scylla2
-    command: --seeds=some-scylla
-    networks:
-      - orchestr8
-  some-scylla3:
-    image: scylladb/scylla
-    container_name: some-scylla3
-    command: --seeds=some-scylla
-    networks:
-      - orchestr8
-  auth-redis:
-    image: redis
-    container_name: auth-redis
-    ports:
-      -  "127.0.0.1:6032:5432"
-    networks:
-      - orchestr8
-  cache-redis:
-    image: redis
-    container_name: cache-redis
-    ports:
-      -  "127.0.0.1:6033:5432"
-    networks:
-      - orchestr8
-  search-redis:
-    image: redis
-    container_name: search-redis
-    ports:
-      -  "127.0.0.1:6034:5432"
-    networks:
-      - orchestr8
-  message-redis:
-    image: redis
-    container_name: message-redis
-    ports:
-      -  "127.0.0.1:6035:5432"
-    networks:
-      - orchestr8
-networks:
-  orchestr8:
-    name: orchestr8
-    external: true
+  cache-redis-1:
+    image: redis/redis-stack-server
+    container_name: cache-redis-1
+    hostname: cache-redis-1
+    environment:
+      - REDIS_ARGS= --requirepass hamscramble --appendonly no --save "" --maxmemory 2140000000 --maxmemory-policy allkeys-lfu --port 6888 --cluster-enabled yes --cluster-announce-hostname cache-redis-1
+    #ports:
+    #  -  "127.0.0.1:6888:6888"
+    #  -  "127.0.0.1:16888:16888"
+  cache-redis-2:
+    image: redis/redis-stack-server
+    container_name: cache-redis-2
+    hostname: cache-redis-2
+    environment:
+      - REDIS_ARGS= --requirepass hamscramble --appendonly no --save "" --maxmemory 2140000000 --maxmemory-policy allkeys-lfu --port 6889 --cluster-enabled yes --cluster-announce-hostname cache-redis-2
+    #ports:
+    #  -  "127.0.0.1:6889:6889"
+    #  -  "127.0.0.1:16889:16889"
+  cache-redis-3:
+    image: redis/redis-stack-server
+    container_name: cache-redis-3
+    hostname: cache-redis-3
+    environment:
+      - REDIS_ARGS= --requirepass hamscramble --appendonly no --save "" --maxmemory 2140000000 --maxmemory-policy allkeys-lfu --port 6890 --cluster-enabled yes --cluster-announce-hostname cache-redis-3
+    #ports:
+    #  -  "127.0.0.1:6890:6890"
+    #  -  "127.0.0.1:16890:16890"
+  redis-cluster:
+    image: redis/redis-stack-server
+    command: redis-cli --cluster create cache-redis-1:6888 cache-redis-2:6889 cache-redis-3:6890 --cluster-replicas 0 -a hamscramble --cluster-yes
+    depends_on:
+      - cache-redis-1
+      - cache-redis-2
+      - cache-redis-3
+  #ssh-tunnel:
+  #  image: lscr.io/linuxserver/openssh-server
+  #  container_name: ssh-tunnel
+  #  ports:
+  #    - "127.0.0.1:2222:2222"
+  #  environment:
+  #    - USER_NAME=proxy
+  #    - USER_PASSWORD=hamscramble
+  #    - PASSWORD_ACCESS=true
+  #    - SUDO_ACCESS=true
+  #    - LOG_STDOUT=true
