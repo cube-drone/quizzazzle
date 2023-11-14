@@ -4,61 +4,11 @@ services:
     container_name: some-scylla
     ports:
       -  "127.0.0.1:9042:9042"
-    networks:
-      - orchestr8
   some-scylla2:
     image: scylladb/scylla
     container_name: some-scylla2
     command: --seeds=some-scylla
-    networks:
-      - orchestr8
   some-scylla3:
     image: scylladb/scylla
     container_name: some-scylla3
     command: --seeds=some-scylla
-    networks:
-      - orchestr8
-  cache-redis-1:
-    image: redis/redis-stack-server
-    container_name: cache-redis-1
-    hostname: cache-redis-1
-    environment:
-      - REDIS_ARGS="--requirepass hamscramble --appendonly no --maxmemory 2140000000 --maxmemory-policy allkeys-lfu --port 6888 --cluster-enabled yes"
-    ports:
-      -  "127.0.0.1:6888:6888"
-      -  "127.0.0.1:16888:16888"
-    networks:
-      - orchestr8
-  cache-redis-2:
-    image: redis/redis-stack-server
-    container_name: cache-redis-2
-    hostname: cache-redis-2
-    environment:
-      - REDIS_ARGS="--requirepass hamscramble --appendonly no --maxmemory 2140000000 --maxmemory-policy allkeys-lfu --port 6889 --cluster-enabled yes"
-    ports:
-      -  "127.0.0.1:6889:6889"
-      -  "127.0.0.1:16889:16889"
-    networks:
-      - orchestr8
-  cache-redis-3:
-    image: redis/redis-stack-server
-    container_name: cache-redis-3
-    hostname: cache-redis-3
-    environment:
-      - REDIS_ARGS="--requirepass hamscramble --appendonly no --maxmemory 2140000000 --maxmemory-policy allkeys-lfu --port 6890 --cluster-enabled yes"
-    ports:
-      -  "127.0.0.1:6890:6890"
-      -  "127.0.0.1:16890:16890"
-    networks:
-      - orchestr8
-  redis-cluster:
-    image: redis/redis-stack-server
-    command: redis-cli --cluster create cache-redis-1:6888 cache-redis-2:6889 cache-redis-3:6890 --cluster-replicas 0 -a hamscramble
-    depends_on:
-      - cache-redis-1
-      - cache-redis-2
-      - cache-redis-3
-networks:
-  orchestr8:
-    name: orchestr8
-    external: true

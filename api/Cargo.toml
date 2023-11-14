@@ -9,3 +9,12 @@ edition = "2021"
 anyhow = "=1.0.75"
 rocket = "=0.5.0-rc.4"
 scylla = "=0.10.1"
+
+[dependencies.redis]
+version = "0.23.3"
+default-features = false
+features = ["r2d2", "cluster-async", "tokio-comp", "connection-manager", "keep-alive", "ahash"]
+# r2d2 - enables r2d2 connection pool support
+# connection-manager - enables automatic reconnection
+# keep-alive - uses socket2 to enable keep-alive
+# ahash - ahash map/set support internally (+7-10% performance)

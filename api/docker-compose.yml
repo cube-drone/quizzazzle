@@ -1,31 +1,46 @@
 services:
+  ministry:
+    depends_on:
+      - redis-cluster
+      - cache-redis-1
+      - cache-redis-2
+      - cache-redis-3
+      - application-redis-1
+      - application-redis-2
+      - application-redis-3
+    image:
+      rust:1.73
+    volumes:
+      - .:/usr/src/ministry
+    working_dir: /usr/src/ministry
+    command: cargo run
+    environment:
+      CARGO_TARGET_DIR: /tmp/target # this one's really interesting: volume mounting is incredibly slow, which slows rust builds to a crawl, so instead rust build filespace should exist in tmpfs
+      ROCKET_ADDRESS: 0.0.0.0
+      ROCKET_PORT: 3333
+      CACHE_REDIS_URLS: redis://:hamscramble@cache-redis-1:6888,redis://:hamscramble@cache-redis-2:6889,redis://:hamscramble@cache-redis-3:6890
+      APPLICATION_REDIS_URLS: redis://:hamscramble@application-redis-1:6999,redis://:hamscramble@application-redis-2:6998,redis://:hamscramble@application-redis-3:6997
+    ports:
+      - "3333:3333"
+      - "8000:8000"
   cache-redis-1:
     image: redis/redis-stack-server
     container_name: cache-redis-1
     hostname: cache-redis-1
     environment:
       - REDIS_ARGS= --requirepass hamscramble --appendonly no --save "" --maxmemory 2140000000 --maxmemory-policy allkeys-lfu --port 6888 --cluster-enabled yes --cluster-announce-hostname cache-redis-1
-    #ports:
-    #  -  "127.0.0.1:6888:6888"
-    #  -  "127.0.0.1:16888:16888"
   cache-redis-2:
     image: redis/redis-stack-server
     container_name: cache-redis-2
     hostname: cache-redis-2
     environment:
       - REDIS_ARGS= --requirepass hamscramble --appendonly no --save "" --maxmemory 2140000000 --maxmemory-policy allkeys-lfu --port 6889 --cluster-enabled yes --cluster-announce-hostname cache-redis-2
-    #ports:
-    #  -  "127.0.0.1:6889:6889"
-    #  -  "127.0.0.1:16889:16889"
   cache-redis-3:
     image: redis/redis-stack-server
     container_name: cache-redis-3
     hostname: cache-redis-3
     environment:
       - REDIS_ARGS= --requirepass hamscramble --appendonly no --save "" --maxmemory 2140000000 --maxmemory-policy allkeys-lfu --port 6890 --cluster-enabled yes --cluster-announce-hostname cache-redis-3
-    #ports:
-    #  -  "127.0.0.1:6890:6890"
-    #  -  "127.0.0.1:16890:16890"
   redis-cluster:
     image: redis/redis-stack-server
     command: redis-cli --cluster create cache-redis-1:6888 cache-redis-2:6889 cache-redis-3:6890 --cluster-replicas 0 -a hamscramble --cluster-yes
@@ -33,14 +48,28 @@ services:
       - cache-redis-1
       - cache-redis-2
       - cache-redis-3
-  #ssh-tunnel:
-  #  image: lscr.io/linuxserver/openssh-server
-  #  container_name: ssh-tunnel
-  #  ports:
-  #    - "127.0.0.1:2222:2222"
-  #  environment:
-  #    - USER_NAME=proxy
-  #    - USER_PASSWORD=hamscramble
-  #    - PASSWORD_ACCESS=true
-  #    - SUDO_ACCESS=true
-  #    - LOG_STDOUT=true
+  application-redis-1:
+    image: redis/redis-stack-server
+    container_name: application-redis-1
+    hostname: application-redis-1
+    environment:
+      - REDIS_ARGS= --requirepass hamscramble --appendonly no --save "" --maxmemory 2140000000 --maxmemory-policy noeviction --port 6999 --cluster-enabled yes --cluster-announce-hostname application-redis-1
+  application-redis-2:
+    image: redis/redis-stack-server
+    container_name: application-redis-2
+    hostname: application-redis-2
+    environment:
+      - REDIS_ARGS= --requirepass hamscramble --appendonly no --save "" --maxmemory 2140000000 --maxmemory-policy noeviction --port 6998 --cluster-enabled yes --cluster-announce-hostname application-redis-2
+  application-redis-3:
+    image: redis/redis-stack-server
+    container_name: application-redis-3
+    hostname: application-redis-3
+    environment:
+      - REDIS_ARGS= --requirepass hamscramble --appendonly no --save "" --maxmemory 2140000000 --maxmemory-policy noeviction --port 6997 --cluster-enabled yes --cluster-announce-hostname application-redis-3
+  app-redis-cluster:
+    image: redis/redis-stack-server
+    command: redis-cli --cluster create application-redis-1:6999 application-redis-2:6998 application-redis-3:6997 --cluster-replicas 0 -a hamscramble --cluster-yes
+    depends_on:
+      - application-redis-1
+      - application-redis-2
+      - application-redis-3
