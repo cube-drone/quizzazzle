@@ -5,31 +5,15 @@ use std::env;
 use std::sync::Arc;
 use redis::cluster::ClusterClient;
 use redis::AsyncCommands;
-use rocket::State;
-use rocket::http::Status;
+use rocket::{Rocket, Build};
 
-fn error_response(error_string: String) -> Status {
-    eprintln!("ERROR!: {}", error_string);
-    return Status::InternalServerError;
-}
+mod error; // provides the no_shit! macro
+mod basic;
 
-macro_rules! no_shit {
-    ($message:expr) => {
-        $message.map_err(|err| error_response(err.to_string()))?
-    }
-}
 
 #[get("/")]
 fn index() -> &'static str {
     "Hello, world!"
-}
-
-#[get("/counter")]
-async fn counter(services: &State<Services>) -> Result<String, Status> {
-    let mut redis_connection = no_shit!( services.cache_redis.get_async_connection().await );
-    let counter_result:i64 = no_shit!( redis_connection.incr("counter", 1).await );
-
-    Ok(format!("Counter: {counter_result}"))
 }
 
 pub struct Services{
@@ -54,8 +38,9 @@ async fn setup_redis_cluster(redis_urls: &String) -> Arc<ClusterClient> {
     return Arc::new(client);
 }
 
+
 #[launch]
-async fn rocket() -> _ {
+async fn rocket() -> Rocket<Build> {
 
     // Environment Variables
     let cache_redis_urls = env::var("CACHE_REDIS_URLS").unwrap_or_else(|_| "".to_string());
@@ -67,6 +52,11 @@ async fn rocket() -> _ {
         application_redis: setup_redis_cluster(&application_redis_urls).await,
     };
 
-    rocket::build().manage(services)
-        .mount("/", routes![index, counter])
+    let mut app = rocket::build();
+
+    app = app.manage(services);
+    app = app.mount("/", routes![index]);
+    app = basic::routes::mount_routes(app);
+
+    app
 }
