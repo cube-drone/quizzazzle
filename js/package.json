@@ -20,6 +20,7 @@
     "build": "esbuild app.js --bundle --outfile=build/out.js",
     "prod": "esbuild app.js --minify --sourcemap --bundle --outfile=build/out.js",
     "watch": "esbuild app.js --bundle --watch --outfile=build/out.js",
-    "serve": "npx http-server -c-1 -p 3000"
+    "serve": "npx http-server -c-1 -p 3000",
+	"test": "node --test"
   }
 }
