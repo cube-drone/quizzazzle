@@ -12,7 +12,7 @@ test('Can connect to localhost', async () => {
 });
 
 test('Can get some JSON', async () => {
-	let root = await fetch(`${endpoint}/basic/simple_json`);
+	let root = await fetch(`${endpoint}/basic/json`);
 
 	let json = await root.json();
 

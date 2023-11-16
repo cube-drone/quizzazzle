@@ -1,7 +1,10 @@
+use std::collections::HashMap;
 use rocket::{Rocket, Build, State};
+use rocket::response::Redirect;
 use rocket::http::Status;
 use redis::AsyncCommands;
 use rocket::serde::{Serialize, json::Json};
+use rocket::serde::uuid::Uuid;
 
 use crate::no_shit;
 
@@ -35,6 +38,11 @@ async fn internal_server_error() -> Status {
 	Status::InternalServerError
 }
 
+#[get("/redirect")]
+async fn redirect() -> Redirect {
+	Redirect::to("/basic/hello".to_string())
+}
+
 #[get("/counter")]
 async fn counter(services: &State<crate::Services>) -> Result<String, Status> {
     let mut redis_connection = no_shit!( services.cache_redis.get_async_connection().await );
@@ -43,15 +51,37 @@ async fn counter(services: &State<crate::Services>) -> Result<String, Status> {
     Ok(format!("Counter: {counter_result}"))
 }
 
+//
+// Let's do some JSON, hoss
+//
+
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
+struct ExampleSubObject {
+	up: bool,
+	down: bool,
+}
+
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
+struct Pizza {
+	crust: String,
+	toppings: Option<Vec<String>>,
+}
+
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
 struct ExampleObject {
 	username: String,
 	timestamp_ms: u128,
 	active: bool,
+	sub_objects: Vec<ExampleSubObject>,
+	maybe: Option<String>,
+	maybe_not: Option<String>,
+	pizzas: Option<HashMap<String, Pizza>>,
 }
 
-#[get("/simple_json")]
+#[get("/json")]
 async fn simple_json() -> Result<Json<ExampleObject>, Status> {
 
 	let timestamp = no_shit!( std::time::UNIX_EPOCH.elapsed() );
@@ -60,10 +90,28 @@ async fn simple_json() -> Result<Json<ExampleObject>, Status> {
 	Ok(Json(ExampleObject{
 		username: "harbo".to_string(),
 		timestamp_ms: timestamp_ms,
-		active: true
+		active: true,
+		sub_objects: vec![ExampleSubObject{up: true, down: false}, ExampleSubObject{up: false, down:true}],
+		maybe: Some("yes".to_string()),
+		maybe_not: None,
+		pizzas: Some(HashMap::from([
+			("peppy".to_string(), Pizza{
+				crust: "thicc".to_string(),
+				toppings: Some(vec!["cheese".to_string(), "pepperoni".to_string()]),
+			}),
+			("flatbread".to_string(), Pizza{
+				crust: "thinn".to_string(),
+				toppings: None,
+			})
+		]))
 	}))
 }
 
+#[get("/identified/<id>")]
+async fn simple_uuid(id: Uuid) -> String {
+	format!("hello, {}", id)
+}
+
 pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
-    app.mount("/basic", routes![root, hello, bad_request, teapot, cool_your_jets, internal_server_error, counter, simple_json])
+    app.mount("/basic", routes![root, hello, bad_request, teapot, cool_your_jets, internal_server_error, redirect, counter, simple_json, simple_uuid])
 }
