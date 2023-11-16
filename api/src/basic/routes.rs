@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use rand::Rng;
 use rocket::{Rocket, Build, State};
 use rocket::response::Redirect;
 use rocket::http::Status;
@@ -107,11 +108,45 @@ async fn simple_json() -> Result<Json<ExampleObject>, Status> {
 	}))
 }
 
-#[get("/identified/<id>")]
+#[get("/id/<id>")]
 async fn simple_uuid(id: Uuid) -> String {
+	// if you enter the Uuid correctly, you get this hello
+	// if you screw it up, you get a 422: Unprocessable Entity
 	format!("hello, {}", id)
 }
 
+#[get("/id")]
+async fn id_redirect() -> Redirect {
+	let uuid = Uuid::new_v4();
+	// note that the uri! macro will calculate the endpoint for us, but it's not aware of the mount point
+	Redirect::to(format!("/basic{}",uri![simple_uuid(uuid)]))
+}
+
+#[get("/coin")]
+async fn coinflip() -> String {
+	let mut rng = rand::thread_rng();
+	let coin = rng.gen_bool(0.5);
+	if coin {
+		"heads".to_string()
+	} else {
+		"tails".to_string()
+	}
+}
+
+
 pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
-    app.mount("/basic", routes![root, hello, bad_request, teapot, cool_your_jets, internal_server_error, redirect, counter, simple_json, simple_uuid])
+    app.mount("/basic", routes![
+		root,
+		hello,
+		bad_request,
+		teapot,
+		cool_your_jets,
+		internal_server_error,
+		redirect,
+		counter,
+		simple_json,
+		simple_uuid,
+		id_redirect,
+		coinflip
+	])
 }
