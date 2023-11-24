@@ -4,8 +4,9 @@ use rocket::{Rocket, Build, State};
 use rocket::response::Redirect;
 use rocket::http::Status;
 use redis::AsyncCommands;
-use rocket::serde::{Serialize, json::Json};
 use rocket::serde::uuid::Uuid;
+use rocket::serde::json::Json;
+use serde::Serialize;
 
 use crate::no_shit;
 
@@ -50,6 +51,11 @@ async fn counter(services: &State<crate::Services>) -> Result<String, Status> {
     let counter_result:i64 = no_shit!( redis_connection.incr("counter", 1).await );
 
     Ok(format!("Counter: {counter_result}"))
+}
+
+#[derive(Serialize)]
+pub struct CreateBasicThing{
+	pub name: String,
 }
 
 //

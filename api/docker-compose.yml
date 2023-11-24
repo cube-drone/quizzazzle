@@ -26,16 +26,18 @@ services:
       - "3333:3333"
       - "8000:8000"
   some-scylla:
+    container_name: some-scylla
     image: scylladb/scylla
     ports:
       -  "127.0.0.1:9042:9042"
-    command: --authenticator=PasswordAuthenticator
   some-scylla2:
+    container_name: some-scylla2
     image: scylladb/scylla
-    command: --seeds=some-scylla --authenticator=PasswordAuthenticator
+    command: --seeds=some-scylla
   some-scylla3:
+    container_name: some-scylla3
     image: scylladb/scylla
-    command: --seeds=some-scylla --authenticator=PasswordAuthenticator
+    command: --seeds=some-scylla
   cache-redis-1:
     image: redis/redis-stack-server
     container_name: cache-redis-1

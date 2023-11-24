@@ -7,15 +7,17 @@ edition = "2021"
 
 [dependencies]
 rand = "=0.8.5"
-# anyhow = "=1.0.75"
+anyhow = "=1.0.75"
 rocket = { version="=0.5.0-rc.4", features=["json", "secrets", "uuid"] }
 scylla = "=0.10.1"
+serde = { version="1.0", features=["derive"]}
 
 [dependencies.redis]
 version = "0.23.3"
 default-features = false
 features = ["r2d2", "cluster-async", "tokio-comp", "connection-manager", "keep-alive", "ahash"]
 # r2d2 - enables r2d2 connection pool support
+# cluster-async / tokio-comp - async support
 # connection-manager - enables automatic reconnection
 # keep-alive - uses socket2 to enable keep-alive
 # ahash - ahash map/set support internally (+7-10% performance)
