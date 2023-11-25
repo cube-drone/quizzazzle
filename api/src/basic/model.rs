@@ -1,16 +1,21 @@
-use anyhow::Result;
+use std::collections::HashMap;
 use std::sync::Arc;
+use anyhow::Result;
 use scylla::Session;
 use scylla::macros::FromRow;
+use scylla::prepared_statement::PreparedStatement;
 //use scylla::transport::session::{IntoTypedRows};
 use rocket::serde::uuid::Uuid;
 use serde::{Serialize, Deserialize};
 
-pub async fn _initialize(scylla_session: &Arc<Session>) -> Result<()> {
+pub async fn _initialize(scylla_session: &Arc<Session>) -> Result<HashMap<&str, PreparedStatement>> {
 
 	scylla_session.query("CREATE TABLE IF NOT EXISTS ks.basic (id uuid PRIMARY KEY, name text)", &[]).await?;
 
-	Ok(())
+	let mut prepared_queries = HashMap::new();
+	prepared_queries.insert("create_basic", scylla_session.prepare("INSERT INTO ks.basic (id, name) VALUES (?, ?)").await?);
+
+	Ok(prepared_queries)
 }
 
 #[derive(Clone, FromRow, Debug, Serialize, Deserialize)]

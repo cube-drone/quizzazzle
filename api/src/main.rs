@@ -1,12 +1,12 @@
 #[macro_use] extern crate rocket;
-//mod config;
-//mod scylla_up;
 use std::env;
+use std::collections::HashMap;
 use std::sync::Arc;
 use redis::cluster::ClusterClient;
 use redis::AsyncCommands;
 use rocket::{Rocket, Build};
 use scylla::transport::session::{Session};
+use scylla::prepared_statement::PreparedStatement;
 use scylla::SessionBuilder;
 
 mod error; // provides the no_shit! macro
@@ -18,10 +18,15 @@ fn index() -> &'static str {
     "Hello, world!"
 }
 
+pub struct ScyllaService{
+	pub session: Arc<Session>,
+	pub prepared_queries: Arc<HashMap<&'static str, PreparedStatement>>
+}
+
 pub struct Services{
     pub cache_redis: Arc<ClusterClient>,
     pub application_redis: Arc<ClusterClient>,
-    pub scylla: Arc<Session>,
+    pub scylla: ScyllaService,
 }
 
 async fn setup_redis_cluster(redis_urls: &String) -> Arc<ClusterClient> {
@@ -57,12 +62,17 @@ async fn rocket() -> Rocket<Build> {
 
     // Scylla Setup
     let scylla_url = env::var("SCYLLA_URL").unwrap_or_else(|_| "".to_string());
+	let scylla_connection = setup_scylla_cluster(&scylla_url).await;
+	let mut prepared_queries = HashMap<&'static str, PreparedStatement>::new();
 
     // Service Setup
     let services = Services{
         cache_redis: setup_redis_cluster(&cache_redis_urls).await,
         application_redis: setup_redis_cluster(&application_redis_urls).await,
-        scylla: setup_scylla_cluster(&scylla_url).await,
+        scylla: ScyllaService{
+			session: scylla_connection,
+			prepared_queries: prepared_queries,
+		}
     };
 
     let mut app = rocket::build();

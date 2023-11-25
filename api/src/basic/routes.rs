@@ -52,12 +52,6 @@ async fn counter(services: &State<crate::Services>) -> Result<String, Status> {
 
     Ok(format!("Counter: {counter_result}"))
 }
-
-#[derive(Serialize)]
-pub struct CreateBasicThing{
-	pub name: String,
-}
-
 //
 // Let's do some JSON, hoss
 //
@@ -137,6 +131,13 @@ async fn coinflip() -> String {
 	} else {
 		"tails".to_string()
 	}
+}
+
+// okay, next we're gonna try to do a complete database looparoo
+
+#[derive(Serialize)]
+pub struct CreateBasicThing{
+	pub name: String,
 }
 
 

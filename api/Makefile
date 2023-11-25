@@ -1,10 +1,3 @@
-b:
-	docker compose up -d
-	docker logs --follow ministry
-build:
-	docker compose up -d
-	docker logs --follow ministry
-
 c:
 	docker compose down
 clean:
