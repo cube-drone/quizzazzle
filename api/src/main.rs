@@ -20,7 +20,6 @@ fn index() -> &'static str {
 
 /*
 	Services gets passed around willy nilly between threads so it needs to be cram-packed fulla arcs like a season of Naruto
-
 */
 pub struct ScyllaService{
 	pub session: Arc<Session>,
