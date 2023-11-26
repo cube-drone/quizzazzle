@@ -1,6 +1,12 @@
 use rocket::http::Status;
 
 pub fn error_response(error_string: String) -> Status {
+
+	if error_string.contains("Validation") || error_string.contains("400") {
+		eprintln!("Validation Error: {}", error_string);
+		return Status::BadRequest;
+	}
+
     eprintln!("ERROR!: {}", error_string);
     return Status::InternalServerError;
 }

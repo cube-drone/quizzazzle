@@ -1,9 +1,11 @@
 use rocket::serde::uuid::Uuid;
 use scylla::macros::FromRow;
 use serde::{Serialize, Deserialize};
+use validator::Validate;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Validate)]
 pub struct BasicThingCreate {
+	#[validate(length(min = 4, max = 255))]
 	pub name: String,
 }
 

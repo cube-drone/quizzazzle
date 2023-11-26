@@ -7,6 +7,7 @@ use redis::AsyncCommands;
 use rocket::serde::uuid::Uuid;
 use rocket::serde::json::Json;
 use serde::Serialize;
+use validator::Validate;
 
 use crate::no_shit;
 use crate::Services;
@@ -143,6 +144,7 @@ async fn create_basic(services: &State<Services>, basic_thing_serialized: Json<B
 
 	// we have to deserialize the JSON into a struct
 	let basic_thing_to_create = basic_thing_serialized.into_inner();
+	no_shit!( basic_thing_to_create.validate() );
 
 	let basic_thing_public = no_shit!( crate::basic::view::create_basic_thing(&services, basic_thing_to_create).await );
 

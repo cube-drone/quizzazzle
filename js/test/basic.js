@@ -48,3 +48,18 @@ test('Can create a Basic Thing', async () => {
 	assert.strictEqual(getJson.id, json.id);
 	assert.strictEqual(getJson.name, "Test Thing 1");
 });
+
+test('Validation Troubles: name too short', async () => {
+
+	const response = await fetch(`${endpoint}/basic/thing`, {
+		method: 'POST',
+		body: JSON.stringify({
+			name: "sht",
+		}),
+		headers: {
+			'Content-Type': 'application/json'
+		}
+	});
+
+	assert.strictEqual(response.status, 400);
+});
