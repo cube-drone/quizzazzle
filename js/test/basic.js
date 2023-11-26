@@ -1,65 +1,65 @@
 const test = require('node:test');
 const assert = require('assert');
 
-const {endpoint} = require('./constants');
+const { endpoint } = require('./constants');
 
 test('Can connect to localhost', async () => {
-	let root = await fetch(`${endpoint}/basic/hello`);
+    let root = await fetch(`${endpoint}/basic/hello`);
 
-	let text = await root.text();
+    let text = await root.text();
 
-	assert.strictEqual(text, "Hello world");
+    assert.strictEqual(text, "Hello world");
 });
 
 test('Can get some JSON', async () => {
-	let root = await fetch(`${endpoint}/basic/json`);
+    let root = await fetch(`${endpoint}/basic/json`);
 
-	let json = await root.json();
+    let json = await root.json();
 
-	assert.strictEqual(json.username, "harbo");
-	let currentTimestamp = Date.now();
-	assert(json.timestamp_ms > (currentTimestamp - 10000));
-	assert(json.timestamp_ms < (currentTimestamp + 10000));
+    assert.strictEqual(json.username, "harbo");
+    let currentTimestamp = Date.now();
+    assert(json.timestamp_ms > (currentTimestamp - 10000));
+    assert(json.timestamp_ms < (currentTimestamp + 10000));
 
-	assert(json.active);
+    assert(json.active);
 });
 
 test('Can create a Basic Thing', async () => {
 
-	const response = await fetch(`${endpoint}/basic/thing`, {
-		method: 'POST',
-		body: JSON.stringify({
-			name: "Test Thing 1",
-		}),
-		headers: {
-			'Content-Type': 'application/json'
-		}
-	});
+    const response = await fetch(`${endpoint}/basic/thing`, {
+        method: 'POST',
+        body: JSON.stringify({
+            name: "Test Thing 1",
+        }),
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
 
-	assert.strictEqual(response.status, 200);
-	const json = await response.json();
-	assert(json.id != null);
-	assert.strictEqual(json.name, "Test Thing 1");
+    assert.strictEqual(response.status, 200);
+    const json = await response.json();
+    assert(json.id != null);
+    assert.strictEqual(json.name, "Test Thing 1");
 
-	const getResponse = await fetch(`${endpoint}/basic/thing/${json.id}`);
+    const getResponse = await fetch(`${endpoint}/basic/thing/${json.id}`);
 
-	assert.strictEqual(getResponse.status, 200);
-	const getJson = await getResponse.json();
-	assert.strictEqual(getJson.id, json.id);
-	assert.strictEqual(getJson.name, "Test Thing 1");
+    assert.strictEqual(getResponse.status, 200);
+    const getJson = await getResponse.json();
+    assert.strictEqual(getJson.id, json.id);
+    assert.strictEqual(getJson.name, "Test Thing 1");
 });
 
 test('Validation Troubles: name too short', async () => {
 
-	const response = await fetch(`${endpoint}/basic/thing`, {
-		method: 'POST',
-		body: JSON.stringify({
-			name: "sht",
-		}),
-		headers: {
-			'Content-Type': 'application/json'
-		}
-	});
+    const response = await fetch(`${endpoint}/basic/thing`, {
+        method: 'POST',
+        body: JSON.stringify({
+            name: "sht",
+        }),
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
 
-	assert.strictEqual(response.status, 400);
+    assert.strictEqual(response.status, 400);
 });
