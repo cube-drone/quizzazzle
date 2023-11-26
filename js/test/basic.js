@@ -1,6 +1,50 @@
 const test = require('node:test');
 const assert = require('assert');
 
-test('basic test', () => {
-	assert(true);
+const {endpoint} = require('./constants');
+
+test('Can connect to localhost', async () => {
+	let root = await fetch(`${endpoint}/basic/hello`);
+
+	let text = await root.text();
+
+	assert.strictEqual(text, "Hello world");
+});
+
+test('Can get some JSON', async () => {
+	let root = await fetch(`${endpoint}/basic/json`);
+
+	let json = await root.json();
+
+	assert.strictEqual(json.username, "harbo");
+	let currentTimestamp = Date.now();
+	assert(json.timestamp_ms > (currentTimestamp - 10000));
+	assert(json.timestamp_ms < (currentTimestamp + 10000));
+
+	assert(json.active);
+});
+
+test('Can create a Basic Thing', async () => {
+
+	const response = await fetch(`${endpoint}/basic/thing`, {
+		method: 'POST',
+		body: JSON.stringify({
+			name: "Test Thing 1",
+		}),
+		headers: {
+			'Content-Type': 'application/json'
+		}
+	});
+
+	assert.strictEqual(response.status, 200);
+	const json = await response.json();
+	assert(json.id != null);
+	assert.strictEqual(json.name, "Test Thing 1");
+
+	const getResponse = await fetch(`${endpoint}/basic/thing/${json.id}`);
+
+	assert.strictEqual(getResponse.status, 200);
+	const getJson = await getResponse.json();
+	assert.strictEqual(getJson.id, json.id);
+	assert.strictEqual(getJson.name, "Test Thing 1");
 });

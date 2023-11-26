@@ -1,14 +1,16 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+
 use anyhow::Result;
 use scylla::Session;
-use scylla::macros::FromRow;
 use scylla::prepared_statement::PreparedStatement;
-//use scylla::transport::session::{IntoTypedRows};
 use rocket::serde::uuid::Uuid;
-use serde::{Serialize, Deserialize};
 
-pub async fn _initialize(scylla_session: &Arc<Session>) -> Result<HashMap<&str, PreparedStatement>> {
+use crate::basic::types::BasicThingDatabase;
+
+use crate::ScyllaService;
+
+pub async fn initialize(scylla_session: &Arc<Session>) -> Result<HashMap<&'static str, PreparedStatement>> {
 
 	scylla_session.query("CREATE TABLE IF NOT EXISTS ks.basic (id uuid PRIMARY KEY, name text)", &[]).await?;
 
@@ -18,20 +20,12 @@ pub async fn _initialize(scylla_session: &Arc<Session>) -> Result<HashMap<&str, 
 	Ok(prepared_queries)
 }
 
-#[derive(Clone, FromRow, Debug, Serialize, Deserialize)]
-pub struct DatabaseBasicThing {
-	pub id: Uuid,
-	pub name: String,
-}
-
-pub async fn _create_basic(scylla_session: &Arc<Session>, uuid: &Uuid, text: &String) -> Result<()> {
-
-	scylla_session.query("INSERT INTO ks.basic (id, name) VALUES (?, ?)", (uuid, text)).await?;
+pub async fn create_basic_thing(scylla: &ScyllaService, basic_thing: &BasicThingDatabase) -> Result<()> {
+	scylla.session.query("INSERT INTO ks.basic (id, name) VALUES (?, ?)", (basic_thing.id, basic_thing.name.clone())).await?;
 
 	Ok(())
 }
 
-pub async fn _get_basic(scylla_session: &Arc<Session>, uuid: &Uuid) -> Result<Option<DatabaseBasicThing>> {
-
-	Ok(scylla_session.query("SELECT id, name FROM ks.basic WHERE id = ?", (uuid, )).await?.maybe_first_row_typed::<DatabaseBasicThing>()?)
+pub async fn get_basic(scylla: &ScyllaService, uuid: &Uuid) -> Result<Option<BasicThingDatabase>> {
+	Ok(scylla.session.query("SELECT id, name FROM ks.basic WHERE id = ?", (uuid, )).await?.maybe_first_row_typed::<BasicThingDatabase>()?)
 }

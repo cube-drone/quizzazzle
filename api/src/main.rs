@@ -18,6 +18,10 @@ fn index() -> &'static str {
     "Hello, world!"
 }
 
+/*
+	Services gets passed around willy nilly between threads so it needs to be cram-packed fulla arcs like a season of Naruto
+
+*/
 pub struct ScyllaService{
 	pub session: Arc<Session>,
 	pub prepared_queries: Arc<HashMap<&'static str, PreparedStatement>>
@@ -63,7 +67,16 @@ async fn rocket() -> Rocket<Build> {
     // Scylla Setup
     let scylla_url = env::var("SCYLLA_URL").unwrap_or_else(|_| "".to_string());
 	let scylla_connection = setup_scylla_cluster(&scylla_url).await;
-	let mut prepared_queries = HashMap<&'static str, PreparedStatement>::new();
+	let mut prepared_queries: HashMap<&'static str, PreparedStatement> = HashMap::new();
+
+	// Initialize Models & Prepare all Scylla Queries
+	let mut basic_prepared_queries = basic::model::initialize(&scylla_connection).await.expect("Could not initialize basic model");
+	let mut other_prepared_queries: HashMap<&'static str, PreparedStatement> = HashMap::new();
+	let queries_to_merge = vec![&mut basic_prepared_queries, &mut other_prepared_queries];
+
+	for query_map in queries_to_merge {
+		prepared_queries.extend(query_map.drain());
+	}
 
     // Service Setup
     let services = Services{
@@ -71,7 +84,7 @@ async fn rocket() -> Rocket<Build> {
         application_redis: setup_redis_cluster(&application_redis_urls).await,
         scylla: ScyllaService{
 			session: scylla_connection,
-			prepared_queries: prepared_queries,
+			prepared_queries: Arc::new(prepared_queries),
 		}
     };
 

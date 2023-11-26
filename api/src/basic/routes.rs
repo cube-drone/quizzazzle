@@ -9,6 +9,9 @@ use rocket::serde::json::Json;
 use serde::Serialize;
 
 use crate::no_shit;
+use crate::Services;
+
+use crate::basic::types::{BasicThingCreate, BasicThingPublic};
 
 #[get("/")]
 fn root() -> &'static str {
@@ -46,7 +49,7 @@ async fn redirect() -> Redirect {
 }
 
 #[get("/counter")]
-async fn counter(services: &State<crate::Services>) -> Result<String, Status> {
+async fn counter(services: &State<Services>) -> Result<String, Status> {
     let mut redis_connection = no_shit!( services.cache_redis.get_async_connection().await );
     let counter_result:i64 = no_shit!( redis_connection.incr("counter", 1).await );
 
@@ -135,11 +138,26 @@ async fn coinflip() -> String {
 
 // okay, next we're gonna try to do a complete database looparoo
 
-#[derive(Serialize)]
-pub struct CreateBasicThing{
-	pub name: String,
+#[post("/thing", format = "json", data = "<basic_thing_serialized>")]
+async fn create_basic(services: &State<Services>, basic_thing_serialized: Json<BasicThingCreate>) -> Result<Json<BasicThingPublic>, Status> {
+
+	// we have to deserialize the JSON into a struct
+	let basic_thing_to_create = basic_thing_serialized.into_inner();
+
+	let basic_thing_public = no_shit!( crate::basic::view::create_basic_thing(&services, basic_thing_to_create).await );
+
+	Ok(Json(basic_thing_public))
 }
 
+#[get("/thing/<id>")]
+async fn get_basic(services: &State<Services>, id: Uuid) -> Result<Option<Json<BasicThingPublic>>, Status> {
+	let basic_thing_public = no_shit!( crate::basic::view::get_basic_thing(&services, &id).await );
+
+	match basic_thing_public{
+		Some(basic_thing_public) => Ok(Some(Json(basic_thing_public))),
+		None => Ok(None),
+	}
+}
 
 pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
     app.mount("/basic", routes![
@@ -154,6 +172,8 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
 		simple_json,
 		simple_uuid,
 		id_redirect,
-		coinflip
+		coinflip,
+		create_basic,
+		get_basic
 	])
 }
