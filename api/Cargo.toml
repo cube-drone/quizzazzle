@@ -12,7 +12,7 @@ rocket = { version = "=0.5.0-rc.4", features=["json", "secrets", "uuid"] }
 scylla = "=0.10.1"
 serde = { version = "1.0", features=["derive"]}
 validator = { version = "0.16.1", features=["derive"] }
-chrono = { version = "0.4.31", features=[]}
+chrono = { version = "0.4.31", features=["serde"]}
 
 redis = { version = "0.23.3", features=["r2d2", "cluster-async", "tokio-comp", "connection-manager", "keep-alive", "ahash"]}
 # r2d2 - enables r2d2 connection pool support

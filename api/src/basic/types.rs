@@ -21,5 +21,5 @@ pub struct BasicThingDatabase {
 pub struct BasicThingPublic {
     pub id: Uuid,
     pub name: String,
-    pub created_at: i64,
+    pub created_at: String, // we always want to share timestamps as ISO-8601 strings
 }

@@ -49,7 +49,7 @@ pub async fn create_basic_thing(
                 .prepared_queries
                 .get("create_basic")
                 .expect("Query missing!"),
-            (basic_thing.id, basic_thing.name.clone(), Timestamp::from(basic_thing.created_at)),
+            (basic_thing.id, basic_thing.name.clone(), Timestamp(basic_thing.created_at)),
         )
         .await?;
 
