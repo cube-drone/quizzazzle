@@ -1,5 +1,6 @@
 use anyhow::Result;
 use rocket::serde::uuid::Uuid;
+use chrono::Utc;
 
 use crate::basic::types::{BasicThingCreate, BasicThingDatabase, BasicThingPublic};
 use crate::Services;
@@ -8,6 +9,7 @@ pub fn sanitize_basic_thing(basic_thing: BasicThingCreate) -> BasicThingDatabase
     BasicThingDatabase {
         id: Uuid::new_v4(),
         name: basic_thing.name,
+        created_at: chrono::Duration::milliseconds(Utc::now().timestamp_millis()),
     }
 }
 
@@ -15,6 +17,7 @@ pub fn transform_basic_thing(basic_thing: BasicThingDatabase) -> BasicThingPubli
     BasicThingPublic {
         id: basic_thing.id,
         name: basic_thing.name,
+        created_at: basic_thing.created_at.num_milliseconds(),
     }
 }
 

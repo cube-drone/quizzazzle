@@ -4,6 +4,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use rocket::serde::uuid::Uuid;
 use scylla::prepared_statement::PreparedStatement;
+use scylla::frame::value::Timestamp;
 use scylla::Session;
 
 use crate::basic::types::BasicThingDatabase;
@@ -15,7 +16,7 @@ pub async fn initialize(
 ) -> Result<HashMap<&'static str, PreparedStatement>> {
     scylla_session
         .query(
-            "CREATE TABLE IF NOT EXISTS ks.basic (id uuid PRIMARY KEY, name text)",
+            "CREATE TABLE IF NOT EXISTS ks.basic (id uuid PRIMARY KEY, name text, created_at timestamp)",
             &[],
         )
         .await?;
@@ -24,13 +25,13 @@ pub async fn initialize(
     prepared_queries.insert(
         "create_basic",
         scylla_session
-            .prepare("INSERT INTO ks.basic (id, name) VALUES (?, ?)")
+            .prepare("INSERT INTO ks.basic (id, name, created_at) VALUES (?, ?, ?)")
             .await?,
     );
     prepared_queries.insert(
         "get_basic",
         scylla_session
-            .prepare("SELECT id, name FROM ks.basic WHERE id = ?")
+            .prepare("SELECT id, name, created_at FROM ks.basic WHERE id = ?")
             .await?,
     );
 
@@ -48,7 +49,7 @@ pub async fn create_basic_thing(
                 .prepared_queries
                 .get("create_basic")
                 .expect("Query missing!"),
-            (basic_thing.id, basic_thing.name.clone()),
+            (basic_thing.id, basic_thing.name.clone(), Timestamp::from(basic_thing.created_at)),
         )
         .await?;
 
