@@ -5,6 +5,7 @@ use rocket::response::Redirect;
 use rocket::serde::json::Json;
 use rocket::serde::uuid::Uuid;
 use rocket::{Build, Rocket, State};
+use rocket_dyn_templates::{Template, context};
 use serde::Serialize;
 use std::collections::HashMap;
 use validator::Validate;
@@ -181,6 +182,13 @@ async fn get_basic(
     }
 }
 
+#[get("/template")]
+async fn get_template() -> Template {
+    Template::render("basic", context! {
+        foo: 123,
+    })
+}
+
 pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
     app.mount(
         "/basic",
@@ -198,7 +206,8 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
             id_redirect,
             coinflip,
             create_basic,
-            get_basic
+            get_basic,
+            get_template
         ],
     )
 }
