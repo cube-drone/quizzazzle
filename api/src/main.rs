@@ -11,6 +11,7 @@ use std::env;
 use std::sync::Arc;
 
 mod basic;
+mod fairings;
 mod error; // provides the no_shit! macro
 
 #[get("/")]
@@ -106,6 +107,7 @@ async fn rocket() -> Rocket<Build> {
 
     app = app.manage(services);
     app = app.mount("/", routes![index]);
+    app = app.attach(crate::fairings::timing::RequestTimer);
     app = basic::routes::mount_routes(app);
 
     app
