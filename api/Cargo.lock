@@ -786,6 +786,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "handlebars"
+version = "4.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c39b3bc2a8f715298032cf5087e58573809374b08160aa7d750582bdb82d2683"
+dependencies = [
+ "log",
+ "pest",
+ "pest_derive",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1818,6 +1832,7 @@ version = "0.1.0-rc.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f44ce172f8a9070daf777dec707273ee042223ad9b030d780349baa0b660ae4f"
 dependencies = [
+ "handlebars",
  "normpath",
  "notify",
  "rocket",

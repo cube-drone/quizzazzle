@@ -3,6 +3,7 @@ extern crate rocket;
 use redis::cluster::ClusterClient;
 use redis::AsyncCommands;
 use rocket::{Build, Rocket};
+use rocket::fs::FileServer;
 use rocket_dyn_templates::Template;
 use scylla::prepared_statement::PreparedStatement;
 use scylla::transport::session::Session;
@@ -110,6 +111,8 @@ async fn rocket() -> Rocket<Build> {
     app = app.mount("/", routes![index]);
     app = app.attach(crate::fairings::timing::RequestTimer)
              .attach(Template::fairing());
+    app = app.mount("/static", FileServer::from("/tmp/static"));
+    app = app.mount("/build", FileServer::from("/tmp/build"));
     app = basic::routes::mount_routes(app);
 
     app
