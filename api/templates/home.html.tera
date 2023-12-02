@@ -1,0 +1,25 @@
+{% extends "base" %}
+
+{% block title %} Login {% endblock title %}
+
+{% block head %}
+    {{ super() }}
+{% endblock head %}
+
+{% block content %}
+<div class="card">
+    <div class="content">
+        <div class="header">
+            <h1>groovelet</h1>
+        </div>
+        <div class="bump"></div>
+        <div class="everything">
+            <p>
+            <input type="text" />
+            </p>
+            <input type="button" value="Log In" />
+            <input type="button" value="Register" />
+        </div>
+    </div>
+</div>
+{% endblock content %}

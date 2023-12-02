@@ -12,14 +12,12 @@ use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
 
-mod basic;
 mod fairings;
 mod error; // provides the no_shit! macro
 
-#[get("/")]
-fn index() -> &'static str {
-    "Hello, world!"
-}
+mod home;
+mod basic;
+mod auth;
 
 /*
     Services gets passed around willy nilly between threads so it needs to be cram-packed fulla arcs like a season of Naruto
@@ -108,12 +106,17 @@ async fn rocket() -> Rocket<Build> {
     let mut app = rocket::build();
 
     app = app.manage(services);
-    app = app.mount("/", routes![index]);
     app = app.attach(crate::fairings::timing::RequestTimer)
              .attach(Template::fairing());
     app = app.mount("/static", FileServer::from("/tmp/static"));
     app = app.mount("/build", FileServer::from("/tmp/build"));
+
+    // home is where "/" lives.
+    app = home::routes::mount_routes(app);
+    // basic is a whole module intended to demonstrate basic functionality, it's not intended to be used in production
     app = basic::routes::mount_routes(app);
+    // auth: login, registration, that sort of stuff
+    app = auth::routes::mount_routes(app);
 
     app
 }

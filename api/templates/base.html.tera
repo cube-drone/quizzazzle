@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="/build/style.css" />
     {% endblock head %}
 </head>
-    <body>
-        <div id="content">{% block content %}{% endblock content %}</div>
-    </body>
+<body>
+    {% block content %}{% endblock content %}
+</body>
 </html>

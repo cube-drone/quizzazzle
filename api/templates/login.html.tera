@@ -1,0 +1,18 @@
+{% extends "base" %}
+
+{% block title %} Login {% endblock title %}
+
+{% block head %}
+    {{ super() }}
+{% endblock head %}
+
+{% block content %}
+<div class="card">
+    <div class="content">
+        <h1>Login</h1>
+        <p class="important">
+            Log in to the whatsamajigger
+        </p>
+    </div>
+</div>
+{% endblock content %}
