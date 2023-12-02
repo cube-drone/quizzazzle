@@ -18,6 +18,7 @@
   "scripts": {
     "help": "npm run",
     "build": "esbuild app.js --bundle --outfile=build/out.js",
+    "css": "esbuild css/style.css --bundle --outfile=build/style.css",
     "prod": "esbuild app.js --minify --sourcemap --bundle --outfile=build/out.js",
     "watch": "esbuild app.js --bundle --watch --outfile=build/out.js",
     "serve": "npx http-server -c-1 -p 3000",

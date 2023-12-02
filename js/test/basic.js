@@ -47,6 +47,7 @@ test('Can create a Basic Thing', async () => {
     const getJson = await getResponse.json();
     assert.strictEqual(getJson.id, json.id);
     assert.strictEqual(getJson.name, "Test Thing 1");
+    assert.notEqual(new Date(getJson.created_at), "Invalid Date");
 });
 
 test('Validation Troubles: name too short', async () => {
@@ -55,6 +56,25 @@ test('Validation Troubles: name too short', async () => {
         method: 'POST',
         body: JSON.stringify({
             name: "sht",
+        }),
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
+
+    assert.strictEqual(response.status, 400);
+});
+
+test('Validation Troubles: name too long', async () => {
+
+    const response = await fetch(`${endpoint}/basic/thing`, {
+        method: 'POST',
+        body: JSON.stringify({
+            name: "tubatubatubatubatubatubatubatubatubatubatubatubatubatubatubatubatubatuba\
+                    tubatubatubatubatubatubatubatubatubatubatubatubatubatubatubatubatubat\
+                    tubatubatubatubatubatubatubatubatubatubatubatubatubatubatubatubatubat\
+                    tubatubatubatubatubatubatubatubatubatubatubatubatubatubatubatubatubat\
+                    tubatubatubatubatubatubatubatubatubatubatubatubatubatubatubatubatubat",
         }),
         headers: {
             'Content-Type': 'application/json'
