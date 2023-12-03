@@ -10,7 +10,7 @@
 <div class="card">
     <div class="content">
         <div class="header">
-            <h1>groovelet</h1>
+            <h1 class="animate__animated animate__pulse">groovelet</h1>
         </div>
         <div class="bump"></div>
         <div class="everything">
@@ -19,6 +19,11 @@
             </p>
             <input type="button" value="Log In" />
             <input type="button" value="Register" />
+            <ul>
+                <li><a href="#">FAQ</a></li>
+                <li><a href="#">Pricing</a></li>
+                <li><a href="#">Legal</a></li>
+            </ul>
         </div>
     </div>
 </div>
