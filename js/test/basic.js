@@ -89,5 +89,13 @@ test("Let's get some config", async () => {
 
     assert.strictEqual(response.status, 200);
 
-    console.dir(await response.json());
+    let publicConfig = await response.json();
+    assert.strictEqual(publicConfig.public_key, "public_value");
+
+    const responsePriv = await fetch(`${endpoint}/config/private`);
+
+    assert.strictEqual(responsePriv.status, 200);
+
+    let privateConfig = await responsePriv.json();
+    assert.strictEqual(privateConfig.private_key, "private_value");
 });

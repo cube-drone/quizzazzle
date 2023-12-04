@@ -13,7 +13,6 @@ use scylla::SessionBuilder;
 use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::sync::RwLock;
 
 mod fairings;
@@ -100,8 +99,16 @@ async fn rocket() -> Rocket<Build> {
     let mut basic_prepared_queries = basic::model::initialize(&scylla_connection)
         .await
         .expect("Could not initialize basic model");
+    let mut config_prepared_queries = config::model::initialize(&scylla_connection)
+        .await
+        .expect("Could not initialize config model");
     let mut other_prepared_queries: HashMap<&'static str, PreparedStatement> = HashMap::new();
-    let queries_to_merge = vec![&mut basic_prepared_queries, &mut other_prepared_queries];
+
+    let queries_to_merge = vec![
+        &mut basic_prepared_queries,
+        &mut config_prepared_queries,
+        &mut other_prepared_queries
+    ];
 
     for query_map in queries_to_merge {
         prepared_queries.extend(query_map.drain());
