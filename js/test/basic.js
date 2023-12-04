@@ -83,3 +83,11 @@ test('Validation Troubles: name too long', async () => {
 
     assert.strictEqual(response.status, 400);
 });
+
+test("Let's get some config", async () => {
+    const response = await fetch(`${endpoint}/config/public`);
+
+    assert.strictEqual(response.status, 200);
+
+    console.dir(await response.json());
+});

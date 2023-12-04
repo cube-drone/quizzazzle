@@ -5,16 +5,21 @@ use redis::AsyncCommands;
 use rocket::{Build, Rocket};
 use rocket::fs::FileServer;
 use rocket_dyn_templates::Template;
+use rocket::tokio;
+use std::time::Duration;
 use scylla::prepared_statement::PreparedStatement;
 use scylla::transport::session::Session;
 use scylla::SessionBuilder;
 use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
+use std::sync::Mutex;
+use std::sync::RwLock;
 
 mod fairings;
 mod error; // provides the no_shit! macro
 
+mod config;
 mod home;
 mod basic;
 mod auth;
@@ -27,10 +32,19 @@ pub struct ScyllaService {
     pub prepared_queries: Arc<HashMap<&'static str, PreparedStatement>>,
 }
 
+/*
+    Note that this is private and public in the "visible to the end-user" sense, not in the "OO" sense
+*/
+pub struct ConfigService {
+    pub public_config: HashMap<String, String>,
+    pub private_config: HashMap<String, String>
+}
+
 pub struct Services {
     pub cache_redis: Arc<ClusterClient>,
     pub application_redis: Arc<ClusterClient>,
     pub scylla: ScyllaService,
+    pub config: Arc<RwLock<ConfigService>>,
 }
 
 async fn setup_redis_cluster(redis_urls: &String) -> Arc<ClusterClient> {
@@ -101,6 +115,20 @@ async fn rocket() -> Rocket<Build> {
             session: scylla_connection,
             prepared_queries: Arc::new(prepared_queries),
         },
+        config: Arc::new(RwLock::new(ConfigService{
+            private_config: HashMap::new(),
+            public_config: HashMap::new(),
+        })),
+    };
+
+    let services_clone = Services{
+        cache_redis: services.cache_redis.clone(),
+        application_redis: services.application_redis.clone(),
+        scylla: ScyllaService {
+            session: services.scylla.session.clone(),
+            prepared_queries: services.scylla.prepared_queries.clone()
+        },
+        config: services.config.clone(),
     };
 
     let mut app = rocket::build();
@@ -117,6 +145,19 @@ async fn rocket() -> Rocket<Build> {
     app = basic::routes::mount_routes(app);
     // auth: login, registration, that sort of stuff
     app = auth::routes::mount_routes(app);
+    // config: configuration
+    app = config::routes::mount_routes(app);
+
+    tokio::spawn(async move {
+        loop{
+            // code goes here
+            println!("Every 5 seconds...");
+            config::model::update_config(&services_clone).await.expect("Could not update config");
+
+            // and now, I sleep
+            tokio::time::sleep(Duration::from_secs(5)).await;
+        }
+    });
 
     app
 }
