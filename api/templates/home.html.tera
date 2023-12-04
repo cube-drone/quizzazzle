@@ -7,11 +7,11 @@
 {% endblock head %}
 
 {% block content %}
-<div class="card">
+<div class="primary-card">
     <div class="content">
-        <div class="header">
-            <h1 class="animate__animated animate__pulse">groovelet</h1>
-        </div>
+        <header>
+            <h1>groovelet</h1>
+        </header>
         <div class="bump"></div>
         <div class="everything">
             <p>
@@ -20,9 +20,9 @@
             <input type="button" value="Log In" />
             <input type="button" value="Register" />
             <ul>
-                <li><a href="#">FAQ</a></li>
-                <li><a href="#">Pricing</a></li>
-                <li><a href="#">Legal</a></li>
+                <li><a href="/faq">FAQ</a></li>
+                <li><a href="/faq">Pricing</a></li>
+                <li><a href="/tos">Legal</a></li>
             </ul>
         </div>
     </div>

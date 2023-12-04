@@ -1,19 +1,22 @@
 #[macro_use]
 extern crate rocket;
-use redis::cluster::ClusterClient;
-use redis::AsyncCommands;
-use rocket::{Build, Rocket};
-use rocket::fs::FileServer;
-use rocket_dyn_templates::Template;
-use rocket::tokio;
-use std::time::Duration;
-use scylla::prepared_statement::PreparedStatement;
-use scylla::transport::session::Session;
-use scylla::SessionBuilder;
+
+use std::fs;
 use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
 use std::sync::RwLock;
+use std::time::Duration;
+use rocket::{Build, Rocket};
+use rocket::fs::FileServer;
+use rocket_dyn_templates::Template;
+use rocket::tokio;
+use redis::cluster::ClusterClient;
+use redis::AsyncCommands;
+use scylla::prepared_statement::PreparedStatement;
+use scylla::transport::session::Session;
+use scylla::SessionBuilder;
+use comrak::{markdown_to_html, Options};
 
 mod fairings;
 mod error; // provides the no_shit! macro
@@ -44,6 +47,7 @@ pub struct Services {
     pub application_redis: Arc<ClusterClient>,
     pub scylla: ScyllaService,
     pub config: Arc<RwLock<ConfigService>>,
+    pub static_markdown: Arc<HashMap<&'static str, String>>
 }
 
 async fn setup_redis_cluster(redis_urls: &String) -> Arc<ClusterClient> {
@@ -83,6 +87,15 @@ async fn setup_scylla_cluster(scylla_url: &String) -> Arc<Session> {
     Arc::new(session)
 }
 
+//  "tos.md" -> look for /tmp/api-static/tos.md -> read it -> markdownify it -> return it
+fn static_markdownify(file_name: &str) -> String {
+    let file_path = format!("/tmp/api-static/{}", file_name);
+    let file_contents = fs::read_to_string(file_path).expect("Should have been able to read the file");
+    let html = markdown_to_html(&file_contents, &Options::default());
+
+    html
+}
+
 #[launch]
 async fn rocket() -> Rocket<Build> {
     // Environment Variables
@@ -114,6 +127,11 @@ async fn rocket() -> Rocket<Build> {
         prepared_queries.extend(query_map.drain());
     }
 
+    let mut static_hashmap = HashMap::new();
+    // Static Content Setup
+    static_hashmap.insert("tos", static_markdownify("tos.md"));
+    static_hashmap.insert("faq", static_markdownify("faq.md"));
+
     // Service Setup
     let services = Services {
         cache_redis: setup_redis_cluster(&cache_redis_urls).await,
@@ -126,6 +144,7 @@ async fn rocket() -> Rocket<Build> {
             private_config: HashMap::new(),
             public_config: HashMap::new(),
         })),
+        static_markdown: Arc::new(static_hashmap),
     };
 
     let services_clone = Services{
@@ -136,6 +155,7 @@ async fn rocket() -> Rocket<Build> {
             prepared_queries: services.scylla.prepared_queries.clone()
         },
         config: services.config.clone(),
+        static_markdown: services.static_markdown.clone()
     };
 
     let mut app = rocket::build();

@@ -12,9 +12,10 @@ services:
     image:
       rust:1.73
     volumes:
-      - .:/usr/src/ministry
       - ../js/build:/tmp/build
       - ../js/static:/tmp/static
+      - ../api/static:/tmp/api-static
+      - .:/usr/src/ministry
     working_dir: /usr/src/ministry
     command: cargo run
     environment:

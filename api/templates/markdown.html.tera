@@ -1,0 +1,21 @@
+{% extends "base" %}
+
+{% block title %} {{ title }} {% endblock title %}
+
+{% block head %}
+    {{ super() }}
+{% endblock head %}
+
+{% block content %}
+    <div class="primary-card">
+        <div class="content">
+            <header>
+                <h2><a href="/">home</a> / {{title}}</h2>
+            </header>
+            <div class="bump"></div>
+            <div class="everything">
+                {{content | safe}}
+            </div>
+        </div>
+    </div>
+{% endblock content %}
