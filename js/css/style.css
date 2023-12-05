@@ -14,7 +14,7 @@ p, li{
 }
 
 
-.card {
+.primary-card {
     width: 100px;
     width: 98vw;
     height: 100px;
@@ -39,7 +39,7 @@ p, li{
     border: 5px solid white;
 }
 
-.card .content{
+.primary-card .content{
     position: relative;
     width: 350px;
     height: 600px;
@@ -51,7 +51,7 @@ p, li{
     background: rgba(255, 255, 255, 0.2);
 }
 
-.card .content .everything {
+.primary-card .content .everything {
     width: 350px;
     height: 550px;
     max-height: 100%;
@@ -62,7 +62,7 @@ p, li{
     font-size: small;
 }
 
-.card .header{
+.primary-card header{
     display: block;
     color: white;
     mix-blend-mode: multiply;
@@ -76,19 +76,24 @@ p, li{
     justify-content: space-between;
 }
 
-.card .header h1, .card .header h2{
+.primary-card header h1, .primary-card header h2{
     margin: 0;
     padding: 0;
     line-height: 60px;
     padding-left: 15px;
 }
 
-.card .header div {
+.primary-card header a, .primary-card header a:visited{
+    color: white;
+    font-weight: 300;
+}
+
+.primary-card header div {
     width: 40px;
     text-align: center;
 }
 
-.card .bump{
+.primary-card .bump{
     display: block;
     height: 40px;
 }
