@@ -16,7 +16,7 @@ pub async fn initialize(
 ) -> Result<HashMap<&'static str, PreparedStatement>> {
     scylla_session
         .query(
-            "CREATE TABLE IF NOT EXISTS ks.basic (id uuid PRIMARY KEY, name text, created_at timestamp)",
+            "CREATE TABLE IF NOT EXISTS ks.user (id uuid PRIMARY KEY, name text, created_at timestamp)",
             &[],
         )
         .await?;
