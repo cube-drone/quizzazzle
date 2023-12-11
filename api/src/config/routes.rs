@@ -16,11 +16,11 @@ async fn public_config(services: &State<Services>) -> Result<Json<HashMap<String
 
 #[get("/private")]
 async fn private_config(services: &State<Services>) -> Result<Json<HashMap<String, String>>, Status> {
-    let config_service = no_shit!(services.config.read());
-
-    if config_service.is_production() {
+    if services.is_production {
         return Err(Status::Forbidden);
     }
+
+    let config_service = no_shit!(services.config.read());
 
     Ok(Json(config_service.private_config.clone()))
 }

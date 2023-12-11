@@ -9,7 +9,6 @@ use scylla::IntoTypedRows;
 
 use crate::Services;
 use crate::ScyllaService;
-use crate::ConfigService;
 
 pub async fn initialize(
     scylla_session: &Arc<Session>,
@@ -95,26 +94,5 @@ pub async fn update_config(services: & Services) -> Result<()> {
     services.config.write().unwrap().private_config = private_config;
     services.config.write().unwrap().public_config = public_config;
 
-    /*
-    Ok(scylla
-        .session
-        .execute(
-            &scylla
-                .prepared_queries
-                .get("get_all_config")
-                .expect("Query missing!"),
-            ("",),
-        )
-        .await?
-        .maybe_first_row_typed::<BasicThingDatabase>()?)
-     */
-
     Ok(())
-}
-
-impl ConfigService {
-    pub fn is_production(&self) -> bool {
-        self.private_config.get("GROOVELET_PRODUCTION").is_some() &&
-            self.private_config.get("GROOVELET_PRODUCTION").unwrap() == "true"
-    }
 }

@@ -7,6 +7,7 @@ use std::env;
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::Duration;
+//use rocket::http::hyper::service;
 use rocket::{Build, Rocket};
 use rocket::fs::FileServer;
 use rocket_dyn_templates::Template;
@@ -25,6 +26,7 @@ mod config;
 mod home;
 mod basic;
 mod auth;
+mod email;
 
 /*
     Services gets passed around willy nilly between threads so it needs to be cram-packed fulla arcs like a season of Naruto
@@ -43,10 +45,12 @@ pub struct ConfigService {
 }
 
 pub struct Services {
+    pub is_production: bool,
     pub cache_redis: Arc<ClusterClient>,
     pub application_redis: Arc<ClusterClient>,
     pub scylla: ScyllaService,
     pub config: Arc<RwLock<ConfigService>>,
+    pub email: Arc<email::EmailProvider>,
     pub static_markdown: Arc<HashMap<&'static str, String>>
 }
 
@@ -99,6 +103,7 @@ fn static_markdownify(file_name: &str) -> String {
 #[launch]
 async fn rocket() -> Rocket<Build> {
     // Environment Variables
+    let is_production: bool = env::var("GROOVELET_PRODUCTION").unwrap_or_else(|_| "false".to_string()) == "true";
     let cache_redis_urls = env::var("CACHE_REDIS_URLS").unwrap_or_else(|_| "".to_string());
     let application_redis_urls =
         env::var("APPLICATION_REDIS_URLS").unwrap_or_else(|_| "".to_string());
@@ -127,13 +132,24 @@ async fn rocket() -> Rocket<Build> {
         prepared_queries.extend(query_map.drain());
     }
 
-    let mut static_hashmap = HashMap::new();
     // Static Content Setup
+    let mut static_hashmap = HashMap::new();
     static_hashmap.insert("tos", static_markdownify("tos.md"));
     static_hashmap.insert("faq", static_markdownify("faq.md"));
 
+    // Email Setup
+    let email_provider = email::EmailProvider::setup().await;
+    /*
+    email_provider.send("curtis@lassam.net".to_string(),
+        "Server booted up!".to_string(),
+        "Ohai there!".to_string(),
+        "<h1>Ohai there!</h1>".to_string()).await.expect("Could not send email");
+     */
+    email_provider.send_hello("test@gooble.email".to_string()).await.expect("Could not send email");
+
     // Service Setup
     let services = Services {
+        is_production: is_production,
         cache_redis: setup_redis_cluster(&cache_redis_urls).await,
         application_redis: setup_redis_cluster(&application_redis_urls).await,
         scylla: ScyllaService {
@@ -144,10 +160,12 @@ async fn rocket() -> Rocket<Build> {
             private_config: HashMap::new(),
             public_config: HashMap::new(),
         })),
+        email: Arc::new(email_provider),
         static_markdown: Arc::new(static_hashmap),
     };
 
     let services_clone = Services{
+        is_production: services.is_production,
         cache_redis: services.cache_redis.clone(),
         application_redis: services.application_redis.clone(),
         scylla: ScyllaService {
@@ -155,6 +173,7 @@ async fn rocket() -> Rocket<Build> {
             prepared_queries: services.scylla.prepared_queries.clone()
         },
         config: services.config.clone(),
+        email: services.email.clone(),
         static_markdown: services.static_markdown.clone()
     };
 

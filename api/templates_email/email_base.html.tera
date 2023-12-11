@@ -1,0 +1,12 @@
+
+<div style="
+    width: 400px;
+    margin: auto;
+    text-align: center;
+    font-family: Helvetica, Arial, sans-serif;
+    margin-top: 10px;
+    padding: 15px 30px 10px 30px;
+    border: 10px solid;">
+
+    {% block content %}{% endblock content %}
+</div>
