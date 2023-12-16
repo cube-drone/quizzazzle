@@ -1,0 +1,26 @@
+{% extends "base" %}
+
+{% block title %} Invite Code {% endblock title %}
+
+{% block head %}
+    {{ super() }}
+{% endblock head %}
+
+{% block content %}
+<div class="primary-card">
+    <div class="content">
+        <header>
+            <h2><a href="/">home</a> / Invite </h2>
+        </header>
+        <div class="bump"></div>
+        <div class="everything">
+            <form>
+                <label for="invite_code">Invite Code</label>
+                <input name="invite_code" type="text" placeholder="123e4567-e89b-12d3-a456-426614174000" />
+                <button name="submit" value="Ok">Ok</button>
+            </form>
+            <a href="/auth/nocode">I don't have one!</a>
+        </div>
+    </div>
+</div>
+{% endblock content %}

@@ -22,12 +22,18 @@ async fn login() -> Template {
     })
 }
 
+#[get("/invite")]
+async fn invite() -> Template {
+    Template::render("invite", context! {})
+}
+
 pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
     app.mount(
         "/auth",
         routes![
             register,
             login,
+            invite,
         ],
     )
 }

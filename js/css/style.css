@@ -13,7 +13,6 @@ p, li{
     font-weight: 300;
 }
 
-
 .primary-card {
     width: 100px;
     width: 98vw;
@@ -58,6 +57,7 @@ p, li{
     padding: 10px 30px;
     box-sizing: border-box;
     margin: auto;
+    margin-top: 60px;
     overflow-y: scroll;
     font-size: small;
 }
@@ -91,9 +91,4 @@ p, li{
 .primary-card header div {
     width: 40px;
     text-align: center;
-}
-
-.primary-card .bump{
-    display: block;
-    height: 40px;
 }

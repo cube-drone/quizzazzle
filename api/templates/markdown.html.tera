@@ -12,7 +12,6 @@
             <header>
                 <h2><a href="/">home</a> / {{title}}</h2>
             </header>
-            <div class="bump"></div>
             <div class="everything">
                 {{content | safe}}
             </div>

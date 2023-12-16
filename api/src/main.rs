@@ -23,10 +23,10 @@ mod fairings;
 mod error; // provides the no_shit! macro
 
 mod config;
-mod home;
-mod basic;
-mod auth;
 mod email;
+mod basic;
+mod home;
+mod auth;
 
 /*
     Services gets passed around willy nilly between threads so it needs to be cram-packed fulla arcs like a season of Naruto
@@ -139,12 +139,6 @@ async fn rocket() -> Rocket<Build> {
 
     // Email Setup
     let email_provider = email::EmailProvider::setup().await;
-    /*
-    email_provider.send("curtis@lassam.net".to_string(),
-        "Server booted up!".to_string(),
-        "Ohai there!".to_string(),
-        "<h1>Ohai there!</h1>".to_string()).await.expect("Could not send email");
-     */
     email_provider.send_hello("test@gooble.email".to_string()).await.expect("Could not send email");
 
     // Service Setup
@@ -177,14 +171,16 @@ async fn rocket() -> Rocket<Build> {
         static_markdown: services.static_markdown.clone()
     };
 
+	// Launch App
     let mut app = rocket::build();
 
     app = app.manage(services);
     app = app.attach(crate::fairings::timing::RequestTimer)
              .attach(Template::fairing());
+
+	// Mount Routes
     app = app.mount("/static", FileServer::from("/tmp/static"));
     app = app.mount("/build", FileServer::from("/tmp/build"));
-
     // home is where "/" lives.
     app = home::routes::mount_routes(app);
     // basic is a whole module intended to demonstrate basic functionality, it's not intended to be used in production
