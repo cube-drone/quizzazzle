@@ -1,0 +1,17 @@
+{% extends "base" %}
+
+{% block title %} Invite Code {% endblock title %}
+
+{% block head %}
+    {{ super() }}
+{% endblock head %}
+
+{% block content %}
+<div class="primary-card">
+    <div class="content-transparent">
+        <video width="350px" height="600px" loop controls>
+            <source src="/static/sample_video.webm" type="video/webm" />
+        </video>
+    </div>
+</div>
+{% endblock content %}

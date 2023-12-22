@@ -189,6 +189,13 @@ async fn get_template() -> Template {
     })
 }
 
+#[get("/videotest")]
+async fn get_videotest() -> Template {
+    Template::render("videotest", context! {
+        foo: 123,
+    })
+}
+
 pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
     app.mount(
         "/basic",
@@ -207,7 +214,8 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
             coinflip,
             create_basic,
             get_basic,
-            get_template
+            get_template,
+            get_videotest
         ],
     )
 }
