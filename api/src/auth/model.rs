@@ -11,6 +11,8 @@ use crate::basic::types::BasicThingDatabase;
 
 use crate::ScyllaService;
 
+const ROOT_USER_ID: Uuid = Uuid::from_u128(0);
+
 pub async fn initialize(
     scylla_session: &Arc<Session>,
 ) -> Result<HashMap<&'static str, PreparedStatement>> {
@@ -48,6 +50,24 @@ pub async fn initialize(
             "CREATE TABLE IF NOT EXISTS ks.user_parents (" +
                 "user_id uuid PRIMARY KEY, " +
                 "parents list<uuid>)",
+            &[],
+        )
+        .await?;
+
+    scylla_session
+        .query(
+            "CREATE TABLE IF NOT EXISTS ks.user_children (" +
+                "user_id uuid PRIMARY KEY, " +
+                "children list<uuid>)",
+            &[],
+        )
+        .await?;
+
+    scylla_session
+        .query(
+            "CREATE TABLE IF NOT EXISTS ks.user_ancestors (" +
+                "user_id uuid PRIMARY KEY, " +
+                "ancestors list<uuid>)",
             &[],
         )
         .await?;
@@ -98,12 +118,14 @@ pub async fn initialize(
     Ok(prepared_queries)
 }
 
-pub async fn create_anon_session(redis: &ClusterClient) -> Result<String> {
-    let mut redis_connection = redis.get_async_connection().await?;
-    let token: String = nanoid!(32);
-    let _: () = redis_connection
-        .set_ex(token.clone(), "anon", 60 * 60 * 24 * 7)
-        .await?;
-
-    Ok(token)
+impl Services {
+    pub async fn get_invite_code_source(
+        &self,
+        invite_code: &str,
+    ) -> Result<Uuid> {
+        if invite_code == "invalid" {
+            return Err(anyhow!("Invalid invite code"));
+        }
+        Ok(ROOT_USER_ID)
+    }
 }

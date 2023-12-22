@@ -14,7 +14,10 @@
         </header>
         <div class="bump"></div>
         <div class="everything">
-            <form>
+            {% if error %}
+                <div class="error">{{error}}</div>
+            {% endif %}
+            <form method="post">
                 <label for="invite_code">Invite Code</label>
                 <input name="invite_code" type="text" placeholder="123e4567-e89b-12d3-a456-426614174000" />
                 <button name="submit" value="Ok">Ok</button>
