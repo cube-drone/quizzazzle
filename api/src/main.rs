@@ -193,11 +193,11 @@ async fn rocket() -> Rocket<Build> {
     tokio::spawn(async move {
         loop{
             // code goes here
-            println!("Every 5 seconds...");
+            println!("Every 60 seconds... ");
             config::model::update_config(&services_clone).await.expect("Could not update config");
 
             // and now, I sleep
-            tokio::time::sleep(Duration::from_secs(5)).await;
+            tokio::time::sleep(Duration::from_secs(60)).await;
         }
     });
 

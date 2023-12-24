@@ -5,6 +5,7 @@ use rocket::response::Redirect;
 use rocket::State;
 
 use crate::Services;
+use crate::auth::model;
 
 #[get("/register")]
 async fn register() -> &'static str {
@@ -37,20 +38,35 @@ struct Invite<'r> {
     invite_code: &'r str,
 }
 
-//async fn counter(services: &State<Services>) -> Result<String, Status> {
-
 #[post("/invite", data = "<invite>")]
-async fn invite_post(_services: &State<Services>, invite: Form<Invite<'_>>) -> Result<Redirect, Template> {
+async fn invite_post(services: &State<Services>, invite: Form<Invite<'_>>) -> Template {
+    if invite.invite_code.len() < 1{
+        return Template::render("invite", context! {
+            error: "Invite code too short",
+        });
+    }
     if invite.invite_code.len() > 10{
-        return Err(Template::render("invite", context! {
+        return Template::render("invite", context! {
             error: "Invite code too long",
-        }));
+        });
     }
     println!("invite code: {}", invite.invite_code);
 
-    //let uuid = services.get_invite_code_source(invite.invite_code).await;
+    match services.get_invite_code_source(invite.invite_code).await{
+        Ok(invite_source) => {
+            println!("invite source: {}", invite_source);
 
-    Ok(Redirect::to("/auth/ok"))
+            return Template::render("register", context! {
+                invite_code: invite.invite_code,
+            });
+        },
+        Err(e) => {
+            return Template::render("invite", context! {
+                error: e.to_string(),
+            });
+        }
+    }
+
 }
 
 #[get("/ok")]

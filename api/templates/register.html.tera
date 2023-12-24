@@ -1,0 +1,40 @@
+{% extends "base" %}
+
+{% block title %} Invite Code {% endblock title %}
+
+{% block head %}
+    {{ super() }}
+{% endblock head %}
+
+{% block content %}
+<div class="primary-card">
+    <div class="content">
+        <header>
+            <h2><a href="/">home</a> / Invite </h2>
+        </header>
+        <div class="bump"></div>
+        <div class="everything">
+            {% if error %}
+                <div class="error">{{error}}</div>
+            {% endif %}
+            <form method="post">
+                <input name="csrf_token" type="hidden" value="{{ csrf_token }}" />
+                <input name="invite_code" type="hidden" value="{{ invite_code }}" />
+
+                <label for="email">Email</label>
+                <input name="email" type="text" placeholder="farts@toots.poots" />
+
+                <label for="password">Password</label>
+                <input name="password" type="password" />
+                <p><small>password must be at least 11 characters long</small></p>
+
+                <label for="tos">i agree to the <a href="/tos">ToS</a></small></p></label>
+                <label for="age">i am age 13+</label>
+
+                <button name="submit" value="Ok">Ok</button>
+            </form>
+            <a href="/auth/nocode">I don't have one!</a>
+        </div>
+    </div>
+</div>
+{% endblock content %}
