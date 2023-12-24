@@ -6,6 +6,7 @@ use rocket::serde::json::Json;
 use rocket::serde::uuid::Uuid;
 use rocket::{Build, Rocket, State};
 use rocket_dyn_templates::{Template, context};
+use rocket::http::CookieJar;
 use serde::Serialize;
 use std::collections::HashMap;
 use validator::Validate;
@@ -196,6 +197,33 @@ async fn get_videotest() -> Template {
     })
 }
 
+#[get("/setcookie")]
+async fn setcookie(cookies: &CookieJar<'_>) -> String {
+
+    cookies.add(("potato", "bark bark bark"));
+    cookies.add_private(("secret", "pork pork pork"));
+
+    "Cookie set".to_string()
+}
+
+#[get("/getcookie")]
+async fn getcookie(cookies: &CookieJar<'_>) -> String {
+
+    let maybe_potato = cookies.get("potato");
+    let maybe_secret = cookies.get_private("secret");
+
+    match maybe_potato{
+        Some(cookieval) => println!("cookie {}", cookieval),
+        _ => (),
+    }
+    match maybe_secret{
+        Some(cookieval) => println!("secret {}", cookieval),
+        _ => (),
+    }
+
+    "Cookie get".to_string()
+}
+
 pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
     app.mount(
         "/basic",
@@ -215,7 +243,9 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
             create_basic,
             get_basic,
             get_template,
-            get_videotest
+            get_videotest,
+            setcookie,
+            getcookie
         ],
     )
 }
