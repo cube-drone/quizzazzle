@@ -17,23 +17,32 @@
             {% if error %}
                 <div class="error">{{error}}</div>
             {% endif %}
-            <form method="post">
+            <form method="post" target="/auth/register">
                 <input name="csrf_token" type="hidden" value="{{ csrf_token }}" />
                 <input name="invite_code" type="hidden" value="{{ invite_code }}" />
 
+                <label for="display_name">Display Name</label>
+                <input name="display_name" type="text" placeholder="Super Cool Gang" />
+                <br/>
+
                 <label for="email">Email</label>
                 <input name="email" type="text" placeholder="farts@toots.poots" />
+                <br/>
 
                 <label for="password">Password</label>
                 <input name="password" type="password" />
+                <br/>
                 <p><small>password must be at least 11 characters long</small></p>
 
-                <label for="tos">i agree to the <a href="/tos">ToS</a></small></p></label>
+                <label for="tos">i agree to the <a href="/tos">ToS</a></label>
+                <input name="tos" type="checkbox" checked />
+                <br/>
                 <label for="age">i am age 13+</label>
+                <input name="age" type="checkbox" checked />
+                <br/>
 
                 <button name="submit" value="Ok">Ok</button>
             </form>
-            <a href="/auth/nocode">I don't have one!</a>
         </div>
     </div>
 </div>

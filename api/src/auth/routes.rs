@@ -3,6 +3,8 @@ use rocket_dyn_templates::{Template, context};
 use rocket::form::Form;
 use rocket::response::Redirect;
 use rocket::State;
+use rocket::serde::uuid::Uuid;
+use rocket::http::CookieJar;
 
 use crate::Services;
 use crate::auth::model;
@@ -39,7 +41,7 @@ struct Invite<'r> {
 }
 
 #[post("/invite", data = "<invite>")]
-async fn invite_post(services: &State<Services>, invite: Form<Invite<'_>>) -> Template {
+async fn invite_post(services: &State<Services>, cookies: &CookieJar<'_>, invite: Form<Invite<'_>>) -> Template {
     if invite.invite_code.len() < 1{
         return Template::render("invite", context! {
             error: "Invite code too short",
@@ -56,7 +58,11 @@ async fn invite_post(services: &State<Services>, invite: Form<Invite<'_>>) -> Te
         Ok(invite_source) => {
             println!("invite source: {}", invite_source);
 
+            let csrf_token = Uuid::new_v4().to_string();
+            cookies.add_private(("csrf_token", csrf_token.clone()));
+
             return Template::render("register", context! {
+                csrf_token: csrf_token,
                 invite_code: invite.invite_code,
             });
         },
