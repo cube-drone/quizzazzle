@@ -49,6 +49,17 @@ p, li{
     overflow: hidden;
     background: rgba(255, 255, 255, 0.3);
 }
+.primary-card .content-transparent{
+    position: relative;
+    width: 350px;
+    height: 600px;
+    max-height: 100%;
+    border: 5px solid black;
+    padding: 0;
+    margin: auto;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.05);
+}
 
 .primary-card .content .everything {
     width: 350px;
