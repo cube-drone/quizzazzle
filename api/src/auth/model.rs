@@ -134,11 +134,12 @@ impl Services {
         Ok(ROOT_USER_ID)
     }
 
-    pub async fn create_user(
+    pub async fn _create_user(
         &self,
         parent_id: Uuid,
     ) -> Result<Uuid> {
         let user_id = Uuid::new_v4();
+        //.prepare("INSERT INTO ks.user (id, parent_id, hashed_password, thumbnail_url, is_verified, created_at, updated_at) VALUES (?, ?, ?, ?, false, ?, ?);")
         self.scylla
             .session
             .execute(
@@ -152,4 +153,5 @@ impl Services {
             .await?;
         Ok(user_id)
     }
+
 }
