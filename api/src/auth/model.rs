@@ -45,7 +45,7 @@ pub async fn initialize(
     prepared_queries.insert(
         "create_user",
         scylla_session
-            .prepare("INSERT INTO ks.user (id, parent_id, hashed_password, thumbnail_url, is_verified, created_at, updated_at) VALUES (?, ?, ?, ?, false, ?, ?);")
+            .prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, thumbnail_url, is_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, false, ?, ?);")
             .await?,
     );
 
@@ -136,9 +136,14 @@ impl Services {
 
     pub async fn create_user(
         &self,
+        display_name: &str,
         parent_id: Uuid,
+        password: &str,
+        thumbnail_url: &str,
     ) -> Result<Uuid> {
         let user_id = Uuid::new_v4();
+        // .prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, thumbnail_url, is_verified, created_at, updated_at) VALUES (?, ?, ?, ?, false, ?, ?);")
+        let hashed_password = "TODO";
         self.scylla
             .session
             .execute(
@@ -147,7 +152,7 @@ impl Services {
                     .prepared_queries
                     .get("create_user")
                     .expect("Query missing!"),
-                (user_id, parent_id, Utc::now().timestamp_millis(), Utc::now().timestamp_millis()),
+                (user_id, display_name, parent_id, hashed_password, thumbnail_url, Utc::now().timestamp_millis(), Utc::now().timestamp_millis()),
             )
             .await?;
         Ok(user_id)
