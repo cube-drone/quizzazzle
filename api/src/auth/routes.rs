@@ -90,7 +90,7 @@ struct Register<'r> {
 }
 
 #[post("/register", data = "<register>")]
-async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, register: Form<Register<'_>>) -> Template {
+async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, register: Form<Register<'_>>) -> Result<Redirect, Template> {
 
     let csrf_token_new = Uuid::new_v4().to_string();
 
@@ -99,70 +99,113 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, regi
 
         cookies.add_private(("csrf_token", csrf_token_new.clone()));
         if(register.csrf_token != csrf_token_cookie){
-            return Template::render("register", context! {
+            return Err(Template::render("register", context! {
                 csrf_token: csrf_token_new,
                 invite_code: register.invite_code,
                 error: "CSRF token mismatch",
                 display_name: register.display_name,
                 email: register.email,
                 password: register.password,
-            })
+            }))
         }
     }
     else{
         cookies.add_private(("csrf_token", csrf_token_new.clone()));
 
-        return Template::render("register", context! {
+        return Err(Template::render("register", context! {
             csrf_token: csrf_token_new,
             invite_code: register.invite_code,
             error: "CSRF cookie missing",
             display_name: register.display_name,
             email: register.email,
             password: register.password,
-        })
+        }))
     }
 
     if(!register.tos){
-        return Template::render("register", context! {
+        return Err(Template::render("register", context! {
             csrf_token: csrf_token_new,
             invite_code: register.invite_code,
             error: "You must agree to the terms of service",
             display_name: register.display_name,
             email: register.email,
             password: register.password,
-        })
+        }))
     }
     if(!register.age){
-        return Template::render("register", context! {
+        return Err(Template::render("register", context! {
             csrf_token: csrf_token_new,
             invite_code: register.invite_code,
             error: "You must be 13 years of age or older",
             display_name: register.display_name,
             email: register.email,
             password: register.password,
-        })
+        }))
     }
     match register.validate() {
         Ok(_) => (),
-        Err(e) => return Template::render("register", context! {
+        Err(e) => return Err(Template::render("register", context! {
             csrf_token: csrf_token_new,
             invite_code: register.invite_code,
             error: e.to_string(),
             display_name: register.display_name,
             email: register.email,
             password: register.password,
-        }),
+        })),
       };
 
+    // okay, now, let's try to create the user
+    if let Ok(parent_uuid) = services.get_invite_code_source(register.invite_code).await{
+        let user = model::User{
+            uuid: Uuid::new_v4(),
+            parent_uuid: parent_uuid,
+            display_name: register.display_name.to_string(),
+            email: register.email.to_string(),
+            password: register.password.to_string(),
+        };
 
-    Template::render("register", context! {
-        csrf_token: csrf_token_new,
-        invite_code: register.invite_code,
-        error: "Not implemented",
-        display_name: register.display_name,
-        email: register.email,
-        password: register.password,
-    })
+        match services.exhaust_invite_code(register.invite_code).await{
+            Ok(_) => (),
+            Err(e) => {
+                println!("Error exhausting invite code: {}", e);
+                return Err(Template::render("register", context! {
+                    csrf_token: csrf_token_new,
+                    invite_code: register.invite_code,
+                    error: "Error exhausting invite code"
+                    display_name: register.display_name,
+                    email: register.email,
+                    password: register.password,
+                }))
+            }
+        }
+
+        match services.create_user(display_name, parent_uuid, password).await{
+            Ok(_) => {
+                return Ok(Redirect::to("/auth/ok"))
+            },
+            Err(e) => {
+                println!("Error creating user: {}", e);
+                return Err(Template::render("register", context! {
+                    csrf_token: csrf_token_new,
+                    invite_code: register.invite_code,
+                    error: "Error creating user",
+                    display_name: register.display_name,
+                    email: register.email,
+                    password: register.password,
+                }))
+            }
+        }
+    }
+    else{
+        return Err(Template::render("register", context! {
+            csrf_token: csrf_token_new,
+            invite_code: register.invite_code,
+            error: "Invalid invite code",
+            display_name: register.display_name,
+            email: register.email,
+            password: register.password,
+        }))
+    }
 }
 
 #[get("/ok")]

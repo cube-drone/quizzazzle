@@ -120,6 +120,9 @@ async fn rocket() -> Rocket<Build> {
     let mut config_prepared_queries = config::model::initialize(&scylla_connection)
         .await
         .expect("Could not initialize config model");
+    let mut auth_prepared_queries = auth::model::initialize(&scylla_connection)
+        .await
+        .expect("Could not initialize auth model");
     let mut other_prepared_queries: HashMap<&'static str, PreparedStatement> = HashMap::new();
 
     let queries_to_merge = vec![
@@ -170,6 +173,9 @@ async fn rocket() -> Rocket<Build> {
         email: services.email.clone(),
         static_markdown: services.static_markdown.clone()
     };
+
+    // Create a root user
+    services.create_root_user().await.expect("Could not create root user");
 
 	// Launch App
     let mut app = rocket::build();

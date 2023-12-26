@@ -22,6 +22,7 @@ use crate::ScyllaService;
 use crate::Services;
 
 const ROOT_USER_ID: Uuid = Uuid::from_u128(0);
+const DEFAULT_THUMBNAIL_URL: &str = "/static/chismas.png";
 
 pub async fn initialize(
     scylla_session: &Arc<Session>,
@@ -55,6 +56,13 @@ pub async fn initialize(
         "create_user",
         scylla_session
             .prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, thumbnail_url, is_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, false, ?, ?);")
+            .await?,
+    );
+
+    prepared_queries.insert(
+        "get_user_exists",
+        scylla_session
+            .prepare("SELECT id FROM ks.user WHERE id = ?")
             .await?,
     );
 
@@ -132,6 +140,14 @@ pub async fn initialize(
     Ok(prepared_queries)
 }
 
+pub fn hash(password: &str) -> Result<String> {
+    let peppered: String = format!("{}-{}-{}", password, env::var("GROOVELET_PEPPER").unwrap_or_else(|_| "peppa".to_string()), "SPUDJIBMSPLQPFFSPLBLBlBLBLPRT");
+    let salt = SaltString::generate(&mut OsRng);
+    let argon2 = Argon2::default();
+    let hashed_password = argon2.hash_password(peppered.as_bytes(), &salt)?.to_string();
+    Ok(hashed_password)
+}
+
 impl Services {
     pub async fn get_invite_code_source(
         &self,
@@ -143,19 +159,46 @@ impl Services {
         Ok(ROOT_USER_ID)
     }
 
-    pub async fn _create_user(
+    pub async fn exhaust_invite_code(
         &self,
-        display_name: &str,
-        parent_id: Uuid,
-        password: &str,
-        thumbnail_url: &str,
-    ) -> Result<Uuid> {
-        let user_id = Uuid::new_v4();
-        let peppered: String = format!("{}-{}-{}", password, env::var("GROOVELET_PEPPER").unwrap_or_else(|_| "peppa".to_string()), "SPUDJIBMSPLQPFFSPLBLBlBLBLPRT");
-        let salt = SaltString::generate(&mut OsRng);
-        // Argon2 with default params (Argon2id v19)
-        let argon2 = Argon2::default();
-        let hashed_password = argon2.hash_password(peppered.as_bytes(), &salt).expect("passwords should be hashable").to_string();
+        invite_code: &str,
+    ) -> Result<()> {
+        // the invite code can only be used once
+        // so we'll just delete it
+        Ok(())
+    }
+
+    pub async fn get_user_exists(
+        &self,
+        user_id: &Uuid,
+    ) -> Result<bool> {
+        let result = self.scylla
+            .session
+            .execute(
+                &self
+                    .scylla
+                    .prepared_queries
+                    .get("get_user_exists")
+                    .expect("Query missing!"),
+                (user_id,),
+            )
+            .await?;
+
+        Ok(result.rows.len() > 0)
+    }
+
+    pub async fn create_root_user(&self) -> Result<()>{
+        // don't create a root user if one already exists
+        if self.get_user_exists(&ROOT_USER_ID).await? {
+            return Ok(());
+        }
+
+        let user_id = ROOT_USER_ID;
+        let display_name = "root";
+        let parent_id = "";
+        let root_auth_password = env::var("GROOVELET_ROOT_AUTH_PASSWORD").unwrap_or_else(|_| "root".to_string());
+        let hashed_password = hash(&root_auth_password)?;
+
         self.scylla
             .session
             .execute(
@@ -164,9 +207,43 @@ impl Services {
                     .prepared_queries
                     .get("create_user")
                     .expect("Query missing!"),
-                (user_id, display_name, parent_id, hashed_password, thumbnail_url, Utc::now().timestamp_millis(), Utc::now().timestamp_millis()),
+                //.prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, thumbnail_url, is_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, false, ?, ?);")
+                (user_id, display_name, parent_id, hashed_password, DEFAULT_THUMBNAIL_URL, Utc::now().timestamp_millis(), Utc::now().timestamp_millis()),
             )
             .await?;
+
+        Ok(())
+    }
+
+    pub async fn create_user(
+        &self,
+        display_name: &str,
+        parent_id: Uuid,
+        password: &str,
+    ) -> Result<Uuid> {
+        let user_id = Uuid::new_v4();
+        let hashed_password = hash(&password)?;
+
+        if self.get_user_exists(&user_id).await? {
+            return Err(anyhow!("User somehow already exists! Wow, UUIDs are not as unique as I thought!"));
+        }
+        if !self.get_user_exists(&parent_id).await? {
+            return Err(anyhow!("Parent user does not exist!"));
+        }
+
+        self.scylla
+            .session
+            .execute(
+                &self
+                    .scylla
+                    .prepared_queries
+                    .get("create_user")
+                    .expect("Query missing!"),
+                //.prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, thumbnail_url, is_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, false, ?, ?);")
+                (user_id, display_name, parent_id, hashed_password, DEFAULT_THUMBNAIL_URL, Utc::now().timestamp_millis(), Utc::now().timestamp_millis()),
+            )
+            .await?;
+
         Ok(user_id)
     }
 
