@@ -224,6 +224,28 @@ async fn getcookie(cookies: &CookieJar<'_>) -> String {
     "Cookie get".to_string()
 }
 
+use ::argon2::{
+    password_hash::{
+        rand_core::OsRng,
+        PasswordHash, PasswordHasher, PasswordVerifier, SaltString
+    },
+    Argon2
+};
+
+#[get("/argon2")]
+async fn argon2() -> Result<String, Status> {
+    let password = Uuid::new_v4().to_string();
+    let salt = SaltString::generate(&mut OsRng);
+    // Argon2 with default params (Argon2id v19)
+    let argon2 = Argon2::default();
+    let password_hash = no_shit!(argon2.hash_password(password.as_bytes(), &salt)).to_string();
+
+    let parsed_hash = no_shit!(PasswordHash::new(&password_hash));
+    assert!(Argon2::default().verify_password(password.as_bytes(), &parsed_hash).is_ok());
+
+    Ok(password_hash)
+}
+
 pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
     app.mount(
         "/basic",
@@ -245,7 +267,8 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
             get_template,
             get_videotest,
             setcookie,
-            getcookie
+            getcookie,
+            argon2
         ],
     )
 }

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::env;
 
 use anyhow::Result;
 use anyhow::anyhow;
@@ -8,6 +9,14 @@ use scylla::prepared_statement::PreparedStatement;
 use scylla::frame::value::Timestamp;
 use scylla::Session;
 use chrono::{Utc};
+
+use ::argon2::{
+    password_hash::{
+        rand_core::OsRng,
+        PasswordHash, PasswordHasher, PasswordVerifier, SaltString
+    },
+    Argon2
+};
 
 use crate::ScyllaService;
 use crate::Services;
@@ -142,7 +151,11 @@ impl Services {
         thumbnail_url: &str,
     ) -> Result<Uuid> {
         let user_id = Uuid::new_v4();
-        let hashed_password = "TODO";
+        let peppered: String = format!("{}-{}-{}", password, env::var("GROOVELET_PEPPER").unwrap_or_else(|_| "peppa".to_string()), "SPUDJIBMSPLQPFFSPLBLBlBLBLPRT");
+        let salt = SaltString::generate(&mut OsRng);
+        // Argon2 with default params (Argon2id v19)
+        let argon2 = Argon2::default();
+        let hashed_password = argon2.hash_password(peppered.as_bytes(), &salt).expect("passwords should be hashable").to_string();
         self.scylla
             .session
             .execute(

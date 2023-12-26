@@ -15,6 +15,7 @@ scylla = "=0.10.1"
 serde = { version = "1.0", features=["derive"]}
 validator = { version = "0.16.1", features=["derive"] }
 chrono = { version = "0.4.31", features=["serde"]}
+argon2 = { version = "0.5.2"}
 comrak = "0.20" # markdown
 aws-config = { version = "1.0.3", features = ["behavior-version-latest"] }
 aws-sdk-sesv2 = "1.4.0"

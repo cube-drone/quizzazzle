@@ -17,20 +17,20 @@
             {% if error %}
                 <div class="error">{{error}}</div>
             {% endif %}
-            <form method="post" target="/auth/register">
+            <form method="post" action="/auth/register">
                 <input name="csrf_token" type="hidden" value="{{ csrf_token }}" />
                 <input name="invite_code" type="hidden" value="{{ invite_code }}" />
 
                 <label for="display_name">Display Name</label>
-                <input name="display_name" type="text" placeholder="Super Cool Gang" />
+                <input name="display_name" type="text" placeholder="Supercool Funkpiotr" value="{{display_name}}"/>
                 <br/>
 
                 <label for="email">Email</label>
-                <input name="email" type="text" placeholder="farts@toots.poots" />
+                <input name="email" type="text" placeholder="farts@toots.poots" value="{{ email }}" />
                 <br/>
 
                 <label for="password">Password</label>
-                <input name="password" type="password" />
+                <input name="password" type="password" value="{{ password }}" />
                 <br/>
                 <p><small>password must be at least 11 characters long</small></p>
 
