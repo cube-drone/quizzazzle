@@ -37,9 +37,9 @@ pub async fn initialize(
                 parent_id uuid,
                 hashed_password text,
                 thumbnail_url text,
-                is_verified bool,
+                is_verified boolean,
                 created_at timestamp,
-                updated_at timestamp)
+                updated_at timestamp);
         "#, &[], ).await?;
 
     scylla_session
@@ -49,7 +49,7 @@ pub async fn initialize(
                 invite_key uuid,
                 uses_remaining int,
                 created_at timestamp,
-                updated_at timestamp)
+                updated_at timestamp);
             "#, &[], ).await?;
 
     prepared_queries.insert(
@@ -62,10 +62,11 @@ pub async fn initialize(
     prepared_queries.insert(
         "get_user_exists",
         scylla_session
-            .prepare("SELECT id FROM ks.user WHERE id = ?")
+            .prepare("SELECT id FROM ks.user WHERE id = ?;")
             .await?,
     );
 
+    /*
     prepared_queries.insert(
         "create_user_invite",
         scylla_session
@@ -136,6 +137,7 @@ pub async fn initialize(
                 user_id uuid, " +
                 PRIMARY KEY (email_domain, user_id))
             "#, &[], ).await?;
+    */
 
     Ok(prepared_queries)
 }
@@ -144,7 +146,7 @@ pub fn hash(password: &str) -> Result<String> {
     let peppered: String = format!("{}-{}-{}", password, env::var("GROOVELET_PEPPER").unwrap_or_else(|_| "peppa".to_string()), "SPUDJIBMSPLQPFFSPLBLBlBLBLPRT");
     let salt = SaltString::generate(&mut OsRng);
     let argon2 = Argon2::default();
-    let hashed_password = argon2.hash_password(peppered.as_bytes(), &salt)?.to_string();
+    let hashed_password = argon2.hash_password(peppered.as_bytes(), &salt).expect("strings should be hashable").to_string();
     Ok(hashed_password)
 }
 
@@ -161,7 +163,7 @@ impl Services {
 
     pub async fn exhaust_invite_code(
         &self,
-        invite_code: &str,
+        _invite_code: &str,
     ) -> Result<()> {
         // the invite code can only be used once
         // so we'll just delete it
@@ -184,7 +186,17 @@ impl Services {
             )
             .await?;
 
-        Ok(result.rows.len() > 0)
+        if let Some(rows) = result.rows {
+            if rows.len() > 0 {
+                return Ok(true);
+            }
+            else{
+                return Ok(false);
+            }
+        }
+        else{
+            return Ok(false);
+        }
     }
 
     pub async fn create_root_user(&self) -> Result<()>{

@@ -156,14 +156,6 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, regi
 
     // okay, now, let's try to create the user
     if let Ok(parent_uuid) = services.get_invite_code_source(register.invite_code).await{
-        let user = model::User{
-            uuid: Uuid::new_v4(),
-            parent_uuid: parent_uuid,
-            display_name: register.display_name.to_string(),
-            email: register.email.to_string(),
-            password: register.password.to_string(),
-        };
-
         match services.exhaust_invite_code(register.invite_code).await{
             Ok(_) => (),
             Err(e) => {
@@ -171,7 +163,7 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, regi
                 return Err(Template::render("register", context! {
                     csrf_token: csrf_token_new,
                     invite_code: register.invite_code,
-                    error: "Error exhausting invite code"
+                    error: "Error exhausting invite code",
                     display_name: register.display_name,
                     email: register.email,
                     password: register.password,
@@ -179,8 +171,10 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, regi
             }
         }
 
-        match services.create_user(display_name, parent_uuid, password).await{
+        match services.create_user(register.display_name, parent_uuid, register.password).await{
             Ok(_) => {
+                // u did it, create a session token
+
                 return Ok(Redirect::to("/auth/ok"))
             },
             Err(e) => {

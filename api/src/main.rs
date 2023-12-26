@@ -128,6 +128,7 @@ async fn rocket() -> Rocket<Build> {
     let queries_to_merge = vec![
         &mut basic_prepared_queries,
         &mut config_prepared_queries,
+        &mut auth_prepared_queries,
         &mut other_prepared_queries
     ];
 
