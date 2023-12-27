@@ -370,16 +370,16 @@ impl Services {
 
         let session_token = self.create_session_token(&user_create.user_id).await?;
 
-        Ok(SessionToken(session_token))
+        Ok(session_token)
     }
 
-    pub async fn create_session_token(&self, user_id: &UserId) -> Result<Uuid>{
+    pub async fn create_session_token(&self, user_id: &UserId) -> Result<SessionToken>{
         let mut redis_connection = self.application_redis.get_async_connection().await?;
         let session_token = Uuid::new_v4();
         let options = SetOptions::default().with_expiration(SetExpiry::EX(86400 * 3));
         redis_connection.set_options(&format!("session_token:{}", session_token.to_string()), user_id.0.to_string(), options).await?;
 
-        Ok(session_token)
+        Ok(SessionToken(session_token))
     }
 
     pub async fn get_user_session(&self, user_id: &UserId) -> Result<UserSession>{
