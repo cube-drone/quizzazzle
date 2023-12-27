@@ -2,11 +2,14 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::env;
 
+use redis::AsyncCommands;
+use redis::{SetOptions, SetExpiry};
+
 use anyhow::Result;
 use anyhow::anyhow;
 use rocket::serde::uuid::Uuid;
 use scylla::prepared_statement::PreparedStatement;
-use scylla::frame::value::Timestamp;
+//use scylla::frame::value::Timestamp;
 use scylla::Session;
 use chrono::{Utc};
 
@@ -37,6 +40,7 @@ pub async fn initialize(
                 parent_id uuid,
                 hashed_password text,
                 thumbnail_url text,
+                email text,
                 is_verified boolean,
                 created_at timestamp,
                 updated_at timestamp);
@@ -55,7 +59,7 @@ pub async fn initialize(
     prepared_queries.insert(
         "create_user",
         scylla_session
-            .prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, thumbnail_url, is_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, false, ?, ?);")
+            .prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, false, ?, ?);")
             .await?,
     );
 
@@ -63,6 +67,13 @@ pub async fn initialize(
         "get_user_exists",
         scylla_session
             .prepare("SELECT id FROM ks.user WHERE id = ?;")
+            .await?,
+    );
+
+    prepared_queries.insert(
+        "get_user",
+        scylla_session
+            .prepare("SELECT id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, created_at, updated_at FROM ks.user WHERE id = ?;")
             .await?,
     );
 
@@ -150,6 +161,22 @@ pub fn hash(password: &str) -> Result<String> {
     Ok(hashed_password)
 }
 
+pub struct UserCreate<'r>{
+    pub user_id: Uuid,
+    pub parent_id: Uuid,
+    pub display_name: &'r str,
+    pub email: &'r str,
+    pub password: &'r str,
+}
+
+pub struct UserSession {
+    pub user_id: Uuid,
+    pub display_name: String,
+    pub thumbnail_url: String,
+    pub is_verified: bool,
+    pub email: String,
+}
+
 impl Services {
     pub async fn get_invite_code_source(
         &self,
@@ -180,7 +207,7 @@ impl Services {
                 &self
                     .scylla
                     .prepared_queries
-                    .get("get_user_exists")
+                    .get("get_user")
                     .expect("Query missing!"),
                 (user_id,),
             )
@@ -207,6 +234,7 @@ impl Services {
 
         let user_id = ROOT_USER_ID;
         let display_name = "root";
+        let email = "root@gooble.email";
         let parent_id = "";
         let root_auth_password = env::var("GROOVELET_ROOT_AUTH_PASSWORD").unwrap_or_else(|_| "root".to_string());
         let hashed_password = hash(&root_auth_password)?;
@@ -219,30 +247,41 @@ impl Services {
                     .prepared_queries
                     .get("create_user")
                     .expect("Query missing!"),
-                //.prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, thumbnail_url, is_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, false, ?, ?);")
-                (user_id, display_name, parent_id, hashed_password, DEFAULT_THUMBNAIL_URL, Utc::now().timestamp_millis(), Utc::now().timestamp_millis()),
+                //.prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, false, ?, ?);")
+                (user_id, display_name, parent_id, hashed_password, email, DEFAULT_THUMBNAIL_URL, Utc::now().timestamp_millis(), Utc::now().timestamp_millis()),
             )
             .await?;
 
         Ok(())
     }
 
+    /*
+    pub async fn send_verification_email(
+        &self,
+        user_id: &Uuid,
+    ) -> Result<()> {
+        let mut redis_connection = self.application_redis.get_async_connection().await?;
+        let email_verification_token = Uuid::new_v4().to_string();
+        redis_connection.set(&format!("user:{}:email_verification_token", user_id), email_verification_token, "EX", 86400 * 3).await?;
+
+        Ok(())
+    }
+    */
+
     pub async fn create_user(
         &self,
-        display_name: &str,
-        parent_id: Uuid,
-        password: &str,
+        user_create: UserCreate<'_>,
     ) -> Result<Uuid> {
-        let user_id = Uuid::new_v4();
-        let hashed_password = hash(&password)?;
+        let hashed_password = hash(&user_create.password)?;
 
-        if self.get_user_exists(&user_id).await? {
+        if self.get_user_exists(&user_create.user_id).await? {
             return Err(anyhow!("User somehow already exists! Wow, UUIDs are not as unique as I thought!"));
         }
-        if !self.get_user_exists(&parent_id).await? {
+        if !self.get_user_exists(&user_create.parent_id).await? {
             return Err(anyhow!("Parent user does not exist!"));
         }
 
+        // the core user record!
         self.scylla
             .session
             .execute(
@@ -251,12 +290,95 @@ impl Services {
                     .prepared_queries
                     .get("create_user")
                     .expect("Query missing!"),
-                //.prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, thumbnail_url, is_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, false, ?, ?);")
-                (user_id, display_name, parent_id, hashed_password, DEFAULT_THUMBNAIL_URL, Utc::now().timestamp_millis(), Utc::now().timestamp_millis()),
+                //.prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, false, ?, ?);")
+                (
+                    user_create.user_id,
+                    user_create.display_name,
+                    user_create.parent_id,
+                    hashed_password,
+                    user_create.email,
+                    DEFAULT_THUMBNAIL_URL,
+                    Utc::now().timestamp_millis(),
+                    Utc::now().timestamp_millis()
+                ),
             )
             .await?;
 
-        Ok(user_id)
+        //send_verification_email(&self, &user_id).await?;
+
+        let session_token = self.create_session_token(&user_create.user_id).await?;
+
+        Ok(session_token)
+    }
+
+    pub async fn create_session_token(&self, user_id: &Uuid) -> Result<Uuid>{
+        let mut redis_connection = self.application_redis.get_async_connection().await?;
+        let session_token = Uuid::new_v4();
+        let options = SetOptions::default().with_expiration(SetExpiry::EX(86400 * 3));
+        redis_connection.set_options(&format!("session_token:{}", session_token.to_string()), user_id.to_string(), options).await?;
+
+        Ok(session_token)
+    }
+
+    pub async fn get_user_session(&self, user_id: &Uuid) -> Result<UserSession>{
+        /*
+        let result = self.scylla
+            .session
+            .execute(
+                &self
+                    .scylla
+                    .prepared_queries
+                    .get("get_user")
+                    .expect("Query missing!"),
+                (user_id,),
+            )
+            .await?;
+
+        if let Some(rows) = result.rows {
+            if rows.len() > 0 {
+                let row = rows.get(0).unwrap();
+                let display_name: String = row.get_r_by_name("display_name")?;
+                let thumbnail_url: String = row.get_r_by_name("thumbnail_url")?;
+                let is_verified: bool = row.get_r_by_name("is_verified")?;
+                let email: String = row.get_r_by_name("email")?;
+
+                return Ok(UserSession{
+                    user_id: *user_id,
+                    display_name,
+                    thumbnail_url,
+                    is_verified,
+                    email,
+                });
+            }
+            else{
+                return Err(anyhow!("User does not exist!"));
+            }
+        }
+        else{
+            return Err(anyhow!("User does not exist!"));
+        }
+        */
+        return Ok(UserSession{
+            user_id: *user_id,
+            display_name: "root".to_string(),
+            thumbnail_url: DEFAULT_THUMBNAIL_URL.to_string(),
+            is_verified: true,
+            email: "fake@fake.fake".to_string(),
+        });
+    }
+
+    pub async fn get_user_from_session_token(&self, session_token: &str) -> Result<UserSession>{
+        let mut redis_connection = self.application_redis.get_async_connection().await?;
+        let user_id: String = redis_connection.get(&format!("session_token:{}", session_token)).await?;
+        if user_id == "" {
+            return Err(anyhow!("Session token does not exist!"));
+        }
+
+        let user_id = Uuid::parse_str(&user_id)?;
+
+        let user_session = self.get_user_session(&user_id).await?;
+
+        return Ok(user_session);
     }
 
 }

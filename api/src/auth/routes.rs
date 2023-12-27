@@ -5,31 +5,26 @@ use rocket::response::Redirect;
 use rocket::State;
 use rocket::serde::uuid::Uuid;
 use rocket::http::CookieJar;
+use rocket::request::{FromRequest, Request, Outcome};
+use rocket::http::Status;
 
-use validator::{Validate, ValidationError};
+use anyhow::anyhow;
+use validator::Validate;
 
 use crate::Services;
 use crate::auth::model;
-
-#[get("/register")]
-async fn register() -> &'static str {
-    "Hello world"
-}
-
-/*
-#[post("/register")]
-async fn post_register() -> Redirect {
-    // create an anon session
-    // put the auth token in a cookie
-
-}
- */
 
 #[get("/login")]
 async fn login() -> Template {
     Template::render("login", context! {
         foo: 123,
     })
+}
+
+#[get("/register")]
+async fn register() -> Redirect  {
+    /* since all registration requires an invite code, */
+    Redirect::to("/auth/invite")
 }
 
 #[get("/invite")]
@@ -72,7 +67,6 @@ async fn invite_post(services: &State<Services>, cookies: &CookieJar<'_>, invite
             });
         }
     }
-
 }
 
 #[derive(FromForm, Validate)]
@@ -98,7 +92,7 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, regi
         let csrf_token_cookie = csrf_cookie.value();
 
         cookies.add_private(("csrf_token", csrf_token_new.clone()));
-        if(register.csrf_token != csrf_token_cookie){
+        if register.csrf_token != csrf_token_cookie {
             return Err(Template::render("register", context! {
                 csrf_token: csrf_token_new,
                 invite_code: register.invite_code,
@@ -122,7 +116,7 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, regi
         }))
     }
 
-    if(!register.tos){
+    if !register.tos {
         return Err(Template::render("register", context! {
             csrf_token: csrf_token_new,
             invite_code: register.invite_code,
@@ -132,7 +126,7 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, regi
             password: register.password,
         }))
     }
-    if(!register.age){
+    if !register.age {
         return Err(Template::render("register", context! {
             csrf_token: csrf_token_new,
             invite_code: register.invite_code,
@@ -171,7 +165,15 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, regi
             }
         }
 
-        match services.create_user(register.display_name, parent_uuid, register.password).await{
+        let user_create = model::UserCreate{
+            user_id: Uuid::new_v4(),
+            display_name: register.display_name,
+            email: register.email,
+            parent_id: parent_uuid,
+            password: register.password,
+        };
+
+        match services.create_user(user_create).await{
             Ok(_) => {
                 // u did it, create a session token
 
@@ -199,6 +201,35 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, regi
             email: register.email,
             password: register.password,
         }))
+    }
+}
+
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for model::UserSession {
+
+    type Error = anyhow::Error;
+
+    async fn from_request(req: &'r Request<'_>) -> Outcome<Self, anyhow::Error> {
+        let services = req.rocket().state::<Services>().unwrap();
+
+        let maybe_session_token = req.cookies().get_private("session_token");
+
+        if let Some(session_token) = maybe_session_token{
+            let session_token = session_token.value();
+
+            match services.get_user_from_session_token(session_token).await{
+                Ok(user) => {
+                    return Outcome::Success(user);
+                },
+                Err(e) => {
+                    println!("Error getting user from session token: {}", e);
+                    return Outcome::Error((Status::Unauthorized, anyhow!("Error getting user from session token")));
+                }
+            }
+        }
+        else{
+            return Outcome::Error((Status::Unauthorized, anyhow!("No session token")));
+        }
     }
 }
 

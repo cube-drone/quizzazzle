@@ -22,21 +22,35 @@
                 <input name="invite_code" type="hidden" value="{{ invite_code }}" />
 
                 <label for="display_name">Display Name</label>
-                <input name="display_name" type="text" placeholder="Supercool Funkpiotr" value="{{display_name}}"/>
+                {% if display_name %}
+                    <input name="display_name" type="text" placeholder="Supercool Funkpiotr" value="{{ display_name }}"/>
+                {% else %}
+                    <input name="display_name" type="text" placeholder="Supercool Funkpiotr"/>
+                {% endif %}
                 <br/>
 
                 <label for="email">Email</label>
-                <input name="email" type="text" placeholder="farts@toots.poots" value="{{ email }}" />
+                {% if email %}
+                    <input name="email" type="text" placeholder="farts@toots.poots" value="{{ email }}" />
+                {% else %}
+                    <input name="email" type="text" placeholder="farts@toots.poots" />
+                {% endif %}
                 <br/>
 
                 <label for="password">Password</label>
-                <input name="password" type="password" value="{{ password }}" />
+                {% if password %}
+                    <input name="password" type="password" value="{{ password }}" />
+                {% else %}
+                    <input name="password" type="password" />
+                {% endif %}
+
                 <br/>
                 <p><small>password must be at least 11 characters long</small></p>
 
                 <label for="tos">i agree to the <a href="/tos">ToS</a></label>
                 <input name="tos" type="checkbox" checked />
                 <br/>
+
                 <label for="age">i am age 13+</label>
                 <input name="age" type="checkbox" checked />
                 <br/>
