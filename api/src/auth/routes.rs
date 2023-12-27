@@ -33,12 +33,12 @@ async fn invite() -> Template {
 }
 
 #[derive(FromForm, Validate)]
-struct Invite {
-    invite_code: Uuid,
+struct Invite<'r> {
+    invite_code: &'r str,
 }
 
 #[post("/invite", data = "<invite>")]
-async fn invite_post(services: &State<Services>, cookies: &CookieJar<'_>, invite: Form<Invite>) -> Template {
+async fn invite_post(services: &State<Services>, cookies: &CookieJar<'_>, invite: Form<Invite<'_>>) -> Template {
     match invite.validate() {
         Ok(_) => (),
         Err(e) => return Template::render("invite", context! {
@@ -48,7 +48,16 @@ async fn invite_post(services: &State<Services>, cookies: &CookieJar<'_>, invite
 
     println!("invite code: {}", invite.invite_code);
 
-    match services.get_invite_code_source(&model::InviteCode::from_uuid(invite.invite_code)).await{
+    let invite_code = match model::InviteCode::from_string(invite.invite_code){
+        Ok(invite_code) => invite_code,
+        Err(e) => {
+            return Template::render("invite", context! {
+                error: e.to_string(),
+            });
+        }
+    };
+
+    match services.get_invite_code_source(&invite_code).await{
         Ok(invite_source) => {
             println!("invite source: {}", invite_source.to_string());
 
