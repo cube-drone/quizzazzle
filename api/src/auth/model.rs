@@ -161,16 +161,22 @@ pub fn hash(password: &str) -> Result<String> {
     Ok(hashed_password)
 }
 
+pub struct InviteCode(Uuid);
+
+pub struct UserId(Uuid);
+
+pub struct SessionToken(Uuid);
+
 pub struct UserCreate<'r>{
-    pub user_id: Uuid,
-    pub parent_id: Uuid,
+    pub user_id: UserId,
+    pub parent_id: UserId,
     pub display_name: &'r str,
     pub email: &'r str,
     pub password: &'r str,
 }
 
 pub struct UserSession {
-    pub user_id: Uuid,
+    pub user_id: UserId,
     pub display_name: String,
     pub thumbnail_url: String,
     pub is_verified: bool,
@@ -180,12 +186,12 @@ pub struct UserSession {
 impl Services {
     pub async fn get_invite_code_source(
         &self,
-        invite_code: &str,
-    ) -> Result<Uuid> {
+        invite_code: InviteCode,
+    ) -> Result<UserId> {
         if invite_code == "invalid" {
             return Err(anyhow!("Invalid invite code"));
         }
-        Ok(ROOT_USER_ID)
+        Ok(UserId(ROOT_USER_ID))
     }
 
     pub async fn exhaust_invite_code(
@@ -280,6 +286,8 @@ impl Services {
         if !self.get_user_exists(&user_create.parent_id).await? {
             return Err(anyhow!("Parent user does not exist!"));
         }
+        // test the email doesn't already exist (if it exists on an unverified user, we'll just destroy them)
+        // TODO
 
         // the core user record!
         self.scylla

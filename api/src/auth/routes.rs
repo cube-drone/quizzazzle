@@ -4,7 +4,7 @@ use rocket::form::Form;
 use rocket::response::Redirect;
 use rocket::State;
 use rocket::serde::uuid::Uuid;
-use rocket::http::CookieJar;
+use rocket::http::{Cookie, CookieJar};
 use rocket::request::{FromRequest, Request, Outcome};
 use rocket::http::Status;
 
@@ -174,8 +174,9 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, regi
         };
 
         match services.create_user(user_create).await{
-            Ok(_) => {
+            Ok(session_token) => {
                 // u did it, create a session token
+                cookies.add_private(Cookie::new("session_token", session_token.to_string()));
 
                 return Ok(Redirect::to("/auth/ok"))
             },
@@ -234,8 +235,20 @@ impl<'r> FromRequest<'r> for model::UserSession {
 }
 
 #[get("/ok")]
+async fn ok_user(user: model::UserSession) -> &'static str {
+    "ok, user"
+}
+
+#[get("/ok", rank=2)]
 async fn ok() -> &'static str {
     "ok"
+}
+
+#[get("/logout")]
+async fn logout(cookies: &CookieJar<'_>) -> Redirect {
+    cookies.remove_private(Cookie::from("session_token"));
+
+    Redirect::to("/")
 }
 
 pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
@@ -247,7 +260,9 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
             invite,
             invite_post,
             register_post,
-            ok
+            ok_user,
+            ok,
+            logout
         ],
     )
 }
