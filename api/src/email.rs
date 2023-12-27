@@ -9,15 +9,30 @@ pub struct EmailProvider{
     provider: Option<Client>
 }
 
-fn send_dummy(to: String, subject: String, message: String, _message_html: String) -> () {
-    println!("to: {}, from: noreply@mail.groovelet.com, subject: {}, message: {}", to, subject, message);
+pub struct EmailAddress(String);
+
+impl EmailAddress{
+    pub fn new(email: String) -> Result<EmailAddress>{
+        Ok(EmailAddress(email))
+    }
+    pub fn to_string(&self) -> String{
+        self.0.clone()
+    }
+    pub fn domain(&self) -> String{
+        let parts: Vec<&str> = self.0.split("@").collect();
+        parts[1].to_string()
+    }
 }
 
-async fn _send_real(email_client: &Client, to: String, subject: String, message: String, message_html: String) -> Result<()> {
-    println!("to: {}, from: noreply@mail.groovelet.com, subject: {}, message: {}", to, subject, message);
+fn send_dummy(to: &EmailAddress, subject: &str, message: &str, _message_html: &str) -> () {
+    println!("to: {}, from: noreply@mail.groovelet.com, subject: {}, message: {}", to.to_string(), subject, message);
+}
+
+async fn _send_real(email_client: &Client, to: &EmailAddress, subject: &str, message: &str, message_html: &str) -> Result<()> {
+    println!("to: {}, from: noreply@mail.groovelet.com, subject: {}, message: {}", to.to_string(), subject, message);
 
     let mut dest: Destination = Destination::builder().build();
-    dest.to_addresses = Some(vec![to]);
+    dest.to_addresses = Some(vec![to.to_string()]);
 
     let subject_content = Content::builder()
         .data(subject)
@@ -55,10 +70,10 @@ async fn _send_real(email_client: &Client, to: String, subject: String, message:
     Ok(())
 }
 
-async fn send_real(email_client: &Client, to: String, subject: String, message: String, message_html: String) -> Result<()> {
+async fn send_real(email_client: &Client, to: &EmailAddress, subject: &str, message: &str, message_html: &str) -> Result<()> {
     // we always send a second copy to ourselves for debugging
-    _send_real(email_client, to, subject.clone(), message.clone(), message_html.clone()).await?;
-    _send_real(email_client, "safe@gooble.email".to_string(), subject, message, message_html).await?;
+    _send_real(email_client, &to, &subject, &message, &message_html).await?;
+    _send_real(email_client, &EmailAddress::new("safe@gooble.email".to_string()).expect("safe is always a valid email address"), &subject, &message, &message_html).await?;
     Ok(())
 }
 
@@ -82,21 +97,21 @@ impl EmailProvider{
         }
     }
 
-    pub async fn send(&self, to: String, subject: String, message: String, message_html: String) -> Result<()> {
+    pub async fn send(&self, to: &EmailAddress, subject: &str, message: &str, message_html: &str) -> Result<()> {
         match &self.provider{
-            None => send_dummy(to,  subject, message, message_html),
-            Some(client) => send_real(&client, to, subject, message, message_html).await?,
+            None => send_dummy(&to, &subject, &message, &message_html),
+            Some(client) => send_real(&client, &to, &subject, &message, &message_html).await?,
         }
 
         Ok(())
     }
 
-    pub async fn send_hello(&self, to: String) -> Result<()> {
+    pub async fn send_hello(&self, to: &EmailAddress) -> Result<()> {
         let templates = &self.templates;
         let mut context = tera::Context::new();
         context.insert("name", "Curtis");
         let message_html = templates.render("email_helloworld.html.tera", &context)?;
-        self.send(to, "Hello!".to_string(), "Hello!".to_string(), message_html).await?;
+        self.send(to, "Hello!", "Hello!", &message_html).await?;
 
         Ok(())
     }

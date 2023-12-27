@@ -143,7 +143,8 @@ async fn rocket() -> Rocket<Build> {
 
     // Email Setup
     let email_provider = email::EmailProvider::setup().await;
-    email_provider.send_hello("test@gooble.email".to_string()).await.expect("Could not send email");
+    let test_email = email::EmailAddress::new("test@gooble.email".to_string()).expect("Could not create test email");
+    email_provider.send_hello(&test_email).await.expect("Could not send email");
 
     // Service Setup
     let services = Services {
