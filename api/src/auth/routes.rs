@@ -33,13 +33,12 @@ async fn invite() -> Template {
 }
 
 #[derive(FromForm, Validate)]
-struct Invite<'r> {
-    #[validate(length(min = 1, max = 10, message="Invite Code must be between 1 and 10 characters!"))]
-    invite_code: &'r str,
+struct Invite {
+    invite_code: Uuid,
 }
 
 #[post("/invite", data = "<invite>")]
-async fn invite_post(services: &State<Services>, cookies: &CookieJar<'_>, invite: Form<Invite<'_>>) -> Template {
+async fn invite_post(services: &State<Services>, cookies: &CookieJar<'_>, invite: Form<Invite>) -> Template {
     match invite.validate() {
         Ok(_) => (),
         Err(e) => return Template::render("invite", context! {
@@ -49,9 +48,9 @@ async fn invite_post(services: &State<Services>, cookies: &CookieJar<'_>, invite
 
     println!("invite code: {}", invite.invite_code);
 
-    match services.get_invite_code_source(invite.invite_code).await{
+    match services.get_invite_code_source(&model::InviteCode::from_uuid(invite.invite_code)).await{
         Ok(invite_source) => {
-            println!("invite source: {}", invite_source);
+            println!("invite source: {}", invite_source.to_string());
 
             let csrf_token = Uuid::new_v4().to_string();
             cookies.add_private(("csrf_token", csrf_token.clone()));
@@ -72,7 +71,7 @@ async fn invite_post(services: &State<Services>, cookies: &CookieJar<'_>, invite
 #[derive(FromForm, Validate)]
 struct Register<'r> {
     csrf_token: &'r str,
-    invite_code: &'r str,
+    invite_code: Uuid,
     #[validate(length(min = 3, max = 120, message="Display name must be between 3 and 120 characters!"))]
     display_name: &'r str,
     #[validate(email(message="Invalid email address!"))]
@@ -149,8 +148,8 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, regi
       };
 
     // okay, now, let's try to create the user
-    if let Ok(parent_uuid) = services.get_invite_code_source(register.invite_code).await{
-        match services.exhaust_invite_code(register.invite_code).await{
+    if let Ok(parent_uuid) = services.get_invite_code_source(&model::InviteCode::from_uuid(register.invite_code)).await{
+        match services.exhaust_invite_code(&model::InviteCode::from_uuid(register.invite_code)).await{
             Ok(_) => (),
             Err(e) => {
                 println!("Error exhausting invite code: {}", e);
@@ -166,7 +165,7 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, regi
         }
 
         let user_create = model::UserCreate{
-            user_id: Uuid::new_v4(),
+            user_id: model::UserId::new(),
             display_name: register.display_name,
             email: register.email,
             parent_id: parent_uuid,
@@ -216,15 +215,22 @@ impl<'r> FromRequest<'r> for model::UserSession {
         let maybe_session_token = req.cookies().get_private("session_token");
 
         if let Some(session_token) = maybe_session_token{
-            let session_token = session_token.value();
+            let session_token_maybe = model::SessionToken::from_string(session_token.value());
 
-            match services.get_user_from_session_token(session_token).await{
-                Ok(user) => {
-                    return Outcome::Success(user);
+            match session_token_maybe{
+                Ok(session_token) => {
+                    match services.get_user_from_session_token(&session_token).await{
+                        Ok(user) => {
+                            return Outcome::Success(user);
+                        },
+                        Err(e) => {
+                            println!("Error getting user from session token: {}", e);
+                            return Outcome::Error((Status::Unauthorized, anyhow!("Error getting user from session token")));
+                        }
+                    }
                 },
-                Err(e) => {
-                    println!("Error getting user from session token: {}", e);
-                    return Outcome::Error((Status::Unauthorized, anyhow!("Error getting user from session token")));
+                Err(_) => {
+                    return Outcome::Error((Status::Unauthorized, anyhow!("Invalid session token")));
                 }
             }
         }
