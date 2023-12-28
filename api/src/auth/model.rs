@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::env;
 
+use serde::{Deserialize, Serialize};
+
 use redis::AsyncCommands;
 use redis::{SetOptions, SetExpiry};
 
@@ -9,9 +11,10 @@ use anyhow::Result;
 use anyhow::anyhow;
 use rocket::serde::uuid::Uuid;
 use scylla::prepared_statement::PreparedStatement;
+use scylla::macros::FromRow;
 //use scylla::frame::value::Timestamp;
 use scylla::Session;
-use chrono::{Utc};
+use chrono::{Utc, Duration};
 
 use ::argon2::{
     password_hash::{
@@ -21,7 +24,7 @@ use ::argon2::{
     Argon2
 };
 
-use crate::ScyllaService;
+use crate::{ScyllaService, email};
 use crate::Services;
 
 const ROOT_USER_ID: UserId = UserId(Uuid::from_u128(0));
@@ -42,6 +45,7 @@ pub async fn initialize(
                 thumbnail_url text,
                 email text,
                 is_verified boolean,
+                is_parentable boolean,
                 created_at timestamp,
                 updated_at timestamp);
         "#, &[], ).await?;
@@ -51,15 +55,13 @@ pub async fn initialize(
             CREATE TABLE IF NOT EXISTS ks.user_invite (
                 user_id uuid PRIMARY KEY,
                 invite_key uuid,
-                uses_remaining int,
-                created_at timestamp,
-                updated_at timestamp);
+                created_at timestamp );
             "#, &[], ).await?;
 
     prepared_queries.insert(
         "create_user",
         scylla_session
-            .prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, false, ?, ?);")
+            .prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, is_parentable, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, false, true, ?, ?);")
             .await?,
     );
 
@@ -77,6 +79,59 @@ pub async fn initialize(
             .await?,
     );
 
+    scylla_session
+        .query(r#"
+            CREATE TABLE IF NOT EXISTS ks.user_parents (
+                user_id uuid PRIMARY KEY,
+                parents list<uuid> );
+            "#, &[], ).await?;
+
+    scylla_session
+        .query(r#"
+            CREATE TABLE IF NOT EXISTS ks.user_children (
+                user_id uuid,
+                child_id uuid,
+                PRIMARY KEY (user_id, child_id));
+            "#, &[], ).await?;
+
+    scylla_session
+        .query(r#"
+            CREATE TABLE IF NOT EXISTS ks.user_descendants (
+                user_id uuid,
+                descendant_id uuid,
+                PRIMARY KEY (user_id, descendant_id));
+            "#, &[], ).await?;
+
+    scylla_session
+        .query(r#"
+            CREATE TABLE IF NOT EXISTS ks.user_ips (
+                user_id uuid,
+                ip inet,
+                PRIMARY KEY(user_id, ip));
+            "#, &[], ).await?;
+
+    scylla_session
+        .query(r#"
+            CREATE TABLE IF NOT EXISTS ks.email_user (
+                email text PRIMARY KEY,
+                user_id uuid)
+            "#, &[], ).await?;
+
+    prepared_queries.insert(
+        "get_email_user",
+        scylla_session
+            .prepare("SELECT user_id FROM ks.email_user WHERE email = ?;")
+            .await?,
+    );
+
+    scylla_session
+        .query(r#"
+            CREATE TABLE IF NOT EXISTS ks.email_domain (
+                email_domain text,
+                user_id uuid,
+                PRIMARY KEY (email_domain, user_id))
+            "#, &[], ).await?;
+
     /*
     prepared_queries.insert(
         "create_user_invite",
@@ -92,62 +147,6 @@ pub async fn initialize(
             .await?,
     );
 
-    scylla_session
-        .query(r#"
-            CREATE TABLE IF NOT EXISTS ks.user_parents (
-                user_id uuid PRIMARY KEY,
-                parents list<uuid>)
-            "#, &[], ).await?;
-
-    scylla_session
-        .query(r#"
-            CREATE TABLE IF NOT EXISTS ks.user_children (
-                "user_id uuid PRIMARY KEY,
-                "children list<uuid>)
-            "#, &[], ).await?;
-
-    scylla_session
-        .query(r#"
-            CREATE TABLE IF NOT EXISTS ks.user_ancestors (
-                user_id uuid PRIMARY KEY, " +
-                ancestors list<uuid>)
-            "#, &[], ).await?;
-
-    scylla_session
-        .query(r#"
-            CREATE TABLE IF NOT EXISTS ks.user_ips (
-                user_id uuid PRIMARY KEY,
-                ips list<uuid>)
-            "#, &[], ).await?;
-
-    scylla_session
-        .query(r#"
-            CREATE TABLE IF NOT EXISTS ks.user_email (
-                user_id uuid,
-                email text,
-                email_domain text,
-                primary_email boolean,
-                verified boolean,
-                verification_token text,
-                created_at timestamp,
-                updated_at timestamp,
-                PRIMARY KEY (user_id, email))
-            "#, &[], ).await?;
-
-    scylla_session
-        .query(r#"
-            CREATE TABLE IF NOT EXISTS ks.email_user (
-                email text PRIMARY KEY,
-                user_id uuid)
-            "#, &[], ).await?;
-
-    scylla_session
-        .query(r#"
-            CREATE TABLE IF NOT EXISTS ks.email_domain (
-                email_domain text,
-                user_id uuid, " +
-                PRIMARY KEY (email_domain, user_id))
-            "#, &[], ).await?;
     */
 
     Ok(prepared_queries)
@@ -161,7 +160,7 @@ pub fn hash(password: &str) -> Result<String> {
     Ok(hashed_password)
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 pub struct InviteCode(Uuid);
 impl InviteCode {
     pub fn new() -> Self {
@@ -181,7 +180,7 @@ impl InviteCode {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 pub struct UserId(Uuid);
 impl UserId {
     pub fn new() -> Self {
@@ -201,7 +200,7 @@ impl UserId {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct SessionToken(Uuid);
 impl SessionToken {
     pub fn new() -> Self {
@@ -229,12 +228,25 @@ pub struct UserCreate<'r>{
     pub password: &'r str,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct UserSession {
     pub user_id: UserId,
     pub display_name: String,
     pub thumbnail_url: String,
     pub is_verified: bool,
+}
+
+#[derive(FromRow)]
+pub struct UserDatabaseRaw {
+    pub user_id: String,
+    pub parent_id: String,
+    pub display_name: String,
+    pub hashed_password: String,
+    pub thumbnail_url: String,
     pub email: String,
+    pub is_verified: bool,
+    pub created_at: Duration,
+    pub updated_at: Duration,
 }
 
 impl Services {
@@ -255,6 +267,12 @@ impl Services {
         // the invite code can only be used once
         // so we'll just delete it
         Ok(())
+    }
+
+    pub async fn generate_invite_code(
+        &self) -> Result<InviteCode> {
+        // for testing, generate a new invite code from the root user
+        Ok(InviteCode::new())
     }
 
     pub async fn get_user_exists(
@@ -283,6 +301,56 @@ impl Services {
         }
         else{
             return Ok(false);
+        }
+    }
+
+    pub async fn get_user(
+        &self,
+        user_id: &UserId,
+    ) -> Result<Option<UserDatabaseRaw>> {
+        Ok(self.scylla
+            .session
+            .execute(
+                &self
+                    .scylla
+                    .prepared_queries
+                    .get("get_user")
+                    .expect("Query missing!"),
+                (user_id.0,),
+            )
+            .await?
+            .maybe_first_row_typed::<UserDatabaseRaw>()?)
+    }
+
+    pub async fn get_user_email(
+        &self,
+        email: &str,
+    ) -> Result<Option<UserDatabaseRaw>> {
+        let result = self.scylla
+            .session
+            .execute(
+                &self
+                    .scylla
+                    .prepared_queries
+                    .get("get_email_user")
+                    .expect("Query missing!"),
+                (email,),
+            )
+            .await?;
+
+        if let Some(rows) = result.rows {
+            if rows.len() > 0 {
+                let row = rows.get(0).unwrap();
+                let user_id: Uuid = row.columns[0].as_ref().unwrap().as_uuid().unwrap();
+                let user_id = UserId(user_id);
+                return self.get_user(&user_id).await;
+            }
+            else{
+                return Ok(None);
+            }
+        }
+        else{
+            return Ok(None);
         }
     }
 
@@ -340,8 +408,17 @@ impl Services {
         if !self.get_user_exists(&user_create.parent_id).await? {
             return Err(anyhow!("Parent user does not exist!"));
         }
-        // test the email doesn't already exist (if it exists on an unverified user, we'll just destroy them)
-        // TODO
+        let email_user = self.get_user_email(&user_create.email).await?;
+        if let Some(email_user) = email_user {
+            if email_user.is_verified{
+                return Err(anyhow!("Email already exists!"));
+            }
+            else{
+                // TODO: delete the unverified user
+                // and just create a new one, now
+                return Err(anyhow!("Email already exists, but is not verified!"));
+            }
+        }
 
         // the core user record!
         self.scylla
@@ -425,7 +502,6 @@ impl Services {
             display_name: "root".to_string(),
             thumbnail_url: DEFAULT_THUMBNAIL_URL.to_string(),
             is_verified: true,
-            email: "fake@fake.fake".to_string(),
         });
     }
 

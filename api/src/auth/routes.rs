@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use rocket::{Build, Rocket};
 use rocket_dyn_templates::{Template, context};
 use rocket::form::Form;
@@ -7,6 +9,7 @@ use rocket::serde::uuid::Uuid;
 use rocket::http::{Cookie, CookieJar};
 use rocket::request::{FromRequest, Request, Outcome};
 use rocket::http::Status;
+use rocket::serde::json::Json;
 
 use anyhow::anyhow;
 use validator::Validate;
@@ -25,6 +28,20 @@ async fn login() -> Template {
 async fn register() -> Redirect  {
     /* since all registration requires an invite code, */
     Redirect::to("/auth/invite")
+}
+
+#[get("/generate_invite_code")]
+async fn generate_invite_code(services: &State<Services>) -> Result<Json<HashMap<String, String>>, Status> {
+    if services.is_production {
+        return Err(Status::Forbidden);
+    }
+
+    let mut hashmap: HashMap<String, String> = HashMap::new();
+    hashmap.insert("invite_code".to_string(),
+        services.generate_invite_code().await.expect("should be able to generate an invite code").to_string()
+    );
+
+    Ok(Json(hashmap))
 }
 
 #[get("/invite")]
@@ -271,6 +288,7 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
         "/auth",
         routes![
             register,
+            generate_invite_code,
             login,
             invite,
             invite_post,

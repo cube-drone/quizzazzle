@@ -7,10 +7,13 @@
     "@preact/compat": "^17.1.2",
     "animejs": "^3.2.1",
     "esbuild": "^0.19.2",
+    "fetch-cookie": "^2.1.0",
     "htm": "^3.1.1",
     "insane": "^2.6.2",
+    "jsdom": "^23.0.1",
     "marked": "^9.1.2",
     "preact": "^10.18.1",
+    "testytesterson": "^9001.9001.9018",
     "zingtouch": "^1.0.6"
   },
   "author": "",
@@ -22,6 +25,6 @@
     "prod": "esbuild app.js --minify --sourcemap --bundle --outfile=build/out.js",
     "watch": "esbuild app.js --bundle --watch --outfile=build/out.js",
     "serve": "npx http-server -c-1 -p 3000",
-	"test": "node --test"
+    "test": "node --test"
   }
 }
