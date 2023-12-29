@@ -124,6 +124,13 @@ pub async fn initialize(
             .await?,
     );
 
+    prepared_queries.insert(
+        "set_email_user",
+        scylla_session
+            .prepare("INSERT INTO ks.email_user (email, user_id) VALUES (?, ?);")
+            .await?,
+    );
+
     scylla_session
         .query(r#"
             CREATE TABLE IF NOT EXISTS ks.email_domain (
@@ -234,6 +241,23 @@ pub struct UserSession {
     pub display_name: String,
     pub thumbnail_url: String,
     pub is_verified: bool,
+}
+
+impl UserSession {
+    pub fn to_verified_user_session(&self) -> VerifiedUserSession {
+        VerifiedUserSession {
+            user_id: self.user_id,
+            display_name: self.display_name.clone(),
+            thumbnail_url: self.thumbnail_url.clone(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct VerifiedUserSession {
+    pub user_id: UserId,
+    pub display_name: String,
+    pub thumbnail_url: String,
 }
 
 #[derive(FromRow)]
@@ -420,6 +444,18 @@ impl Services {
             }
         }
 
+        self.scylla
+            .session
+            .execute(
+                &self
+                    .scylla
+                    .prepared_queries
+                    .get("set_email_user")
+                    .expect("Query missing!"),
+                (user_create.email, user_create.user_id.0,),
+            )
+            .await?;
+
         // the core user record!
         self.scylla
             .session
@@ -444,77 +480,35 @@ impl Services {
             .await?;
 
         //send_verification_email(&self, &user_id).await?;
+        let user_session = UserSession{
+            user_id: user_create.user_id,
+            display_name: user_create.display_name.to_string(),
+            thumbnail_url: DEFAULT_THUMBNAIL_URL.to_string(),
+            is_verified: false,
+        };
 
-        let session_token = self.create_session_token(&user_create.user_id).await?;
+        let session_token = self.create_session_token(&user_session).await?;
 
         Ok(session_token)
     }
 
-    pub async fn create_session_token(&self, user_id: &UserId) -> Result<SessionToken>{
+    pub async fn create_session_token(&self, user_session: &UserSession) -> Result<SessionToken>{
         let mut redis_connection = self.application_redis.get_async_connection().await?;
         let session_token = Uuid::new_v4();
         let options = SetOptions::default().with_expiration(SetExpiry::EX(86400 * 3));
-        redis_connection.set_options(&format!("session_token:{}", session_token.to_string()), user_id.0.to_string(), options).await?;
+
+        let session_json = serde_json::to_string(user_session)?;
+        redis_connection.set_options(&format!("session_token:{}", session_token.to_string()), session_json, options).await?;
 
         Ok(SessionToken(session_token))
     }
 
-    pub async fn get_user_session(&self, user_id: &UserId) -> Result<UserSession>{
-        /*
-        let result = self.scylla
-            .session
-            .execute(
-                &self
-                    .scylla
-                    .prepared_queries
-                    .get("get_user")
-                    .expect("Query missing!"),
-                (user_id,),
-            )
-            .await?;
-
-        if let Some(rows) = result.rows {
-            if rows.len() > 0 {
-                let row = rows.get(0).unwrap();
-                let display_name: String = row.get_r_by_name("display_name")?;
-                let thumbnail_url: String = row.get_r_by_name("thumbnail_url")?;
-                let is_verified: bool = row.get_r_by_name("is_verified")?;
-                let email: String = row.get_r_by_name("email")?;
-
-                return Ok(UserSession{
-                    user_id: *user_id,
-                    display_name,
-                    thumbnail_url,
-                    is_verified,
-                    email,
-                });
-            }
-            else{
-                return Err(anyhow!("User does not exist!"));
-            }
-        }
-        else{
-            return Err(anyhow!("User does not exist!"));
-        }
-        */
-        return Ok(UserSession{
-            user_id: *user_id,
-            display_name: "root".to_string(),
-            thumbnail_url: DEFAULT_THUMBNAIL_URL.to_string(),
-            is_verified: true,
-        });
-    }
-
     pub async fn get_user_from_session_token(&self, session_token: &SessionToken) -> Result<UserSession>{
         let mut redis_connection = self.application_redis.get_async_connection().await?;
-        let user_id: String = redis_connection.get(&format!("session_token:{}", session_token.0)).await?;
-        if user_id == "" {
-            return Err(anyhow!("Session token does not exist!"));
-        }
 
-        let user_id = UserId(Uuid::parse_str(&user_id)?);
+        let session_json: String = redis_connection.get(&format!("session_token:{}", session_token.to_string())).await?;
 
-        let user_session = self.get_user_session(&user_id).await?;
+        let user_session: UserSession = serde_json::from_str(&session_json)?;
 
         return Ok(user_session);
     }

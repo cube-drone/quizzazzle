@@ -231,6 +231,47 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, regi
 }
 
 #[rocket::async_trait]
+impl<'r> FromRequest<'r> for model::VerifiedUserSession {
+
+    type Error = anyhow::Error;
+
+    async fn from_request(req: &'r Request<'_>) -> Outcome<Self, anyhow::Error> {
+        let services = req.rocket().state::<Services>().unwrap();
+
+        let maybe_session_token = req.cookies().get_private("session_token");
+
+        if let Some(session_token) = maybe_session_token{
+            let session_token_maybe = model::SessionToken::from_string(session_token.value());
+
+            match session_token_maybe{
+                Ok(session_token) => {
+                    match services.get_user_from_session_token(&session_token).await{
+                        Ok(user) => {
+                            if user.is_verified{
+                                return Outcome::Success(user.to_verified_user_session());
+                            }
+                            else{
+                                return Outcome::Forward(Status::Forbidden);
+                            }
+                        },
+                        Err(e) => {
+                            println!("Error getting user from session token: {}", e);
+                            return Outcome::Forward(Status::Forbidden);
+                        }
+                    }
+                },
+                Err(_) => {
+                    return Outcome::Forward(Status::Forbidden);
+                }
+            }
+        }
+        else{
+            return Outcome::Forward(Status::Forbidden);
+        }
+    }
+}
+
+#[rocket::async_trait]
 impl<'r> FromRequest<'r> for model::UserSession {
 
     type Error = anyhow::Error;
@@ -251,27 +292,32 @@ impl<'r> FromRequest<'r> for model::UserSession {
                         },
                         Err(e) => {
                             println!("Error getting user from session token: {}", e);
-                            return Outcome::Error((Status::Unauthorized, anyhow!("Error getting user from session token")));
+                            return Outcome::Forward(Status::Forbidden);
                         }
                     }
                 },
                 Err(_) => {
-                    return Outcome::Error((Status::Unauthorized, anyhow!("Invalid session token")));
+                    return Outcome::Forward(Status::Forbidden);
                 }
             }
         }
         else{
-            return Outcome::Error((Status::Unauthorized, anyhow!("No session token")));
+            return Outcome::Forward(Status::Forbidden);
         }
     }
 }
 
 #[get("/ok")]
-async fn ok_user(user: model::UserSession) -> &'static str {
-    "ok, user"
+async fn ok_verified_user(_user: model::VerifiedUserSession) -> &'static str {
+    "ok, verified user"
 }
 
 #[get("/ok", rank=2)]
+async fn ok_user(_user: model::UserSession) -> &'static str {
+    "ok, user"
+}
+
+#[get("/ok", rank=3)]
 async fn ok() -> &'static str {
     "ok"
 }
@@ -293,6 +339,7 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
             invite,
             invite_post,
             register_post,
+            ok_verified_user,
             ok_user,
             ok,
             logout

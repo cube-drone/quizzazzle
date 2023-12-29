@@ -61,6 +61,7 @@ test('Use the invite code to create a new user', async () => {
 
     // This should take us to a page that demands we verify our email
     let responseText = await register_form_response.text();
+    console.warn(responseText);
 
     assert(responseText.includes('ok, user'));
 
