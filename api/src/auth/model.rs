@@ -31,6 +31,10 @@ use crate::Services;
 const ROOT_USER_ID: UserId = UserId(Uuid::from_u128(0));
 const DEFAULT_THUMBNAIL_URL: &str = "/static/chismas.png";
 
+const USER_SESSION_TIMEOUT_SECONDS: usize = 86400 * 14; // two weeks
+const EMAIL_VERIFICATION_TIMEOUT_SECONDS: usize = 86400 * 3; // three days
+const USER_MAX_SESSION_COUNT: usize = 8; // how many sessions can a single user have active?
+
 pub async fn initialize(
     scylla_session: &Arc<Session>,
 ) -> Result<HashMap<&'static str, PreparedStatement>> {
@@ -427,8 +431,9 @@ impl Services {
     ) -> Result<()> {
         let mut redis_connection = self.application_redis.get_async_connection().await?;
         let email_verification_token = Uuid::new_v4().to_string();
-        let options = SetOptions::default().with_expiration(SetExpiry::EX(86400 * 3));
-        redis_connection.set_options(&format!("email_verification_token:${}", email_verification_token), user_id.to_string(), options).await?;
+        let key = format!("email_verification_token:${}", email_verification_token);
+
+        redis_connection.set_ex(&key, user_id.to_string(), EMAIL_VERIFICATION_TIMEOUT_SECONDS).await?;
 
         let public_address = self.get_public_address();
 
@@ -442,7 +447,7 @@ impl Services {
     pub async fn verify_email(
         &self,
         email_verification_token: &Uuid,
-    ) -> Result<()> {
+    ) -> Result<UserId> {
         let mut redis_connection = self.application_redis.get_async_connection().await?;
         let user_id: String = redis_connection.get(&format!("email_verification_token:${}", email_verification_token.to_string())).await?;
         let user_id = Uuid::parse_str(&user_id)?;
@@ -463,7 +468,7 @@ impl Services {
             )
             .await?;
 
-        Ok(())
+        Ok(user_id)
     }
 
     pub async fn create_user(
@@ -542,11 +547,55 @@ impl Services {
     pub async fn create_session_token(&self, user_session: &UserSession) -> Result<SessionToken>{
         let mut redis_connection = self.application_redis.get_async_connection().await?;
         let session_token = Uuid::new_v4();
-        let options = SetOptions::default().with_expiration(SetExpiry::EX(86400 * 3));
         let session_json = serde_json::to_string(user_session)?;
-        redis_connection.set_options(&format!("session_token:{}", session_token.to_string()), session_json, options).await?;
+        let key = format!("session_token:{}", session_token.to_string());
+        redis_connection.set_ex(&key, session_json, USER_SESSION_TIMEOUT_SECONDS).await?;
+
+        let user_sessions_key = format!("user_sessions:{}", user_session.user_id.to_string());
+        redis_connection.zadd(&user_sessions_key, session_token.to_string(), Utc::now().timestamp_millis()).await?;
+        redis_connection.expire(&user_sessions_key, USER_SESSION_TIMEOUT_SECONDS*2).await?;
+
+        let user_sessions_count: usize = redis_connection.zcard(&user_sessions_key).await?;
+        // if the user has more than MAX_SESSIONS sessions, delete the oldest one
+        if user_sessions_count > USER_MAX_SESSION_COUNT {
+            self.cull_old_sessions(&user_session.user_id).await?;
+        }
 
         Ok(SessionToken(session_token))
+    }
+
+    pub async fn cull_old_sessions(&self, _user_id: &UserId) -> Result<()>{
+        // the user has more than USER_MAX_SESSION_COUNT sessions, delete all but the USER_MAX_SESSION_COUNT most recent
+        // it's also fine to cull any that have obviously expired (> USER_SESSION_TIMEOUT_SECONDS old)
+        let mut redis_connection = self.application_redis.get_async_connection().await?;
+        let timestamp_cutoff: i64 = Utc::now().timestamp_millis() - (USER_SESSION_TIMEOUT_SECONDS as i64 * 1000);
+
+        let user_sessions: Vec<(String, i64)> = redis_connection.zrangebyscore_withscores(&format!("user_sessions:{}", _user_id.to_string()), "+inf", "+inf").await?;
+        let mut counter: usize = 0;
+        for (session_token, timestamp) in user_sessions {
+            if timestamp < timestamp_cutoff {
+                redis_connection.unlink(&format!("session_token:{}", session_token)).await?;
+                redis_connection.zrem(&format!("user_sessions:{}", _user_id.to_string()), session_token).await?;
+            }
+            else if(counter > USER_MAX_SESSION_COUNT){
+                redis_connection.unlink(&format!("session_token:{}", session_token)).await?;
+                redis_connection.zrem(&format!("user_sessions:{}", _user_id.to_string()), session_token).await?;
+            }
+            counter += 1;
+        }
+
+        Ok(())
+    }
+
+    pub async fn refresh_session_token(&self, session_token: &SessionToken, user_id: &UserId) -> Result<()>{
+        let mut redis_connection = self.application_redis.get_async_connection().await?;
+
+        redis_connection.expire(&format!("session_token:{}", session_token.to_string()), USER_SESSION_TIMEOUT_SECONDS).await?;
+
+        let user_sessions_key = format!("user_sessions:{}", user_id.to_string());
+        redis_connection.zadd(&user_sessions_key, session_token.to_string(), Utc::now().timestamp_millis()).await?;
+
+        Ok(())
     }
 
     pub async fn get_user_from_session_token(&self, session_token: &SessionToken) -> Result<UserSession>{
@@ -555,6 +604,8 @@ impl Services {
         let session_json: String = redis_connection.get(&format!("session_token:{}", session_token.to_string())).await?;
 
         let user_session: UserSession = serde_json::from_str(&session_json)?;
+
+        self.refresh_session_token(session_token, &user_session.user_id).await?;
 
         return Ok(user_session);
     }
