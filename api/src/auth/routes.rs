@@ -307,6 +307,11 @@ impl<'r> FromRequest<'r> for model::UserSession {
     }
 }
 
+#[get("/verify_email?<verify_email_token>")]
+async fn verify_email(verify_email_token: Uuid) -> Redirect {
+    Redirect::to("/auth/ok")
+}
+
 #[get("/ok")]
 async fn ok_verified_user(_user: model::VerifiedUserSession) -> &'static str {
     "ok, verified user"

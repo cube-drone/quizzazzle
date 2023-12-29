@@ -142,7 +142,7 @@ async fn rocket() -> Rocket<Build> {
     static_hashmap.insert("faq", static_markdownify("faq.md"));
 
     // Email Setup
-    let email_provider = email::EmailProvider::setup().await;
+    let email_provider = email::EmailProvider::setup(is_production).await;
     let test_email = email::EmailAddress::new("test@gooble.email".to_string()).expect("Could not create test email");
     email_provider.send_hello(&test_email).await.expect("Could not send email");
 

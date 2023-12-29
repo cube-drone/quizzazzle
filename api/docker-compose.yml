@@ -22,6 +22,7 @@ services:
       CARGO_TARGET_DIR: /tmp/target # this one's really interesting: volume mounting is incredibly slow, which slows rust builds to a crawl, so instead rust build filespace should exist in tmpfs
       ROCKET_ADDRESS: 0.0.0.0
       ROCKET_PORT: 3333
+      ROCKET_PUBLIC_ADDRESS: http://localhost:3333
       CACHE_REDIS_URLS: redis://:hamscramble@cache-redis-1:6888,redis://:hamscramble@cache-redis-2:6889,redis://:hamscramble@cache-redis-3:6890
       APPLICATION_REDIS_URLS: redis://:hamscramble@application-redis-1:6999,redis://:hamscramble@application-redis-2:6998,redis://:hamscramble@application-redis-3:6997
       SCYLLA_URL: some-scylla:9042

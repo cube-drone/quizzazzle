@@ -24,6 +24,7 @@ use ::argon2::{
     Argon2
 };
 
+use crate::email::EmailAddress;
 use crate::{ScyllaService, email};
 use crate::Services;
 
@@ -76,6 +77,13 @@ pub async fn initialize(
         "get_user",
         scylla_session
             .prepare("SELECT id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, created_at, updated_at FROM ks.user WHERE id = ?;")
+            .await?,
+    );
+
+    prepared_queries.insert(
+        "verify_user_email",
+        scylla_session
+            .prepare("UPDATE ks.user USING TTL 0 SET is_verified = true WHERE id = ?;")
             .await?,
     );
 
@@ -407,18 +415,56 @@ impl Services {
         Ok(())
     }
 
-    /*
+    pub fn get_public_address(&self) -> String{
+        let config = self.config.read().unwrap();
+        config.public_config.get("ROCKET_PUBLIC_ADDRESS").unwrap_or(&"http://localhost:3333".to_string()).to_string()
+    }
+
     pub async fn send_verification_email(
         &self,
         user_id: &Uuid,
+        email_address: &str,
     ) -> Result<()> {
         let mut redis_connection = self.application_redis.get_async_connection().await?;
         let email_verification_token = Uuid::new_v4().to_string();
-        redis_connection.set(&format!("user:{}:email_verification_token", user_id), email_verification_token, "EX", 86400 * 3).await?;
+        let options = SetOptions::default().with_expiration(SetExpiry::EX(86400 * 3));
+        redis_connection.set_options(&format!("email_verification_token:${}", email_verification_token), user_id.to_string(), options).await?;
+
+        let public_address = self.get_public_address();
+
+        let email_verification_link = format!("{}/auth/verify_email?token={}", public_address, email_verification_token);
+
+        self.email.send_verification_email(&EmailAddress::new(email_address.to_string())?, &email_verification_link).await?;
 
         Ok(())
     }
-    */
+
+    pub async fn verify_email(
+        &self,
+        email_verification_token: &Uuid,
+    ) -> Result<()> {
+        let mut redis_connection = self.application_redis.get_async_connection().await?;
+        let user_id: String = redis_connection.get(&format!("email_verification_token:${}", email_verification_token.to_string())).await?;
+        let user_id = Uuid::parse_str(&user_id)?;
+        let user_id = UserId(user_id);
+
+        let mut user = self.get_user(&user_id).await?.unwrap();
+        user.is_verified = true;
+
+        self.scylla
+            .session
+            .execute(
+                &self
+                    .scylla
+                    .prepared_queries
+                    .get("verify_user_email")
+                    .expect("Query missing!"),
+                (user_id.0,),
+            )
+            .await?;
+
+        Ok(())
+    }
 
     pub async fn create_user(
         &self,
@@ -479,7 +525,8 @@ impl Services {
             )
             .await?;
 
-        //send_verification_email(&self, &user_id).await?;
+        self.send_verification_email( &user_create.user_id.0, &user_create.email ).await?;
+
         let user_session = UserSession{
             user_id: user_create.user_id,
             display_name: user_create.display_name.to_string(),
@@ -496,7 +543,6 @@ impl Services {
         let mut redis_connection = self.application_redis.get_async_connection().await?;
         let session_token = Uuid::new_v4();
         let options = SetOptions::default().with_expiration(SetExpiry::EX(86400 * 3));
-
         let session_json = serde_json::to_string(user_session)?;
         redis_connection.set_options(&format!("session_token:{}", session_token.to_string()), session_json, options).await?;
 
