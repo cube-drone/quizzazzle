@@ -60,24 +60,23 @@ test('Create, verify, and log in as a new user', async () => {
     });
 
     // This should take us to a page that demands we verify our email
-    let responseText = await register_form_response.text();
+    let responseText = (await register_form_response.text()).toLowerCase();
 
-    assert(responseText.includes('ok, user'));
+    assert(responseText.includes('verify') && responseText.includes('email'));
 
+    // we didn't get an email, because we're running this in test mode and we don't have an email server
+    // so we have to cheat:
     // there's an endpoint that will give us the email history
     let email_history = await fetchCookie(`${endpoint}/auth/test/get_last_email?email=${email}`);
-
     let email_code = await email_history.json();
-
     let url = email_code.email;
-
     let verify_email = await fetch(url);
-
     assert.strictEqual(await verify_email.text(), "ok");
 
+    // once we've done that, if we hit /auth/ok, it will take us to the home page
     let test_verification = await fetchCookie(`${endpoint}/auth/ok`);
-
-    assert.strictEqual(await test_verification.text(), "ok, verified user");
+    let homeText = (await test_verification.text()).toLowerCase();
+    assert(homeText.includes("ok, verified user"));
 
     const newFetchCookie = makeFetchHappen(fetch)
 

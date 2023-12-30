@@ -1,0 +1,30 @@
+{% extends "base" %}
+
+{% block title %} Verify Email {% endblock title %}
+
+{% block head %}
+    {{ super() }}
+{% endblock head %}
+
+{% block content %}
+<div class="primary-card">
+    <div class="content">
+        <header>
+            <h2><a href="/">home</a> / Verify Email </h2>
+        </header>
+        <div class="everything">
+            {% if error %}
+                <div class="error">{{error}}</div>
+            {% endif %}
+            <p>Hey, I sent you an e-mail to make sure that that email address actually belongs to you.</p>
+            <p>Go, uh, find it, in your e-mail account, and click on the link in there.</p>
+            <form method="get" action=".">
+                <button name="submit" value="Ok">I did!</button>
+            </form>
+            <form method="post" action="/auth/resend_verification_email">
+                <button name="submit" value="Resend">Resend Verification Email</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock content %}

@@ -409,7 +409,18 @@ impl<'r> FromRequest<'r> for model::UserSession {
     }
 }
 
-#[get("/verify_email?<token>")]
+#[get("/verify_email", rank=1)]
+async fn verify_email_ok(_user: model::VerifiedUserSession) -> Redirect{
+    /* if the user is already verified, no need to show them anything, move them along */
+    Redirect::to("/auth/ok")
+}
+
+#[get("/verify_email", rank=3)]
+async fn verify_email_template(_user: model::UserSession) -> Template{
+    Template::render("verify_email", context! {})
+}
+
+#[get("/verify_email?<token>", rank=2)]
 async fn verify_email(services: &State<Services>, token: Uuid) -> Redirect {
     let maybe_error = services.verify_email(&token).await;
 
@@ -422,9 +433,16 @@ async fn verify_email(services: &State<Services>, token: Uuid) -> Redirect {
     }
 }
 
+#[get("/verify_email", rank=4)]
+async fn verify_email_nobody() -> Redirect{
+    /* if the user is already verified, no need to show them anything, move them along */
+    Redirect::to("/auth/login")
+}
+
+
 #[get("/email_error")]
-async fn email_error() -> &'static str {
-    "error verifying email; please try again"
+async fn email_error() -> Template {
+    Template::render("error", context! {error: "We tried to verify your email, but something went wrong. Please try again!"})
 }
 
 #[get("/ok")]
@@ -433,8 +451,8 @@ async fn ok_verified_user(_user: model::VerifiedUserSession) -> &'static str {
 }
 
 #[get("/ok", rank=2)]
-async fn ok_user(_user: model::UserSession) -> &'static str {
-    "ok, user"
+async fn ok_user(_user: model::UserSession) -> Redirect {
+    Redirect::to("/auth/verify_email")
 }
 
 #[get("/ok", rank=3)]
@@ -462,7 +480,10 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
             invite,
             invite_post,
             register_post,
+            verify_email_ok,
+            verify_email_template,
             verify_email,
+            verify_email_nobody,
             email_error,
             ok_verified_user,
             ok_user,

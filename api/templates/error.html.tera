@@ -1,0 +1,20 @@
+{% extends "base" %}
+
+{% block title %} Error {% endblock title %}
+
+{% block head %}
+    {{ super() }}
+{% endblock head %}
+
+{% block content %}
+    <div class="primary-card">
+        <div class="content">
+            <header>
+                <h2><a href="/">home</a> / Oh no!</h2>
+            </header>
+            <div class="everything">
+                {{error | safe}}
+            </div>
+        </div>
+    </div>
+{% endblock content %}
