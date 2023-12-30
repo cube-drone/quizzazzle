@@ -7,12 +7,37 @@
 {% endblock head %}
 
 {% block content %}
-<div class="card">
+<div class="primary-card">
     <div class="content">
-        <h1>Login</h1>
-        <p class="important">
-            Log in to the whatsamajigger
-        </p>
+        <header>
+            <h2><a href="/">home</a> / Login </h2>
+        </header>
+        <div class="bump"></div>
+        <div class="everything">
+            {% if error %}
+                <div class="error">{{error}}</div>
+            {% endif %}
+            <form method="post" action="/auth/register">
+                <input name="csrf_token" type="hidden" value="{{ csrf_token }}" />
+
+                <label for="email">Email</label>
+                {% if email %}
+                    <input name="email" type="text" placeholder="farts@toots.poots" value="{{ email }}" />
+                {% else %}
+                    <input name="email" type="text" placeholder="farts@toots.poots" />
+                {% endif %}
+                <br/>
+
+                <label for="password">Password</label>
+                {% if password %}
+                    <input name="password" type="password" value="{{ password }}" />
+                {% else %}
+                    <input name="password" type="password" />
+                {% endif %}
+
+                <button name="submit" value="Login">Login</button>
+            </form>
+        </div>
     </div>
 </div>
 {% endblock content %}

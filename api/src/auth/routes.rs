@@ -11,17 +11,88 @@ use rocket::request::{FromRequest, Request, Outcome};
 use rocket::http::Status;
 use rocket::serde::json::Json;
 
-use anyhow::anyhow;
 use validator::Validate;
 
 use crate::Services;
 use crate::auth::model;
 
 #[get("/login")]
-async fn login() -> Template {
+async fn login(cookies: &CookieJar<'_>) -> Template {
+
+    let csrf_token = Uuid::new_v4().to_string();
+    cookies.add_private(("csrf_token", csrf_token.clone()));
+
     Template::render("login", context! {
-        foo: 123,
+        csrf_token: csrf_token,
     })
+}
+
+#[derive(FromForm, Validate)]
+struct Login<'r> {
+    csrf_token: &'r str,
+    #[validate(email(message="Invalid email address!"))]
+    email: &'r str,
+    #[validate(length(min = 11, max = 300, message="Password must be between 11 and 300 characters!"))]
+    password: &'r str,
+}
+
+#[post("/login", data = "<login>")]
+async fn login_post(services: &State<Services>, cookies: &CookieJar<'_>, login: Form<Login<'_>>) -> Result<Redirect, Template> {
+
+    let csrf_token_new = Uuid::new_v4().to_string();
+
+    if let Some(csrf_cookie) = cookies.get_private("csrf_token"){
+        let csrf_token_cookie = csrf_cookie.value();
+
+        cookies.add_private(("csrf_token", csrf_token_new.clone()));
+        if login.csrf_token != csrf_token_cookie {
+            return Err(Template::render("login", context! {
+                csrf_token: csrf_token_new,
+                error: "CSRF token mismatch",
+                email: login.email,
+                password: login.password,
+            }));
+        }
+    }
+    else{
+        cookies.add_private(("csrf_token", csrf_token_new.clone()));
+        return Err(Template::render("login", context! {
+            csrf_token: csrf_token_new,
+            error: "CSRF token missing",
+            email: login.email,
+            password: login.password,
+        }));
+    }
+
+    match login.validate() {
+        Ok(_) => (),
+        Err(e) => return Err(Template::render("login", context! {
+            csrf_token: csrf_token_new,
+            error: e.to_string(),
+            email: login.email,
+            password: login.password,
+        })),
+      };
+
+    // okay, now, let's try to login
+
+    match services.login(login.email, login.password).await{
+        Ok(session_token) => {
+            // u did it, create a session token
+            cookies.add_private(Cookie::new("session_token", session_token.to_string()));
+
+            Ok(Redirect::to("/auth/ok"))
+        },
+        Err(e) => {
+            println!("Error logging in: {}", e);
+            Err(Template::render("login", context! {
+                csrf_token: csrf_token_new,
+                error: "Could not log in",
+                email: login.email,
+                password: login.password,
+            }))
+        }
+    }
 }
 
 #[get("/register")]
@@ -382,11 +453,12 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
     app.mount(
         "/auth",
         routes![
+            login,
+            login_post,
             register,
             test_generate_invite_code,
             test_create_user,
             test_get_last_email,
-            login,
             invite,
             invite_post,
             register_post,

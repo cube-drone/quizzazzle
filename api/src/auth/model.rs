@@ -5,7 +5,6 @@ use std::env;
 use serde::{Deserialize, Serialize};
 
 use redis::AsyncCommands;
-use redis::{SetOptions, SetExpiry};
 
 use anyhow::Result;
 use anyhow::anyhow;
@@ -25,7 +24,6 @@ use ::argon2::{
 };
 
 use crate::email::EmailAddress;
-use crate::{ScyllaService, email};
 use crate::Services;
 
 const ROOT_USER_ID: UserId = UserId(Uuid::from_u128(0));
@@ -50,7 +48,6 @@ pub async fn initialize(
                 thumbnail_url text,
                 email text,
                 is_verified boolean,
-                is_parentable boolean,
                 created_at timestamp,
                 updated_at timestamp);
         "#, &[], ).await?;
@@ -66,7 +63,7 @@ pub async fn initialize(
     prepared_queries.insert(
         "create_user",
         scylla_session
-            .prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, is_parentable, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, false, true, ?, ?);")
+            .prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, false, ?, ?);")
             .await?,
     );
 
@@ -171,12 +168,22 @@ pub async fn initialize(
     Ok(prepared_queries)
 }
 
-pub fn hash(password: &str) -> Result<String> {
+pub fn password_hash(password: &str) -> Result<String> {
     let peppered: String = format!("{}-{}-{}", password, env::var("GROOVELET_PEPPER").unwrap_or_else(|_| "peppa".to_string()), "SPUDJIBMSPLQPFFSPLBLBlBLBLPRT");
     let salt = SaltString::generate(&mut OsRng);
     let argon2 = Argon2::default();
     let hashed_password = argon2.hash_password(peppered.as_bytes(), &salt).expect("strings should be hashable").to_string();
     Ok(hashed_password)
+}
+
+pub fn password_test(password: &str, hashed_password: &str) -> Result<bool> {
+    let peppered: String = format!("{}-{}-{}", password, env::var("GROOVELET_PEPPER").unwrap_or_else(|_| "peppa".to_string()), "SPUDJIBMSPLQPFFSPLBLBlBLBLPRT");
+    let argon2 = Argon2::default();
+    let password_hash = PasswordHash::new(hashed_password).unwrap();
+    let is_valid = argon2
+        .verify_password(peppered.as_bytes(), &password_hash)
+        .is_ok();
+    Ok(is_valid)
 }
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug)]
@@ -275,12 +282,12 @@ pub struct VerifiedUserSession {
 
 #[derive(FromRow)]
 pub struct UserDatabaseRaw {
-    pub user_id: String,
-    pub parent_id: String,
+    pub id: Uuid,
     pub display_name: String,
+    pub parent_id: Uuid,
     pub hashed_password: String,
-    pub thumbnail_url: String,
     pub email: String,
+    pub thumbnail_url: String,
     pub is_verified: bool,
     pub created_at: Duration,
     pub updated_at: Duration,
@@ -345,6 +352,7 @@ impl Services {
         &self,
         user_id: &UserId,
     ) -> Result<Option<UserDatabaseRaw>> {
+        println!("get_user: {}", user_id.to_string());
         Ok(self.scylla
             .session
             .execute(
@@ -353,7 +361,7 @@ impl Services {
                     .prepared_queries
                     .get("get_user")
                     .expect("Query missing!"),
-                (user_id.0,),
+                (user_id.to_uuid(),),
             )
             .await?
             .maybe_first_row_typed::<UserDatabaseRaw>()?)
@@ -363,6 +371,7 @@ impl Services {
         &self,
         email: &str,
     ) -> Result<Option<UserDatabaseRaw>> {
+        println!("get_user_email: {}", email);
         let result = self.scylla
             .session
             .execute(
@@ -402,7 +411,7 @@ impl Services {
         let email = "root@gooble.email";
         let parent_id = "";
         let root_auth_password = env::var("GROOVELET_ROOT_AUTH_PASSWORD").unwrap_or_else(|_| "root".to_string());
-        let hashed_password = hash(&root_auth_password)?;
+        let hashed_password = password_hash(&root_auth_password)?;
 
         self.scylla
             .session
@@ -490,7 +499,7 @@ impl Services {
         &self,
         user_create: UserCreate<'_>,
     ) -> Result<SessionToken> {
-        let hashed_password = hash(&user_create.password)?;
+        let hashed_password = password_hash(&user_create.password)?;
 
         if self.get_user_exists(&user_create.user_id).await? {
             return Err(anyhow!("User somehow already exists! Wow, UUIDs are not as unique as I thought!"));
@@ -558,6 +567,26 @@ impl Services {
 
         Ok(session_token)
     }
+
+    pub async fn login(&self, email: &str, password: &str) -> Result<SessionToken> {
+        let email_user = self.get_user_email(&email).await?;
+        if let Some(email_user) = email_user {
+            if password_test(&password, &email_user.hashed_password)? {
+                let user_id: UserId = UserId::from_uuid(email_user.id);
+                let user_session: UserSession = UserSession{
+                    user_id: user_id,
+                    display_name: email_user.display_name,
+                    thumbnail_url: email_user.thumbnail_url,
+                    is_verified: email_user.is_verified,
+                };
+
+                let session_token = self.create_session_token(&user_session).await?;
+                return Ok(session_token);
+            }
+        }
+        Err(anyhow!("Invalid email or password!"))
+    }
+
 /*
 
 
@@ -596,7 +625,7 @@ s::::::::::::::s  e::::::::eeeeeeee  s::::::::::::::s s::::::::::::::s i::::::io
         redis_connection.expire(&user_sessions_key, USER_SESSION_TIMEOUT_SECONDS*2).await?;
 
         let user_sessions_count: usize = redis_connection.zcard(&user_sessions_key).await?;
-        println!("user_sessions_count: {}", user_sessions_count);
+        //println!("user_sessions_count: {}", user_sessions_count);
         // if the user has more than MAX_SESSIONS sessions, delete the oldest one
         if user_sessions_count > USER_MAX_SESSION_COUNT {
             self.cull_old_sessions(&user_session.user_id).await?;
@@ -641,7 +670,7 @@ s::::::::::::::s  e::::::::eeeeeeee  s::::::::::::::s s::::::::::::::s i::::::io
         let key = format!("session_token:{}", session_token.to_string());
         let session_json: String = redis_connection.get(&key).await?;
 
-        println!("verifying session_json: {}", session_json);
+        //println!("verifying session_json: {}", session_json);
 
         let mut user_session: UserSession = serde_json::from_str(&session_json)?;
 
@@ -689,7 +718,7 @@ s::::::::::::::s  e::::::::eeeeeeee  s::::::::::::::s s::::::::::::::s i::::::io
 
         let session_json: String = redis_connection.get(&format!("session_token:{}", session_token.to_string())).await?;
 
-        println!("getting session_json: {}", session_json);
+        //println!("getting session_json: {}", session_json);
 
         let user_session: UserSession = serde_json::from_str(&session_json)?;
 
