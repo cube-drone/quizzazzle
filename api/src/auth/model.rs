@@ -239,6 +239,7 @@ impl SessionToken {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct UserCreate<'r>{
     pub user_id: UserId,
     pub parent_id: UserId,

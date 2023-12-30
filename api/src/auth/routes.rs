@@ -30,7 +30,7 @@ async fn register() -> Redirect  {
     Redirect::to("/auth/invite")
 }
 
-#[get("/generate_invite_code")]
+#[get("/test/generate_invite_code")]
 async fn generate_invite_code(services: &State<Services>) -> Result<Json<HashMap<String, String>>, Status> {
     if services.is_production {
         return Err(Status::Forbidden);
@@ -40,6 +40,25 @@ async fn generate_invite_code(services: &State<Services>) -> Result<Json<HashMap
     hashmap.insert("invite_code".to_string(),
         services.generate_invite_code().await.expect("should be able to generate an invite code").to_string()
     );
+
+    Ok(Json(hashmap))
+}
+
+#[post("/test/create_user", format = "json", data = "<user_serialized>")]
+async fn test_create_user(services: &State<Services>, cookies: &CookieJar<'_>, user_serialized: Json<model::UserCreate<'_>>) -> Result<Json<HashMap<String, String>>, Status> {
+    if services.is_production {
+        return Err(Status::Forbidden);
+    }
+
+    let user_to_create = user_serialized.into_inner();
+    let user_id = user_to_create.user_id.clone();
+
+    let session_token = services.create_user(user_to_create).await.expect("should be able to create a user");
+    cookies.add_private(Cookie::new("session_token", session_token.to_string()));
+
+    let mut hashmap: HashMap<String, String> = HashMap::new();
+    hashmap.insert("session_token".to_string(), session_token.to_string());
+    hashmap.insert("user_id".to_string(), user_id.to_string());
 
     Ok(Json(hashmap))
 }
@@ -308,8 +327,16 @@ impl<'r> FromRequest<'r> for model::UserSession {
 }
 
 #[get("/verify_email?<verify_email_token>")]
-async fn verify_email(verify_email_token: Uuid) -> Redirect {
-    Redirect::to("/auth/ok")
+async fn verify_email(services: &State<Services>, verify_email_token: Uuid) -> Redirect {
+    let maybe_error = services.verify_email(&verify_email_token).await;
+
+    match maybe_error{
+        Ok(_) => Redirect::to("/auth/ok"),
+        Err(e) => {
+            println!("Error verifying email: {}", e);
+            Redirect::to("/auth/email_error")
+        }
+    }
 }
 
 #[get("/ok")]
@@ -340,10 +367,12 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
         routes![
             register,
             generate_invite_code,
+            test_create_user,
             login,
             invite,
             invite_post,
             register_post,
+            verify_email,
             ok_verified_user,
             ok_user,
             ok,
