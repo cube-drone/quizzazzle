@@ -284,7 +284,7 @@ pub struct VerifiedUserSession {
 pub struct UserDatabaseRaw {
     pub id: Uuid,
     pub display_name: String,
-    pub parent_id: Uuid,
+    pub parent_id: Option<Uuid>,
     pub hashed_password: String,
     pub email: String,
     pub thumbnail_url: String,
@@ -406,12 +406,13 @@ impl Services {
             return Ok(());
         }
 
-        let user_id = ROOT_USER_ID.0;
+        let user_id = ROOT_USER_ID.to_uuid();
         let display_name = "root";
         let email = "root@gooble.email";
         let parent_id = "";
         let root_auth_password = env::var("GROOVELET_ROOT_AUTH_PASSWORD").unwrap_or_else(|_| "root".to_string());
         let hashed_password = password_hash(&root_auth_password)?;
+
 
         self.scylla
             .session
@@ -426,8 +427,115 @@ impl Services {
             )
             .await?;
 
+        // email -> user
+        self.scylla
+            .session
+            .execute(
+                &self
+                    .scylla
+                    .prepared_queries
+                    .get("set_email_user")
+                    .expect("query missing!"),
+                (email, user_id,),
+            )
+            .await?;
+
         Ok(())
     }
+
+    pub async fn create_user(
+        &self,
+        user_create: UserCreate<'_>,
+    ) -> Result<SessionToken> {
+        let hashed_password = password_hash(&user_create.password)?;
+
+        if self.get_user_exists(&user_create.user_id).await? {
+            return Err(anyhow!("User somehow already exists! Wow, UUIDs are not as unique as I thought!"));
+        }
+        if !self.get_user_exists(&user_create.parent_id).await? {
+            return Err(anyhow!("Parent user does not exist!"));
+        }
+        let email_user = self.get_user_email(&user_create.email).await?;
+        if let Some(email_user) = email_user {
+            if email_user.is_verified{
+                return Err(anyhow!("Email already exists!"));
+            }
+            else{
+                // TODO: delete the unverified user
+                // and just create a new one, now
+                return Err(anyhow!("Email already exists, but is not verified!"));
+            }
+        }
+
+        // the core user record!
+        self.scylla
+            .session
+            .execute(
+                &self
+                    .scylla
+                    .prepared_queries
+                    .get("create_user")
+                    .expect("Query missing!"),
+                //.prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, false, ?, ?);")
+                (
+                    user_create.user_id.0,
+                    user_create.display_name,
+                    user_create.parent_id.0,
+                    hashed_password,
+                    user_create.email,
+                    DEFAULT_THUMBNAIL_URL,
+                    Utc::now().timestamp_millis(),
+                    Utc::now().timestamp_millis()
+                ),
+            )
+            .await?;
+
+        // email -> user
+        self.scylla
+            .session
+            .execute(
+                &self
+                    .scylla
+                    .prepared_queries
+                    .get("set_email_user")
+                    .expect("query missing!"),
+                (user_create.email, user_create.user_id.0,),
+            )
+            .await?;
+
+        self.send_verification_email( &user_create.user_id.0, &user_create.email ).await?;
+
+        let user_session = UserSession{
+            user_id: user_create.user_id,
+            display_name: user_create.display_name.to_string(),
+            thumbnail_url: DEFAULT_THUMBNAIL_URL.to_string(),
+            is_verified: false,
+        };
+
+        let session_token = self.create_session_token(&user_session).await?;
+
+        Ok(session_token)
+    }
+
+    pub async fn login(&self, email: &str, password: &str) -> Result<SessionToken> {
+        let email_user = self.get_user_email(&email).await?;
+        if let Some(email_user) = email_user {
+            if password_test(&password, &email_user.hashed_password)? {
+                let user_id: UserId = UserId::from_uuid(email_user.id);
+                let user_session: UserSession = UserSession{
+                    user_id: user_id,
+                    display_name: email_user.display_name,
+                    thumbnail_url: email_user.thumbnail_url,
+                    is_verified: email_user.is_verified,
+                };
+
+                let session_token = self.create_session_token(&user_session).await?;
+                return Ok(session_token);
+            }
+        }
+        Err(anyhow!("Invalid email or password!"))
+    }
+
 
     pub async fn send_verification_email(
         &self,
@@ -487,104 +595,11 @@ impl Services {
             )
             .await?;
 
-        //
         self.verify_all_sessions(&user_id).await?;
 
         redis_connection.unlink(&verification_token_key).await?;
 
         Ok(user_id)
-    }
-
-    pub async fn create_user(
-        &self,
-        user_create: UserCreate<'_>,
-    ) -> Result<SessionToken> {
-        let hashed_password = password_hash(&user_create.password)?;
-
-        if self.get_user_exists(&user_create.user_id).await? {
-            return Err(anyhow!("User somehow already exists! Wow, UUIDs are not as unique as I thought!"));
-        }
-        if !self.get_user_exists(&user_create.parent_id).await? {
-            return Err(anyhow!("Parent user does not exist!"));
-        }
-        let email_user = self.get_user_email(&user_create.email).await?;
-        if let Some(email_user) = email_user {
-            if email_user.is_verified{
-                return Err(anyhow!("Email already exists!"));
-            }
-            else{
-                // TODO: delete the unverified user
-                // and just create a new one, now
-                return Err(anyhow!("Email already exists, but is not verified!"));
-            }
-        }
-
-        self.scylla
-            .session
-            .execute(
-                &self
-                    .scylla
-                    .prepared_queries
-                    .get("set_email_user")
-                    .expect("Query missing!"),
-                (user_create.email, user_create.user_id.0,),
-            )
-            .await?;
-
-        // the core user record!
-        self.scylla
-            .session
-            .execute(
-                &self
-                    .scylla
-                    .prepared_queries
-                    .get("create_user")
-                    .expect("Query missing!"),
-                //.prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, false, ?, ?);")
-                (
-                    user_create.user_id.0,
-                    user_create.display_name,
-                    user_create.parent_id.0,
-                    hashed_password,
-                    user_create.email,
-                    DEFAULT_THUMBNAIL_URL,
-                    Utc::now().timestamp_millis(),
-                    Utc::now().timestamp_millis()
-                ),
-            )
-            .await?;
-
-        self.send_verification_email( &user_create.user_id.0, &user_create.email ).await?;
-
-        let user_session = UserSession{
-            user_id: user_create.user_id,
-            display_name: user_create.display_name.to_string(),
-            thumbnail_url: DEFAULT_THUMBNAIL_URL.to_string(),
-            is_verified: false,
-        };
-
-        let session_token = self.create_session_token(&user_session).await?;
-
-        Ok(session_token)
-    }
-
-    pub async fn login(&self, email: &str, password: &str) -> Result<SessionToken> {
-        let email_user = self.get_user_email(&email).await?;
-        if let Some(email_user) = email_user {
-            if password_test(&password, &email_user.hashed_password)? {
-                let user_id: UserId = UserId::from_uuid(email_user.id);
-                let user_session: UserSession = UserSession{
-                    user_id: user_id,
-                    display_name: email_user.display_name,
-                    thumbnail_url: email_user.thumbnail_url,
-                    is_verified: email_user.is_verified,
-                };
-
-                let session_token = self.create_session_token(&user_session).await?;
-                return Ok(session_token);
-            }
-        }
-        Err(anyhow!("Invalid email or password!"))
     }
 
 /*

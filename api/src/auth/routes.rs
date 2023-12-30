@@ -32,7 +32,6 @@ struct Login<'r> {
     csrf_token: &'r str,
     #[validate(email(message="Invalid email address!"))]
     email: &'r str,
-    #[validate(length(min = 11, max = 300, message="Password must be between 11 and 300 characters!"))]
     password: &'r str,
 }
 
