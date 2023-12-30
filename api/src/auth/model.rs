@@ -48,6 +48,8 @@ pub async fn initialize(
                 thumbnail_url text,
                 email text,
                 is_verified boolean,
+                is_admin boolean,
+                tags set<text>,
                 created_at timestamp,
                 updated_at timestamp);
         "#, &[], ).await?;
@@ -63,7 +65,7 @@ pub async fn initialize(
     prepared_queries.insert(
         "create_user",
         scylla_session
-            .prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, false, ?, ?);")
+            .prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, is_admin, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);")
             .await?,
     );
 
@@ -77,7 +79,7 @@ pub async fn initialize(
     prepared_queries.insert(
         "get_user",
         scylla_session
-            .prepare("SELECT id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, created_at, updated_at FROM ks.user WHERE id = ?;")
+            .prepare("SELECT id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, is_admin, tags, created_at, updated_at FROM ks.user WHERE id = ?;")
             .await?,
     );
 
@@ -261,6 +263,8 @@ pub struct UserSession {
     pub display_name: String,
     pub thumbnail_url: String,
     pub is_verified: bool,
+    pub is_admin: bool,
+    pub tags: Option<Vec<String>>,
 }
 
 impl UserSession {
@@ -269,6 +273,16 @@ impl UserSession {
             user_id: self.user_id,
             display_name: self.display_name.clone(),
             thumbnail_url: self.thumbnail_url.clone(),
+            is_admin: self.is_admin,
+            tags: self.tags.clone(),
+        }
+    }
+    pub fn to_admin_user_session(&self) -> AdminUserSession {
+        AdminUserSession {
+            user_id: self.user_id,
+            display_name: self.display_name.clone(),
+            thumbnail_url: self.thumbnail_url.clone(),
+            tags: self.tags.clone(),
         }
     }
 }
@@ -278,6 +292,16 @@ pub struct VerifiedUserSession {
     pub user_id: UserId,
     pub display_name: String,
     pub thumbnail_url: String,
+    pub is_admin: bool,
+    pub tags: Option<Vec<String>>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AdminUserSession {
+    pub user_id: UserId,
+    pub display_name: String,
+    pub thumbnail_url: String,
+    pub tags: Option<Vec<String>>,
 }
 
 #[derive(FromRow)]
@@ -289,6 +313,8 @@ pub struct UserDatabaseRaw {
     pub email: String,
     pub thumbnail_url: String,
     pub is_verified: bool,
+    pub is_admin: bool,
+    pub tags: Option<Vec<String>>,
     pub created_at: Duration,
     pub updated_at: Duration,
 }
@@ -422,8 +448,8 @@ impl Services {
                     .prepared_queries
                     .get("create_user")
                     .expect("Query missing!"),
-                //.prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, false, ?, ?);")
-                (user_id, display_name, parent_id, hashed_password, email, DEFAULT_THUMBNAIL_URL, Utc::now().timestamp_millis(), Utc::now().timestamp_millis()),
+                //.prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, is_admin, created_at, updated_at) VALUES (?, ?, ?, ?, ?, false, ?, ?);")
+                (user_id, display_name, parent_id, hashed_password, email, DEFAULT_THUMBNAIL_URL, true, true, Utc::now().timestamp_millis(), Utc::now().timestamp_millis()),
             )
             .await?;
 
@@ -476,7 +502,6 @@ impl Services {
                     .prepared_queries
                     .get("create_user")
                     .expect("Query missing!"),
-                //.prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, false, ?, ?);")
                 (
                     user_create.user_id.0,
                     user_create.display_name,
@@ -484,6 +509,8 @@ impl Services {
                     hashed_password,
                     user_create.email,
                     DEFAULT_THUMBNAIL_URL,
+                    false,
+                    false,
                     Utc::now().timestamp_millis(),
                     Utc::now().timestamp_millis()
                 ),
@@ -510,6 +537,8 @@ impl Services {
             display_name: user_create.display_name.to_string(),
             thumbnail_url: DEFAULT_THUMBNAIL_URL.to_string(),
             is_verified: false,
+            is_admin: false,
+            tags: None,
         };
 
         let session_token = self.create_session_token(&user_session).await?;
@@ -527,6 +556,8 @@ impl Services {
                     display_name: email_user.display_name,
                     thumbnail_url: email_user.thumbnail_url,
                     is_verified: email_user.is_verified,
+                    is_admin: email_user.is_admin,
+                    tags: email_user.tags,
                 };
 
                 let session_token = self.create_session_token(&user_session).await?;
