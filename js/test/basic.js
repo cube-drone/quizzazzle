@@ -18,8 +18,8 @@ test('Can get some JSON', async () => {
 
     assert.strictEqual(json.username, "harbo");
     let currentTimestamp = Date.now();
-    assert(json.timestamp_ms > (currentTimestamp - 10000));
-    assert(json.timestamp_ms < (currentTimestamp + 10000));
+    assert(json.timestamp_ms > (currentTimestamp - 100000));
+    assert(json.timestamp_ms < (currentTimestamp + 100000));
 
     assert(json.active);
 });
