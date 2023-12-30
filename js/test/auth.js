@@ -26,7 +26,7 @@ test('Get a valid invite code from the bin', async () => {
 test('Use the invite code to create a new user', async () => {
     const fetchCookie = makeFetchHappen(fetch)
 
-    let root = await fetch(`${endpoint}/auth/generate_invite_code`);
+    let root = await fetch(`${endpoint}/auth/test/generate_invite_code`);
     let json = await root.json();
     let invite_code = json.invite_code;
 
@@ -66,6 +66,20 @@ test('Use the invite code to create a new user', async () => {
     assert(responseText.includes('ok, user'));
 
     // there's an endpoint that will give us the email history
+    let email_history = await fetchCookie(`${endpoint}/auth/test/get_last_email?email=${email}`);
 
+    let email_code = await email_history.json();
+    console.dir(email_code);
+
+    let url = email_code.email;
+    console.dir(url);
+
+    let verify_email = await fetch(url);
+
+    assert.strictEqual(await verify_email.text(), "ok");
+
+    let test_verification = await fetchCookie(`${endpoint}/auth/ok`);
+
+    assert.strictEqual(await test_verification.text(), "ok, verified user");
 
 });

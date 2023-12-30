@@ -87,7 +87,7 @@ pub async fn initialize(
     prepared_queries.insert(
         "verify_user_email",
         scylla_session
-            .prepare("UPDATE ks.user USING TTL 0 SET is_verified = true WHERE id = ?;")
+            .prepare("UPDATE ks.user SET is_verified = true WHERE id = ?;")
             .await?,
     );
 
@@ -437,7 +437,19 @@ impl Services {
 
         self.email.send_verification_email(&EmailAddress::new(email_address.to_string())?, &email_verification_link).await?;
 
+        if ! self.is_production {
+            let last_email_sent_key = format!("last_email_sent:${}", email_address);
+            redis_connection.set(&last_email_sent_key, email_verification_link).await?;
+        }
+
         Ok(())
+    }
+
+    pub async fn test_get_last_email(&self, email_address: &str) -> Result<String> {
+        let mut redis_connection = self.application_redis.get_async_connection().await?;
+        let last_email_sent_key = format!("last_email_sent:${}", email_address);
+        let last_email_sent: String = redis_connection.get(&last_email_sent_key).await?;
+        Ok(last_email_sent)
     }
 
     pub async fn verify_email(
@@ -445,12 +457,14 @@ impl Services {
         email_verification_token: &Uuid,
     ) -> Result<UserId> {
         let mut redis_connection = self.application_redis.get_async_connection().await?;
-        let user_id: String = redis_connection.get(&format!("email_verification_token:${}", email_verification_token.to_string())).await?;
+        let verification_token_key = format!("email_verification_token:${}", email_verification_token.to_string());
+        let user_id: String = redis_connection.get(&verification_token_key).await?;
         let user_id = Uuid::parse_str(&user_id)?;
         let user_id = UserId(user_id);
 
-        let mut user = self.get_user(&user_id).await?.unwrap();
-        user.is_verified = true;
+        if ! self.get_user_exists(&user_id).await? {
+            return Err(anyhow!("User does not exist!"));
+        }
 
         self.scylla
             .session
@@ -460,9 +474,14 @@ impl Services {
                     .prepared_queries
                     .get("verify_user_email")
                     .expect("Query missing!"),
-                (user_id.0,),
+                (user_id.to_uuid(),),
             )
             .await?;
+
+        //
+        self.verify_all_sessions(&user_id).await?;
+
+        redis_connection.unlink(&verification_token_key).await?;
 
         Ok(user_id)
     }
@@ -577,6 +596,7 @@ s::::::::::::::s  e::::::::eeeeeeee  s::::::::::::::s s::::::::::::::s i::::::io
         redis_connection.expire(&user_sessions_key, USER_SESSION_TIMEOUT_SECONDS*2).await?;
 
         let user_sessions_count: usize = redis_connection.zcard(&user_sessions_key).await?;
+        println!("user_sessions_count: {}", user_sessions_count);
         // if the user has more than MAX_SESSIONS sessions, delete the oldest one
         if user_sessions_count > USER_MAX_SESSION_COUNT {
             self.cull_old_sessions(&user_session.user_id).await?;
@@ -588,14 +608,12 @@ s::::::::::::::s  e::::::::eeeeeeee  s::::::::::::::s s::::::::::::::s i::::::io
     pub async fn cull_old_sessions(&self, user_id: &UserId) -> Result<()>{
         // the user has more than USER_MAX_SESSION_COUNT sessions, delete all but the USER_MAX_SESSION_COUNT most recent
         // it's also fine to cull any that have obviously expired (> USER_SESSION_TIMEOUT_SECONDS old)
-        let mut redis_connection = self.application_redis.get_async_connection().await?;
         let timestamp_cutoff: i64 = Utc::now().timestamp_millis() - (USER_SESSION_TIMEOUT_SECONDS as i64 * 1000);
 
-        let user_sessions: Vec<(String, i64)> = redis_connection.zrangebyscore_withscores(&format!("user_sessions:{}", user_id.to_string()), "+inf", "+inf").await?;
         let mut counter: usize = 0;
-        for (session_token, timestamp) in user_sessions {
+        for (session_token, timestamp) in self.get_all_sessions(&user_id).await? {
             if timestamp < timestamp_cutoff || counter > USER_MAX_SESSION_COUNT {
-                self.delete_session(&SessionToken::from_string(&session_token)?, &user_id).await?;
+                self.delete_session(&session_token, &user_id).await?;
             }
             counter += 1;
         }
@@ -612,10 +630,8 @@ s::::::::::::::s  e::::::::eeeeeeee  s::::::::::::::s s::::::::::::::s i::::::io
     }
 
     pub async fn delete_all_sessions(&self, user_id: &UserId) -> Result<()>{
-        let mut redis_connection = self.application_redis.get_async_connection().await?;
-        let user_sessions: Vec<(String, i64)> = redis_connection.zrangebyscore_withscores(&format!("user_sessions:{}", user_id.to_string()), "+inf", "+inf").await?;
-        for (session_token, _timestamp) in user_sessions {
-            self.delete_session(&SessionToken::from_string(&session_token)?, &user_id).await?;
+        for (session_token, _timestamp) in self.get_all_sessions(&user_id).await? {
+            self.delete_session(&session_token, &user_id).await?;
         }
         Ok(())
     }
@@ -624,6 +640,8 @@ s::::::::::::::s  e::::::::eeeeeeee  s::::::::::::::s s::::::::::::::s i::::::io
         let mut redis_connection = self.application_redis.get_async_connection().await?;
         let key = format!("session_token:{}", session_token.to_string());
         let session_json: String = redis_connection.get(&key).await?;
+
+        println!("verifying session_json: {}", session_json);
 
         let mut user_session: UserSession = serde_json::from_str(&session_json)?;
 
@@ -636,15 +654,21 @@ s::::::::::::::s  e::::::::eeeeeeee  s::::::::::::::s s::::::::::::::s i::::::io
         Ok(())
     }
 
+    pub async fn get_all_sessions(&self, user_id: &UserId) -> Result<Vec<(SessionToken, i64)>> {
+        let mut redis_connection = self.application_redis.get_async_connection().await?;
+        let user_sessions: Vec<(String, i64)> = redis_connection.zrangebyscore_withscores(&format!("user_sessions:{}", user_id.to_string()), "-inf", "+inf").await?;
+
+        let new_user_sessions: Vec<(SessionToken, i64)> = user_sessions.iter().map(|(session_token, timestamp)| (SessionToken::from_string(&session_token).unwrap(), *timestamp)).collect();
+
+        Ok(new_user_sessions)
+    }
+
     pub async fn verify_all_sessions(&self, user_id: &UserId) -> Result<()>{
         /*
             after the user has verified that their email address is valid, we should verify all of their sessions
          */
-        let mut redis_connection = self.application_redis.get_async_connection().await?;
-
-        let user_sessions: Vec<(String, i64)> = redis_connection.zrangebyscore_withscores(&format!("user_sessions:{}", user_id.to_string()), "+inf", "+inf").await?;
-        for (session_token, _timestamp) in user_sessions {
-            self.verify_session(&SessionToken::from_string(&session_token)?).await?;
+        for (session_token, _timestamp) in self.get_all_sessions(&user_id).await? {
+            self.verify_session(&session_token).await?;
         }
         Ok(())
     }
@@ -664,6 +688,8 @@ s::::::::::::::s  e::::::::eeeeeeee  s::::::::::::::s s::::::::::::::s i::::::io
         let mut redis_connection = self.application_redis.get_async_connection().await?;
 
         let session_json: String = redis_connection.get(&format!("session_token:{}", session_token.to_string())).await?;
+
+        println!("getting session_json: {}", session_json);
 
         let user_session: UserSession = serde_json::from_str(&session_json)?;
 

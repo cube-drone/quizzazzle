@@ -31,7 +31,7 @@ async fn register() -> Redirect  {
 }
 
 #[get("/test/generate_invite_code")]
-async fn generate_invite_code(services: &State<Services>) -> Result<Json<HashMap<String, String>>, Status> {
+async fn test_generate_invite_code(services: &State<Services>) -> Result<Json<HashMap<String, String>>, Status> {
     if services.is_production {
         return Err(Status::Forbidden);
     }
@@ -63,6 +63,20 @@ async fn test_create_user(services: &State<Services>, cookies: &CookieJar<'_>, u
     Ok(Json(hashmap))
 }
 
+#[get("/test/get_last_email?<email>")]
+async fn test_get_last_email(services: &State<Services>, email: &str) -> Result<Json<HashMap<String, String>>, Status> {
+    if services.is_production {
+        return Err(Status::Forbidden);
+    }
+
+    let mut hashmap: HashMap<String, String> = HashMap::new();
+    hashmap.insert("email".to_string(),
+        services.test_get_last_email(&email).await.expect("should be able to get last email").to_string()
+    );
+
+    Ok(Json(hashmap))
+}
+
 #[get("/invite")]
 async fn invite() -> Template {
     Template::render("invite", context! {})
@@ -81,8 +95,6 @@ async fn invite_post(services: &State<Services>, cookies: &CookieJar<'_>, invite
             error: e.to_string(),
         }),
       };
-
-    println!("invite code: {}", invite.invite_code);
 
     let invite_code = match model::InviteCode::from_string(invite.invite_code){
         Ok(invite_code) => invite_code,
@@ -326,9 +338,9 @@ impl<'r> FromRequest<'r> for model::UserSession {
     }
 }
 
-#[get("/verify_email?<verify_email_token>")]
-async fn verify_email(services: &State<Services>, verify_email_token: Uuid) -> Redirect {
-    let maybe_error = services.verify_email(&verify_email_token).await;
+#[get("/verify_email?<token>")]
+async fn verify_email(services: &State<Services>, token: Uuid) -> Redirect {
+    let maybe_error = services.verify_email(&token).await;
 
     match maybe_error{
         Ok(_) => Redirect::to("/auth/ok"),
@@ -337,6 +349,11 @@ async fn verify_email(services: &State<Services>, verify_email_token: Uuid) -> R
             Redirect::to("/auth/email_error")
         }
     }
+}
+
+#[get("/email_error")]
+async fn email_error() -> &'static str {
+    "error verifying email; please try again"
 }
 
 #[get("/ok")]
@@ -366,13 +383,15 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
         "/auth",
         routes![
             register,
-            generate_invite_code,
+            test_generate_invite_code,
             test_create_user,
+            test_get_last_email,
             login,
             invite,
             invite_post,
             register_post,
             verify_email,
+            email_error,
             ok_verified_user,
             ok_user,
             ok,
