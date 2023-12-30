@@ -16,7 +16,7 @@ test('Can connect to localhost', async () => {
 });
 
 test('Get a valid invite code from the bin', async () => {
-    let root = await fetch(`${endpoint}/auth/generate_invite_code`);
+    let root = await fetch(`${endpoint}/auth/test/generate_invite_code`);
 
     let json = await root.json();
 

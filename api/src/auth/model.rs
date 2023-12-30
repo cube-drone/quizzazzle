@@ -420,11 +420,6 @@ impl Services {
         Ok(())
     }
 
-    pub fn get_public_address(&self) -> String{
-        let config = self.config.read().unwrap();
-        config.public_config.get("ROCKET_PUBLIC_ADDRESS").unwrap_or(&"http://localhost:3333".to_string()).to_string()
-    }
-
     pub async fn send_verification_email(
         &self,
         user_id: &Uuid,
@@ -436,7 +431,7 @@ impl Services {
 
         redis_connection.set_ex(&key, user_id.to_string(), EMAIL_VERIFICATION_TIMEOUT_SECONDS).await?;
 
-        let public_address = self.get_public_address();
+        let public_address = self.config_get_public_address();
 
         let email_verification_link = format!("{}/auth/verify_email?token={}", public_address, email_verification_token);
 

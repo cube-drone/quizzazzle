@@ -96,3 +96,10 @@ pub async fn update_config(services: & Services) -> Result<()> {
 
     Ok(())
 }
+
+impl Services {
+    pub fn config_get_public_address(&self) -> String{
+        let config = self.config.read().unwrap();
+        config.public_config.get("ROCKET_PUBLIC_ADDRESS").unwrap_or(&"http://localhost:3333".to_string()).to_string()
+    }
+}
