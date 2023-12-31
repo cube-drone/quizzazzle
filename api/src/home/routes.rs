@@ -29,13 +29,23 @@ async fn faq(services: &State<Services>) -> Template {
     })
 }
 
+#[get("/home")]
+async fn user_home(_user: crate::auth::model::VerifiedUserSession) -> Template {
+    let current_date = chrono::Utc::now();
+    let year = current_date.year();
+    Template::render("user_home", context! {
+        year: year,
+    })
+}
+
 pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
     app.mount(
         "/",
         routes![
             home,
             tos,
-            faq
+            faq,
+            user_home
         ],
     )
 }

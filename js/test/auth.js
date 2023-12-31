@@ -6,6 +6,7 @@ const makeFetchHappen = require('fetch-cookie');
 const { JSDOM } = jsdom;
 
 const { endpoint } = require('./constants');
+const { createUser } = require('./generator');
 
 test('Can connect to localhost', async () => {
     let root = await fetch(`${endpoint}/auth/invite`);
@@ -25,6 +26,11 @@ test('Get a valid invite code from the bin', async () => {
 
 test('Create, verify, and log in as a new user', async () => {
     const fetchCookie = makeFetchHappen(fetch)
+
+    // check our status
+    let status_response = await fetchCookie(`${endpoint}/auth/status`);
+    let status_text = await status_response.text();
+    assert(status_text.includes("ok, not logged in"));
 
     let root = await fetch(`${endpoint}/auth/test/generate_invite_code`);
     let json = await root.json();
@@ -64,6 +70,11 @@ test('Create, verify, and log in as a new user', async () => {
 
     assert(responseText.includes('verify') && responseText.includes('email'));
 
+    // check our status
+    status_response = await fetchCookie(`${endpoint}/auth/status`);
+    status_text = await status_response.text();
+    assert(status_text.includes("ok, user"));
+
     // we didn't get an email, because we're running this in test mode and we don't have an email server
     // so we have to cheat:
     // there's an endpoint that will give us the email history
@@ -71,12 +82,17 @@ test('Create, verify, and log in as a new user', async () => {
     let email_code = await email_history.json();
     let url = email_code.email;
     let verify_email = await fetch(url);
-    assert.strictEqual(await verify_email.text(), "ok");
+    assert((await verify_email.text()).toLowerCase().includes("home"));
+
+    // check our status
+    status_response = await fetchCookie(`${endpoint}/auth/status`);
+    status_text = await status_response.text();
+    assert(status_text.includes("ok, verified user"));
 
     // once we've done that, if we hit /auth/ok, it will take us to the home page
     let test_verification = await fetchCookie(`${endpoint}/auth/ok`);
     let homeText = (await test_verification.text()).toLowerCase();
-    assert(homeText.includes("ok, verified user"));
+    assert(homeText.includes("home"));
 
     const newFetchCookie = makeFetchHappen(fetch)
 
@@ -94,7 +110,28 @@ test('Create, verify, and log in as a new user', async () => {
         method: 'POST',
         body: loginFormData,
     });
+    homeText = (await login_final_form_response.text()).toLowerCase();
+    assert(homeText.includes("home"));
+});
 
-    console.dir(await login_final_form_response.text())
+test('Quickly create a new user', async () => {
+    let {fetch, user} = await createUser();
 
+    let root = await fetch(`${endpoint}/auth/status`);
+
+    let html = await root.text();
+
+    assert(html.includes("ok, verified user"));
+});
+
+test('Quickly create a hundred new users', async () => {
+    for(let i = 0; i < 100; i++){
+        let {fetch, user} = await createUser();
+
+        let root = await fetch(`${endpoint}/auth/status`);
+
+        let html = await root.text();
+
+        assert(html.includes("ok, verified user"));
+    }
 });

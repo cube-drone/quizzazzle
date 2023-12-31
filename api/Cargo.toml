@@ -20,6 +20,7 @@ argon2 = { version = "0.5.2"}
 comrak = "0.20" # markdown
 aws-config = { version = "1.0.3", features = ["behavior-version-latest"] }
 aws-sdk-sesv2 = "1.4.0"
+murmur3 = "=0.5.2"
 
 redis = { version = "0.23.3", features=["r2d2", "cluster-async", "tokio-comp", "connection-manager", "keep-alive", "ahash"]}
 # r2d2 - enables r2d2 connection pool support

@@ -297,6 +297,8 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, regi
             email: register.email,
             parent_id: parent_uuid,
             password: register.password,
+            is_verified: false,
+            is_admin: false,
         };
 
         match services.create_user(user_create).await{
@@ -328,6 +330,47 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, regi
             email: register.email,
             password: register.password,
         }))
+    }
+}
+
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for model::AdminUserSession {
+
+    type Error = anyhow::Error;
+
+    async fn from_request(req: &'r Request<'_>) -> Outcome<Self, anyhow::Error> {
+        let services = req.rocket().state::<Services>().unwrap();
+
+        let maybe_session_token = req.cookies().get_private("session_token");
+
+        if let Some(session_token) = maybe_session_token{
+            let session_token_maybe = model::SessionToken::from_string(session_token.value());
+
+            match session_token_maybe{
+                Ok(session_token) => {
+                    match services.get_user_from_session_token(&session_token).await{
+                        Ok(user) => {
+                            if user.is_admin{
+                                return Outcome::Success(user.to_admin_user_session());
+                            }
+                            else{
+                                return Outcome::Forward(Status::Forbidden);
+                            }
+                        },
+                        Err(e) => {
+                            println!("Error getting user from session token: {}", e);
+                            return Outcome::Forward(Status::Forbidden);
+                        }
+                    }
+                },
+                Err(_) => {
+                    return Outcome::Forward(Status::Forbidden);
+                }
+            }
+        }
+        else{
+            return Outcome::Forward(Status::Forbidden);
+        }
     }
 }
 
@@ -438,6 +481,26 @@ async fn verify_email_nobody() -> Redirect{
     Redirect::to("/auth/login")
 }
 
+#[get("/status")]
+async fn status_auth_user(_admin: model::AdminUserSession) -> &'static str {
+    "ok, auth user"
+}
+
+#[get("/status", rank=2)]
+async fn status_verified_user(_user: model::VerifiedUserSession) -> &'static str {
+    "ok, verified user"
+}
+
+#[get("/status", rank=3)]
+async fn status_user(_user: model::UserSession) -> &'static str {
+    "ok, user"
+}
+
+#[get("/status", rank=4)]
+async fn status() -> &'static str {
+    "ok, not logged in"
+}
+
 
 #[get("/email_error")]
 async fn email_error() -> Template {
@@ -445,8 +508,8 @@ async fn email_error() -> Template {
 }
 
 #[get("/ok")]
-async fn ok_verified_user(_user: model::VerifiedUserSession) -> &'static str {
-    "ok, verified user"
+async fn ok_verified_user(_user: model::VerifiedUserSession) -> Redirect {
+    Redirect::to("/home")
 }
 
 #[get("/ok", rank=2)]
@@ -455,8 +518,8 @@ async fn ok_user(_user: model::UserSession) -> Redirect {
 }
 
 #[get("/ok", rank=3)]
-async fn ok() -> &'static str {
-    "ok"
+async fn ok() -> Redirect {
+    Redirect::to("/auth/login")
 }
 
 #[get("/logout")]
@@ -484,6 +547,10 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
             verify_email,
             verify_email_nobody,
             email_error,
+            status_auth_user,
+            status_verified_user,
+            status_user,
+            status,
             ok_verified_user,
             ok_user,
             ok,

@@ -15,6 +15,7 @@ use scylla::macros::FromRow;
 use scylla::Session;
 use chrono::{Utc, Duration};
 
+// hashing some stuff
 use ::argon2::{
     password_hash::{
         rand_core::OsRng,
@@ -22,6 +23,8 @@ use ::argon2::{
     },
     Argon2
 };
+use std::io::Cursor;
+use murmur3::murmur3_x86_128;
 
 use crate::email::EmailAddress;
 use crate::Services;
@@ -188,6 +191,16 @@ pub fn password_test(password: &str, hashed_password: &str) -> Result<bool> {
     Ok(is_valid)
 }
 
+pub fn lazy_password_hash(password: &str) -> Result<String> {
+    let hash_result = murmur3_x86_128(&mut Cursor::new(password), 0).expect("hashing works");
+    return Ok(hash_result.to_string());
+}
+
+pub fn lazy_password_test(password: &str, hashed_password: &str) -> Result<bool> {
+    let hash_result = murmur3_x86_128(&mut Cursor::new(password), 0).expect("hashing works");
+    return Ok(hash_result.to_string() == hashed_password);
+}
+
 #[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 pub struct InviteCode(Uuid);
 impl InviteCode {
@@ -255,6 +268,8 @@ pub struct UserCreate<'r>{
     pub display_name: &'r str,
     pub email: &'r str,
     pub password: &'r str,
+    pub is_verified: bool,
+    pub is_admin: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -437,8 +452,14 @@ impl Services {
         let email = "root@gooble.email";
         let parent_id = "";
         let root_auth_password = env::var("GROOVELET_ROOT_AUTH_PASSWORD").unwrap_or_else(|_| "root".to_string());
-        let hashed_password = password_hash(&root_auth_password)?;
 
+        let hashed_password: String;
+        if self.is_production{
+            hashed_password = password_hash(&root_auth_password)?;
+        }
+        else{
+            hashed_password = lazy_password_hash(&root_auth_password)?;
+        }
 
         self.scylla
             .session
@@ -473,8 +494,6 @@ impl Services {
         &self,
         user_create: UserCreate<'_>,
     ) -> Result<SessionToken> {
-        let hashed_password = password_hash(&user_create.password)?;
-
         if self.get_user_exists(&user_create.user_id).await? {
             return Err(anyhow!("User somehow already exists! Wow, UUIDs are not as unique as I thought!"));
         }
@@ -493,6 +512,15 @@ impl Services {
             }
         }
 
+        let hashed_password: String;
+        if self.is_production{
+            hashed_password = password_hash(&user_create.password)?;
+        }
+        else{
+            hashed_password = lazy_password_hash(&user_create.password)?;
+        }
+
+
         // the core user record!
         self.scylla
             .session
@@ -509,8 +537,8 @@ impl Services {
                     hashed_password,
                     user_create.email,
                     DEFAULT_THUMBNAIL_URL,
-                    false,
-                    false,
+                    user_create.is_verified,
+                    user_create.is_admin,
                     Utc::now().timestamp_millis(),
                     Utc::now().timestamp_millis()
                 ),
@@ -536,8 +564,8 @@ impl Services {
             user_id: user_create.user_id,
             display_name: user_create.display_name.to_string(),
             thumbnail_url: DEFAULT_THUMBNAIL_URL.to_string(),
-            is_verified: false,
-            is_admin: false,
+            is_verified: user_create.is_verified,
+            is_admin: user_create.is_admin,
             tags: None,
         };
 
@@ -549,7 +577,14 @@ impl Services {
     pub async fn login(&self, email: &str, password: &str) -> Result<SessionToken> {
         let email_user = self.get_user_email(&email).await?;
         if let Some(email_user) = email_user {
-            if password_test(&password, &email_user.hashed_password)? {
+            let password_success:bool;
+            if self.is_production {
+                password_success = password_test(&password, &email_user.hashed_password)?;
+            }
+            else{
+                password_success = lazy_password_test(&password, &email_user.hashed_password)?;
+            }
+            if password_success {
                 let user_id: UserId = UserId::from_uuid(email_user.id);
                 let user_session: UserSession = UserSession{
                     user_id: user_id,
