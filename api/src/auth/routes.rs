@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::net::IpAddr;
 
 use rocket::{Build, Rocket};
 use rocket_dyn_templates::{Template, context};
@@ -35,8 +36,10 @@ struct Login<'r> {
     password: &'r str,
 }
 
+const MAXIMUM_LOGIN_ATTEMPTS_PER_HOUR: usize = 15;
+
 #[post("/login", data = "<login>")]
-async fn login_post(services: &State<Services>, cookies: &CookieJar<'_>, login: Form<Login<'_>>) -> Result<Redirect, Template> {
+async fn login_post(services: &State<Services>, cookies: &CookieJar<'_>, login: Form<Login<'_>>, ip: BestGuessIpAddress) -> Result<Redirect, Template> {
 
     let csrf_token_new = Uuid::new_v4().to_string();
 
@@ -73,8 +76,21 @@ async fn login_post(services: &State<Services>, cookies: &CookieJar<'_>, login: 
         })),
       };
 
-    // okay, now, let's try to login
+    let rate_limit_factors: Vec<String> = vec![ip.to_string(), login.email.to_string()];
+    match services.rate_limits(&rate_limit_factors, MAXIMUM_LOGIN_ATTEMPTS_PER_HOUR).await{
+        Ok(()) => {
+        },
+        Err(e) => {
+            return Err(Template::render("login", context! {
+                csrf_token: csrf_token_new,
+                error: "Attempting logins too fast, please wait a bit and try again!",
+                email: "",
+                password: "",
+            }));
+        }
+    }
 
+    // okay, now, let's try to login
     match services.login(login.email, login.password).await{
         Ok(session_token) => {
             // u did it, create a session token
@@ -447,6 +463,53 @@ impl<'r> FromRequest<'r> for model::UserSession {
         }
         else{
             return Outcome::Forward(Status::Forbidden);
+        }
+    }
+}
+
+struct BestGuessIpAddress(IpAddr);
+impl BestGuessIpAddress{
+    fn from_string(ip: &str) -> Result<Self, anyhow::Error>{
+        let ip = ip.parse::<IpAddr>()?;
+        Ok(Self(ip))
+    }
+    fn from_ip(ip: IpAddr) -> Self{
+        Self(ip)
+    }
+    fn to_string(&self) -> String{
+        self.0.to_string()
+    }
+    fn to_ip(&self) -> IpAddr{
+        self.0
+    }
+}
+
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for BestGuessIpAddress {
+    type Error = anyhow::Error;
+
+    async fn from_request(req: &'r Request<'_>) -> Outcome<Self, anyhow::Error> {
+        // X-Forwarded-For is a comma-separated list of IPs, the first one is the client IP
+        // return that, or, failing that
+        let maybe_ip = req.headers().get_one("X-Forwarded-For");
+        match maybe_ip{
+            Some(ip) => {
+                let ip = ip.split(",").next().unwrap().to_string();
+                match BestGuessIpAddress::from_string(&ip){
+                    Ok(ip) => return Outcome::Success(ip),
+                    Err(e) => {
+                        println!("Error parsing ip address: {}", e);
+                        return Outcome::Error((Status::BadRequest, anyhow::anyhow!("error parsing ip address")));
+                    }
+                }
+            },
+            None => {
+                let maybe_ip = req.remote().map(|ip| ip.ip());
+                match maybe_ip{
+                    Some(ip) => return Outcome::Success(BestGuessIpAddress::from_ip(ip)),
+                    None => return Outcome::Error((Status::BadRequest, anyhow::anyhow!("error parsing ip address"))),
+                }
+            }
         }
     }
 }
