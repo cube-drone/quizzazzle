@@ -18,7 +18,7 @@
             {% endif %}
             <p>Hey, I sent you an e-mail to make sure that that email address actually belongs to you.</p>
             <p>Go, uh, find it, in your e-mail account, and click on the link in there.</p>
-            <form method="get" action=".">
+            <form method="get" action="/auth/verify_email">
                 <button name="submit" value="Ok">I did!</button>
             </form>
             <form method="post" action="/auth/resend_verification_email">

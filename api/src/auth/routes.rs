@@ -501,7 +501,6 @@ async fn status() -> &'static str {
     "ok, not logged in"
 }
 
-
 #[get("/email_error")]
 async fn email_error() -> Template {
     Template::render("error", context! {error: "We tried to verify your email, but something went wrong. Please try again!"})
@@ -529,6 +528,11 @@ async fn logout(cookies: &CookieJar<'_>) -> Redirect {
     Redirect::to("/")
 }
 
+#[get("/user")]
+async fn auth_user(user: model::VerifiedUserSession) -> Json<model::VerifiedUserSession> {
+    Json(user)
+}
+
 pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
     app.mount(
         "/auth",
@@ -554,7 +558,8 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
             ok_verified_user,
             ok_user,
             ok,
-            logout
+            logout,
+            auth_user
         ],
     )
 }

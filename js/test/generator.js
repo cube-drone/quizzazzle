@@ -31,7 +31,7 @@ async function createUser(userCreate){
 
     return {
         fetch: fetchCookie,
-        user: userCreate,
+        user: toCreate,
         sessionToken: returnValue.session_token,
         id: returnValue.user_id,
     }

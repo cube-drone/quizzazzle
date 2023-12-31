@@ -97,7 +97,6 @@ test('Create, verify, and log in as a new user', async () => {
     const newFetchCookie = makeFetchHappen(fetch)
 
     let login_form_response = await newFetchCookie(`${endpoint}/auth/login`);
-
     let login_form_dom = new JSDOM(await login_form_response.text());
     let login_csrf_token = login_form_dom.window.document.querySelector("input[name=\"csrf_token\"]").value;
 
@@ -118,10 +117,16 @@ test('Quickly create a new user', async () => {
     let {fetch, user} = await createUser();
 
     let root = await fetch(`${endpoint}/auth/status`);
-
     let html = await root.text();
-
     assert(html.includes("ok, verified user"));
+
+    let json = await fetch(`${endpoint}/auth/user`);
+    let userJson = await json.json();
+
+    assert.strictEqual(userJson.user_id, user.user_id);
+    assert.strictEqual(userJson.display_name, user.display_name);
+    assert.strictEqual(userJson.is_admin, user.is_admin);
+    assert(userJson.thumbnail_url);
 });
 
 test('Quickly create a hundred new users', async () => {
