@@ -8,6 +8,8 @@ use redis::AsyncCommands;
 
 use anyhow::Result;
 use anyhow::anyhow;
+use rocket::tokio::task;
+
 use rocket::serde::uuid::Uuid;
 use scylla::prepared_statement::PreparedStatement;
 use scylla::macros::FromRow;
@@ -181,6 +183,15 @@ pub fn password_hash(password: &str) -> Result<String> {
     Ok(hashed_password)
 }
 
+pub async fn password_hash_async(password: &str) -> Result<String> {
+    let password = password.to_string();
+    let result = task::spawn_blocking(move || {
+        password_hash(&password)
+    }).await?;
+
+    result
+}
+
 pub fn password_test(password: &str, hashed_password: &str) -> Result<bool> {
     let peppered: String = format!("{}-{}-{}", password, env::var("GROOVELET_PEPPER").unwrap_or_else(|_| "peppa".to_string()), "SPUDJIBMSPLQPFFSPLBLBlBLBLPRT");
     let argon2 = Argon2::default();
@@ -191,14 +202,43 @@ pub fn password_test(password: &str, hashed_password: &str) -> Result<bool> {
     Ok(is_valid)
 }
 
+pub async fn password_test_async(password: &str, hashed_password: &str) -> Result<bool> {
+    let password = password.to_string();
+    let hashed_password = hashed_password.to_string();
+    let result = task::spawn_blocking(move || {
+        password_test(&password, &hashed_password)
+    }).await?;
+
+    result
+}
+
 pub fn lazy_password_hash(password: &str) -> Result<String> {
     let hash_result = murmur3_x86_128(&mut Cursor::new(password), 0).expect("hashing works");
-    return Ok(hash_result.to_string());
+    Ok(hash_result.to_string())
+}
+
+pub async fn lazy_password_hash_async(password: &str) -> Result<String> {
+    let password = password.to_string();
+    let result = task::spawn_blocking(move || {
+        lazy_password_hash(&password)
+    }).await?;
+
+    result
 }
 
 pub fn lazy_password_test(password: &str, hashed_password: &str) -> Result<bool> {
     let hash_result = murmur3_x86_128(&mut Cursor::new(password), 0).expect("hashing works");
-    return Ok(hash_result.to_string() == hashed_password);
+    Ok(hash_result.to_string() == hashed_password)
+}
+
+pub async fn lazy_password_test_async(password: &str, hashed_password: &str) -> Result<bool> {
+    let password = password.to_string();
+    let hashed_password = hashed_password.to_string();
+    let result = task::spawn_blocking(move || {
+        lazy_password_test(&password, &hashed_password)
+    }).await?;
+
+    result
 }
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug)]
@@ -455,10 +495,10 @@ impl Services {
 
         let hashed_password: String;
         if self.is_production{
-            hashed_password = password_hash(&root_auth_password)?;
+            hashed_password = password_hash_async(&root_auth_password).await?;
         }
         else{
-            hashed_password = lazy_password_hash(&root_auth_password)?;
+            hashed_password = lazy_password_hash_async(&root_auth_password).await?;
         }
 
         self.scylla
@@ -514,10 +554,10 @@ impl Services {
 
         let hashed_password: String;
         if self.is_production{
-            hashed_password = password_hash(&user_create.password)?;
+            hashed_password = password_hash_async(&user_create.password).await?;
         }
         else{
-            hashed_password = lazy_password_hash(&user_create.password)?;
+            hashed_password = lazy_password_hash_async(&user_create.password).await?;
         }
 
 
@@ -579,10 +619,10 @@ impl Services {
         if let Some(email_user) = email_user {
             let password_success:bool;
             if self.is_production {
-                password_success = password_test(&password, &email_user.hashed_password)?;
+                password_success = password_test_async(&password, &email_user.hashed_password).await?;
             }
             else{
-                password_success = lazy_password_test(&password, &email_user.hashed_password)?;
+                password_success = lazy_password_test_async(&password, &email_user.hashed_password).await?;
             }
             if password_success {
                 let user_id: UserId = UserId::from_uuid(email_user.id);
