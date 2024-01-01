@@ -126,6 +126,20 @@ pub async fn initialize(
                 PRIMARY KEY(user_id, ip));
             "#, &[], ).await?;
 
+    prepared_queries.insert(
+        "get_user_ips",
+        scylla_session
+            .prepare("SELECT ip FROM ks.user_ips WHERE user_id = ?;")
+            .await?,
+    );
+
+    prepared_queries.insert(
+        "set_user_ip",
+        scylla_session
+            .prepare("INSERT INTO ks.user_ips (user_id, ip) VALUES (?, ?);")
+            .await?,
+    );
+
     scylla_session
         .query(r#"
             CREATE TABLE IF NOT EXISTS ks.email_user (
@@ -310,6 +324,7 @@ pub struct UserCreate<'r>{
     pub password: &'r str,
     pub is_verified: bool,
     pub is_admin: bool,
+    pub ip: &'r str,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -560,6 +575,7 @@ impl Services {
             hashed_password = lazy_password_hash_async(&user_create.password).await?;
         }
 
+        let user_id = user_create.user_id.to_uuid();
 
         // the core user record!
         self.scylla
@@ -571,7 +587,7 @@ impl Services {
                     .get("create_user")
                     .expect("Query missing!"),
                 (
-                    user_create.user_id.0,
+                    user_id,
                     user_create.display_name,
                     user_create.parent_id.0,
                     hashed_password,
@@ -595,6 +611,19 @@ impl Services {
                     .get("set_email_user")
                     .expect("query missing!"),
                 (user_create.email, user_create.user_id.0,),
+            )
+            .await?;
+
+        // user -> ip
+        self.scylla
+            .session
+            .execute(
+                &self
+                    .scylla
+                    .prepared_queries
+                    .get("set_user_ip")
+                    .expect("Query missing!"),
+                (user_id, user_create.ip, ),
             )
             .await?;
 

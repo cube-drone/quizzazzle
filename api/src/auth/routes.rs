@@ -131,13 +131,18 @@ async fn test_generate_invite_code(services: &State<Services>) -> Result<Json<Ha
 }
 
 #[post("/test/create_user", format = "json", data = "<user_serialized>")]
-async fn test_create_user(services: &State<Services>, cookies: &CookieJar<'_>, user_serialized: Json<model::UserCreate<'_>>) -> Result<Json<HashMap<String, String>>, Status> {
+async fn test_create_user(services: &State<Services>, cookies: &CookieJar<'_>, ip: BestGuessIpAddress, user_serialized: Json<model::UserCreate<'_>>) -> Result<Json<HashMap<String, String>>, Status> {
     if services.is_production {
         return Err(Status::Forbidden);
     }
 
     let user_to_create = user_serialized.into_inner();
     let user_id = user_to_create.user_id.clone();
+
+    let user_to_create = model::UserCreate{
+        ip: &ip.to_string(),
+        ..user_to_create
+    };
 
     let session_token = services.create_user(user_to_create).await.expect("should be able to create a user");
     cookies.add_private(Cookie::new("session_token", session_token.to_string()));
@@ -226,7 +231,7 @@ struct Register<'r> {
 }
 
 #[post("/register", data = "<register>")]
-async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, register: Form<Register<'_>>) -> Result<Redirect, Template> {
+async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: BestGuessIpAddress, register: Form<Register<'_>>) -> Result<Redirect, Template> {
 
     let csrf_token_new = Uuid::new_v4().to_string();
 
@@ -315,6 +320,7 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, regi
             password: register.password,
             is_verified: false,
             is_admin: false,
+            ip: &ip.to_string(),
         };
 
         match services.create_user(user_create).await{
