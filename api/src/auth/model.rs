@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::env;
+use std::net::IpAddr;
 
 use serde::{Deserialize, Serialize};
 
@@ -324,7 +325,7 @@ pub struct UserCreate<'r>{
     pub password: &'r str,
     pub is_verified: bool,
     pub is_admin: bool,
-    pub ip: &'r str,
+    pub ip: IpAddr,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -334,6 +335,7 @@ pub struct UserSession {
     pub thumbnail_url: String,
     pub is_verified: bool,
     pub is_admin: bool,
+    pub is_known_ip: bool,
     pub tags: Option<Vec<String>>,
 }
 
@@ -635,6 +637,7 @@ impl Services {
             thumbnail_url: DEFAULT_THUMBNAIL_URL.to_string(),
             is_verified: user_create.is_verified,
             is_admin: user_create.is_admin,
+            is_known_ip: true,
             tags: None,
         };
 
@@ -661,6 +664,7 @@ impl Services {
                     thumbnail_url: email_user.thumbnail_url,
                     is_verified: email_user.is_verified,
                     is_admin: email_user.is_admin,
+                    is_known_ip: true,
                     tags: email_user.tags,
                 };
 

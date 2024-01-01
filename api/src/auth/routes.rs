@@ -140,7 +140,7 @@ async fn test_create_user(services: &State<Services>, cookies: &CookieJar<'_>, i
     let user_id = user_to_create.user_id.clone();
 
     let user_to_create = model::UserCreate{
-        ip: &ip.to_string(),
+        ip: ip.to_ip(),
         ..user_to_create
     };
 
@@ -320,7 +320,7 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: 
             password: register.password,
             is_verified: false,
             is_admin: false,
-            ip: &ip.to_string(),
+            ip: ip.to_ip(),
         };
 
         match services.create_user(user_create).await{
