@@ -1,7 +1,7 @@
 {% extends "email_base.html.tera" %}
 
 {% block content %}
-<h1> Please Verify Your Email </h1>
-<p> Please click <a href="{{ verification_link }}">here</a> to verify that you are the owner of this email!</p>
-<p> (If you didn't just register for a new account, please disregard this email) </p>
+<h1> You've Logged In to {{ site_name }} From a New Location</h1>
+<p> Please click <a href="{{ verification_link }}">here</a> to verify that you are... you! The owner of this email!</p>
+<p> (If you didn't just log in to {{ site_name }}, please disregard this email) </p>
 {% endblock content %}

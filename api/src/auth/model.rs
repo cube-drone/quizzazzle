@@ -119,6 +119,7 @@ pub async fn initialize(
                 PRIMARY KEY (user_id, descendant_id));
             "#, &[], ).await?;
 
+    // user --> ip
     scylla_session
         .query(r#"
             CREATE TABLE IF NOT EXISTS ks.user_ips (
@@ -127,6 +128,7 @@ pub async fn initialize(
                 PRIMARY KEY(user_id, ip));
             "#, &[], ).await?;
 
+    /* we don't have a plan for this one yet: get all of the ips for a given user */
     prepared_queries.insert(
         "get_user_ips",
         scylla_session
@@ -134,6 +136,9 @@ pub async fn initialize(
             .await?,
     );
 
+    // register an ip against a user
+    // this lasts forever: if you've _ever_ logged in from an IP, it's good forever
+    //   TODO: maybe show users the list and let them remove entries?
     prepared_queries.insert(
         "set_user_ip",
         scylla_session
@@ -141,6 +146,16 @@ pub async fn initialize(
             .await?,
     );
 
+    // this one's mostly here to test whether or not any given ip is "known" to us
+    // if not, we need to send a verification email
+    prepared_queries.insert(
+        "get_user_ip",
+        scylla_session
+            .prepare("SELECT ip FROM ks.user_ips WHERE user_id = ? AND ip = ?;")
+            .await?,
+    );
+
+    // email --> user
     scylla_session
         .query(r#"
             CREATE TABLE IF NOT EXISTS ks.email_user (
@@ -162,6 +177,7 @@ pub async fn initialize(
             .await?,
     );
 
+    // email_domain --> user
     scylla_session
         .query(r#"
             CREATE TABLE IF NOT EXISTS ks.email_domain (
@@ -336,6 +352,7 @@ pub struct UserSession {
     pub is_verified: bool,
     pub is_admin: bool,
     pub is_known_ip: bool,
+    pub ip: IpAddr,
     pub tags: Option<Vec<String>>,
 }
 
@@ -638,6 +655,7 @@ impl Services {
             is_verified: user_create.is_verified,
             is_admin: user_create.is_admin,
             is_known_ip: true,
+            ip: user_create.ip,
             tags: None,
         };
 
@@ -646,7 +664,37 @@ impl Services {
         Ok(session_token)
     }
 
-    pub async fn login(&self, email: &str, password: &str) -> Result<SessionToken> {
+    pub async fn is_this_a_known_ip_for_this_user(
+        &self,
+        user_id: &UserId,
+        ip: &IpAddr,
+    ) -> Result<bool> {
+        let result = self.scylla
+            .session
+            .execute(
+                &self
+                    .scylla
+                    .prepared_queries
+                    .get("get_user_ip")
+                    .expect("Query missing!"),
+                (user_id.to_uuid(), ip,),
+            )
+            .await?;
+
+        if let Some(rows) = result.rows {
+            if rows.len() > 0 {
+                return Ok(true);
+            }
+            else{
+                return Ok(false);
+            }
+        }
+        else{
+            return Ok(false);
+        }
+    }
+
+    pub async fn login(&self, email: &str, password: &str, ip: IpAddr) -> Result<SessionToken> {
         let email_user = self.get_user_email(&email).await?;
         if let Some(email_user) = email_user {
             let password_success:bool;
@@ -656,6 +704,9 @@ impl Services {
             else{
                 password_success = lazy_password_test_async(&password, &email_user.hashed_password).await?;
             }
+
+            let known_ip = self.is_this_a_known_ip_for_this_user(&UserId::from_uuid(email_user.id), &ip).await?;
+
             if password_success {
                 let user_id: UserId = UserId::from_uuid(email_user.id);
                 let user_session: UserSession = UserSession{
@@ -664,7 +715,8 @@ impl Services {
                     thumbnail_url: email_user.thumbnail_url,
                     is_verified: email_user.is_verified,
                     is_admin: email_user.is_admin,
-                    is_known_ip: true,
+                    is_known_ip: known_ip,
+                    ip: ip,
                     tags: email_user.tags,
                 };
 
@@ -742,6 +794,11 @@ impl Services {
     }
 
     pub async fn rate_limit(&self, key: &String, requests_per_hour: usize) -> Result<()> {
+        /*
+            Whatever the key is, it's not allowed to call this funciton more than requests_per_hour times per hour,
+            if it does, it'll throw a rate limit error.
+            It also can't call this function more than once every 5 seconds.
+        */
         let mut redis_connection = self.application_redis.get_async_connection().await?;
 
         // everything has a 5-second rate limit by default
@@ -769,6 +826,9 @@ impl Services {
     }
 
     pub async fn rate_limits(&self, keys: &Vec<String>, requests_per_hour: usize) -> Result<()> {
+        /*
+            Apply multiple rate limits at once.
+        */
         for key in keys {
             self.rate_limit(key, requests_per_hour).await?;
         }

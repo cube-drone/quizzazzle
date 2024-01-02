@@ -91,7 +91,7 @@ async fn login_post(services: &State<Services>, cookies: &CookieJar<'_>, login: 
     }
 
     // okay, now, let's try to login
-    match services.login(login.email, login.password).await{
+    match services.login(login.email, login.password, ip.to_ip()).await{
         Ok(session_token) => {
             // u did it, create a session token
             cookies.add_private(Cookie::new("session_token", session_token.to_string()));
