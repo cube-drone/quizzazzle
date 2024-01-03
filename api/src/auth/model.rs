@@ -472,7 +472,6 @@ impl Services {
         &self,
         user_id: &UserId,
     ) -> Result<Option<UserDatabaseRaw>> {
-        println!("get_user: {}", user_id.to_string());
         Ok(self.scylla
             .session
             .execute(
@@ -491,7 +490,6 @@ impl Services {
         &self,
         email: &str,
     ) -> Result<Option<UserDatabaseRaw>> {
-        println!("get_user_email: {}", email);
         let result = self.scylla
             .session
             .execute(

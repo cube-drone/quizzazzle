@@ -25,6 +25,7 @@ services:
       ROCKET_PUBLIC_ADDRESS: http://localhost:3333
       CACHE_REDIS_URLS: redis://:hamscramble@cache-redis-1:6888,redis://:hamscramble@cache-redis-2:6889,redis://:hamscramble@cache-redis-3:6890
       APPLICATION_REDIS_URLS: redis://:hamscramble@application-redis-1:6999,redis://:hamscramble@application-redis-2:6998,redis://:hamscramble@application-redis-3:6997
+      ROCKET_SECRET_KEY: grPMXJszWoqdlGv1M7Y+9f0FsPhxsycGVjuQ6mfobIk=  # openssl rand -base64 32
       SCYLLA_URL: some-scylla:9042
       RUST_BACKTRACE: 1
       # AWS_ACCESS_KEY_ID: <fill this in if you want to test email locally>
