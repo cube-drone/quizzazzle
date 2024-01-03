@@ -140,3 +140,45 @@ test('Quickly create a hundred new users', async () => {
         assert(html.includes("ok, verified user"));
     }
 });
+
+test('IP verification', async () => {
+    let {fetch, user} = await createUser();
+
+    let root = await fetch(`${endpoint}/auth/status`);
+    let html = await root.text();
+    assert(html.includes("ok, verified user"));
+
+    // this is a test-only endpoint that will forget our IP address and log us out
+    await fetch(`${endpoint}/auth/test/forget_ip`);
+
+    let login_form_response = await fetch(`${endpoint}/auth/login`);
+    let login_form_dom = new JSDOM(await login_form_response.text());
+    let login_csrf_token = login_form_dom.window.document.querySelector("input[name=\"csrf_token\"]").value;
+
+    const loginFormData = new FormData();
+    loginFormData.append('csrf_token', login_csrf_token);
+    loginFormData.append('email', user.email);
+    loginFormData.append('password', user.password);
+
+    let login_verify_response = await fetch(`${endpoint}/auth/login`, {
+        method: 'POST',
+        body: loginFormData,
+    });
+    homeText = (await login_verify_response.text()).toLowerCase();
+    // oh no! we need to verify our location!
+    assert(homeText.includes("verify") && homeText.includes("location"));
+
+    // we didn't get an email, because we're running this in test mode and we don't have an email server
+    // so we have to cheat:
+    // there's an endpoint that will give us the email history (again)
+    let email_history = await fetch(`${endpoint}/auth/test/get_last_email?email=${user.email}`);
+    let email_code = await email_history.json();
+    let url = email_code.email;
+    let verify_email = await fetch(url);
+    assert((await verify_email.text()).toLowerCase().includes("home"));
+
+    // check our status
+    status_response = await fetch(`${endpoint}/auth/status`);
+    status_text = await status_response.text();
+    assert(status_text.includes("ok, verified user"));
+});

@@ -76,17 +76,19 @@ async fn login_post(services: &State<Services>, cookies: &CookieJar<'_>, login: 
         })),
       };
 
-    let rate_limit_factors: Vec<String> = vec![ip.to_string(), login.email.to_string()];
-    match services.rate_limits(&rate_limit_factors, MAXIMUM_LOGIN_ATTEMPTS_PER_HOUR).await{
-        Ok(()) => {
-        },
-        Err(_e) => {
-            return Err(Template::render("login", context! {
-                csrf_token: csrf_token_new,
-                error: "Attempting logins too fast, please wait a bit and try again!",
-                email: "",
-                password: "",
-            }));
+    if services.is_production {
+        let rate_limit_factors: Vec<String> = vec![ip.to_string(), login.email.to_string()];
+        match services.rate_limits(&rate_limit_factors, MAXIMUM_LOGIN_ATTEMPTS_PER_HOUR).await{
+            Ok(()) => {
+            },
+            Err(_e) => {
+                return Err(Template::render("login", context! {
+                    csrf_token: csrf_token_new,
+                    error: "Attempting logins too fast, please wait a bit and try again!",
+                    email: "",
+                    password: "",
+                }));
+            }
         }
     }
 
@@ -139,12 +141,7 @@ async fn test_create_user(services: &State<Services>, cookies: &CookieJar<'_>, i
     let user_to_create = user_serialized.into_inner();
     let user_id = user_to_create.user_id.clone();
 
-    let user_to_create = model::UserCreate{
-        ip: ip.to_ip(),
-        ..user_to_create
-    };
-
-    let session_token = services.create_user(user_to_create).await.expect("should be able to create a user");
+    let session_token = services.create_user(user_to_create, ip.to_ip()).await.expect("should be able to create a user");
     cookies.add_private(Cookie::new("session_token", session_token.to_string()));
 
     let mut hashmap: HashMap<String, String> = HashMap::new();
@@ -334,10 +331,9 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: 
             password: register.password,
             is_verified: false,
             is_admin: false,
-            ip: ip.to_ip(),
         };
 
-        match services.create_user(user_create).await{
+        match services.create_user(user_create, ip.to_ip()).await{
             Ok(session_token) => {
                 // u did it, create a session token
                 cookies.add_private(Cookie::new("session_token", session_token.to_string()));

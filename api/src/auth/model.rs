@@ -347,7 +347,6 @@ pub struct UserCreate<'r>{
     pub password: &'r str,
     pub is_verified: bool,
     pub is_admin: bool,
-    pub ip: IpAddr,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -573,6 +572,7 @@ impl Services {
     pub async fn create_user(
         &self,
         user_create: UserCreate<'_>,
+        ip: IpAddr,
     ) -> Result<SessionToken> {
         if self.get_user_exists(&user_create.user_id).await? {
             return Err(anyhow!("User somehow already exists! Wow, UUIDs are not as unique as I thought!"));
@@ -648,7 +648,7 @@ impl Services {
                     .prepared_queries
                     .get("set_user_ip")
                     .expect("Query missing!"),
-                (user_id, user_create.ip, ),
+                (user_id, ip, ),
             )
             .await?;
 
@@ -661,7 +661,7 @@ impl Services {
             is_verified: user_create.is_verified,
             is_admin: user_create.is_admin,
             is_known_ip: true,
-            ip: user_create.ip,
+            ip: ip,
             tags: None,
         };
 
