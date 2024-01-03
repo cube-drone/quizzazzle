@@ -37,6 +37,7 @@ struct Login<'r> {
 }
 
 const MAXIMUM_LOGIN_ATTEMPTS_PER_HOUR: usize = 15;
+const MAXIMUM_PASSWORD_EMAILS_PER_HOUR: usize = 2;
 
 #[post("/login", data = "<login>")]
 async fn login_post(services: &State<Services>, cookies: &CookieJar<'_>, login: Form<Login<'_>>, ip: BestGuessIpAddress) -> Result<Redirect, Template> {
@@ -365,6 +366,156 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: 
     }
 }
 
+#[get("/password_reset")]
+async fn password_reset(cookies: &CookieJar<'_>) -> Template {
+    let csrf_token = Uuid::new_v4().to_string();
+    cookies.add_private(("csrf_token", csrf_token.clone()));
+    Template::render("password_reset", context! { csrf_token: csrf_token })
+}
+
+#[derive(FromForm, Validate)]
+struct PasswordReset<'r> {
+    csrf_token: &'r str,
+    #[validate(email(message="Invalid email address!"))]
+    email: &'r str,
+}
+
+#[post("/password_reset", data = "<password_reset>")]
+async fn password_reset_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: BestGuessIpAddress, password_reset: Form<PasswordReset<'_>>) -> Result<Redirect, Template> {
+
+        let csrf_token_new = Uuid::new_v4().to_string();
+
+        if let Some(csrf_cookie) = cookies.get_private("csrf_token"){
+            let csrf_token_cookie = csrf_cookie.value();
+
+            cookies.add_private(("csrf_token", csrf_token_new.clone()));
+            if password_reset.csrf_token != csrf_token_cookie {
+                return Err(Template::render("password_reset", context! {
+                    csrf_token: csrf_token_new,
+                    error: "CSRF token mismatch",
+                    email: password_reset.email,
+                }))
+            }
+        }
+        else{
+            cookies.add_private(("csrf_token", csrf_token_new.clone()));
+
+            return Err(Template::render("password_reset", context! {
+                csrf_token: csrf_token_new,
+                error: "CSRF cookie missing",
+                email: password_reset.email,
+            }))
+        }
+
+        match password_reset.validate() {
+            Ok(_) => (),
+            Err(e) => return Err(Template::render("password_reset", context! {
+                csrf_token: csrf_token_new,
+                error: e.to_string(),
+                email: password_reset.email,
+            })),
+        };
+
+        if services.is_production {
+            let rate_limit_factors: Vec<String> = vec![format!("{}-{}", "password-reset", ip.to_string()), password_reset.email.to_string()];
+            match services.rate_limits(&rate_limit_factors, MAXIMUM_PASSWORD_EMAILS_PER_HOUR).await{
+                Ok(()) => {
+                },
+                Err(_e) => {
+                    return Err(Template::render("password_reset", context! {
+                        csrf_token: csrf_token_new,
+                        error: "Attempting password resets too fast, please wait a bit and try again!",
+                        email: "",
+                    }));
+                }
+            }
+        }
+
+        // okay, now, let's try to reset the password
+        match services.send_password_reset_email(&password_reset.email).await{
+            Ok(_) => {
+                // we sent the email, now we wait
+                return Ok(Redirect::to("/auth/password_reset_wait"))
+            },
+            Err(e) => {
+                println!("Error resetting password: {}", e);
+                return Ok(Redirect::to("/auth/password_reset_wait"))
+            }
+        }
+}
+
+#[get("/password_reset_wait")]
+async fn password_reset_wait() -> Template {
+    Template::render("message", context! { title: "Password Email Sent!", message: "If that email address is in our system, we've sent you an email with a link to reset your password. Please check your email!" })
+}
+
+#[get("/password_reset/stage_2?<token>")]
+async fn password_reset_stage_2(cookies: &CookieJar<'_>, token: Uuid) -> Template {
+    // test that the token is valid?
+    let csrf_token = Uuid::new_v4().to_string();
+    cookies.add_private(("csrf_token", csrf_token.clone()));
+    //TODO: past this part
+    Template::render("password_reset_stage_2", context! { csrf_token: csrf_token, password_token: token })
+}
+
+#[derive(FromForm, Validate)]
+struct PasswordResetStage2<'r> {
+    csrf_token: &'r str,
+    password_token: Uuid,
+    #[validate(length(min = 11, max = 300, message="Password must be between 11 and 300 characters!"))]
+    password: &'r str,
+}
+
+#[post("/password_reset/stage_2", data = "<password_reset>")]
+async fn password_reset_stage_2_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: BestGuessIpAddress, password_reset: Form<PasswordResetStage2<'_>>) -> Result<Redirect, Template> {
+
+    let csrf_token_new = Uuid::new_v4().to_string();
+
+    if let Some(csrf_cookie) = cookies.get_private("csrf_token"){
+        let csrf_token_cookie = csrf_cookie.value();
+
+        cookies.add_private(("csrf_token", csrf_token_new.clone()));
+        if password_reset.csrf_token != csrf_token_cookie {
+            return Err(Template::render("password_reset_stage_2", context! {
+                csrf_token: csrf_token_new,
+                error: "CSRF token mismatch",
+            }))
+        }
+    }
+    else{
+        cookies.add_private(("csrf_token", csrf_token_new.clone()));
+
+        return Err(Template::render("password_reset_stage_2", context! {
+            csrf_token: csrf_token_new,
+            error: "CSRF cookie missing",
+        }))
+    }
+
+    match password_reset.validate() {
+        Ok(_) => (),
+        Err(e) => return Err(Template::render("password_reset_stage_2", context! {
+            csrf_token: csrf_token_new,
+            error: e.to_string(),
+        })),
+    };
+
+    // okay, now, let's try to reset the password
+    match services.password_reset(&password_reset.password_token, &password_reset.password, &ip.to_ip()).await{
+        Ok(session_token) => {
+            // u did it, create a session token
+            cookies.add_private(Cookie::new("session_token", session_token.to_string()));
+
+            return Ok(Redirect::to("/auth/ok"))
+        },
+        Err(e) => {
+            return Err(Template::render("password_reset_stage_2", context! {
+                csrf_token: csrf_token_new,
+                error: e.to_string(),
+            }))
+        }
+    }
+}
+
 #[rocket::async_trait]
 impl<'r> FromRequest<'r> for model::AdminUserSession {
 
@@ -670,6 +821,11 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
             invite,
             invite_post,
             register_post,
+            password_reset,
+            password_reset_post,
+            password_reset_wait,
+            password_reset_stage_2,
+            password_reset_stage_2_post,
             verify_email_ok,
             verify_email_template,
             verify_email,

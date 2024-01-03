@@ -37,6 +37,7 @@ const DEFAULT_THUMBNAIL_URL: &str = "/static/chismas.png";
 
 const USER_SESSION_TIMEOUT_SECONDS: usize = 86400 * 14; // two weeks
 const EMAIL_VERIFICATION_TIMEOUT_SECONDS: usize = 86400 * 3; // three days
+const PASSWORD_RESET_TIMEOUT_SECONDS: usize = 86400 * 1; // one day
 const USER_MAX_SESSION_COUNT: usize = 8; // how many sessions can a single user have active?
 
 pub async fn initialize(
@@ -85,6 +86,13 @@ pub async fn initialize(
             "verify_user_email",
             scylla_session
                 .prepare("UPDATE ks.user SET is_verified = true WHERE id = ?;")
+                .await?,
+        );
+
+        prepared_queries.insert(
+            "change_user_password",
+            scylla_session
+                .prepare("UPDATE ks.user SET hashed_password = ? WHERE id = ?;")
                 .await?,
         );
 
@@ -735,6 +743,24 @@ impl Services {
         Err(anyhow!("Invalid email or password!"))
     }
 
+/*
+          _______  _______ _________ _______ _________ _______  _______ __________________ _______  _
+|\     /|(  ____ \(  ____ )\__   __/(  ____ \\__   __/(  ____ \(  ___  )\__   __/\__   __/(  ___  )( (    /|
+| )   ( || (    \/| (    )|   ) (   | (    \/   ) (   | (    \/| (   ) |   ) (      ) (   | (   ) ||  \  ( |
+| |   | || (__    | (____)|   | |   | (__       | |   | |      | (___) |   | |      | |   | |   | ||   \ | |
+( (   ) )|  __)   |     __)   | |   |  __)      | |   | |      |  ___  |   | |      | |   | |   | || (\ \) |
+ \ \_/ / | (      | (\ (      | |   | (         | |   | |      | (   ) |   | |      | |   | |   | || | \   |
+  \   /  | (____/\| ) \ \_____) (___| )      ___) (___| (____/\| )   ( |   | |   ___) (___| (___) || )  \  |
+   \_/   (_______/|/   \__/\_______/|/       \_______/(_______/|/     \|   )_(   \_______/(_______)|/    )_)
+
+*/
+
+    pub async fn test_get_last_email(&self, email_address: &str) -> Result<String> {
+        let mut redis_connection = self.application_redis.get_async_connection().await?;
+        let last_email_sent_key = format!("last_email_sent:${}", email_address);
+        let last_email_sent: String = redis_connection.get(&last_email_sent_key).await?;
+        Ok(last_email_sent)
+    }
 
     pub async fn send_verification_email(
         &self,
@@ -786,13 +812,6 @@ impl Services {
         Ok(())
     }
 
-    pub async fn test_get_last_email(&self, email_address: &str) -> Result<String> {
-        let mut redis_connection = self.application_redis.get_async_connection().await?;
-        let last_email_sent_key = format!("last_email_sent:${}", email_address);
-        let last_email_sent: String = redis_connection.get(&last_email_sent_key).await?;
-        Ok(last_email_sent)
-    }
-
     pub async fn verify_email(
         &self,
         email_verification_token: &Uuid,
@@ -826,6 +845,26 @@ impl Services {
         Ok(user_id)
     }
 
+    pub async fn remember_ip(
+        &self,
+        user_id: &UserId,
+        ip: &IpAddr,
+    ) -> Result<()> {
+        self.scylla
+            .session
+            .execute(
+                &self
+                    .scylla
+                    .prepared_queries
+                    .get("set_user_ip")
+                    .expect("Query missing!"),
+                (user_id.to_uuid(), ip, ),
+            )
+            .await?;
+
+        Ok(())
+    }
+
     pub async fn verify_ip(
         &self,
         email_verification_token: &Uuid,
@@ -841,16 +880,7 @@ impl Services {
             return Err(anyhow!("User does not exist!"));
         }
 
-        self.scylla
-            .session
-            .execute(
-                &self
-                    .scylla
-                    .prepared_queries
-                    .get("set_user_ip")
-                    .expect("Query missing!"),
-                (user_id.to_uuid(), ip,),
-            ).await?;
+        self.remember_ip(&user_id, &ip).await?;
 
         self.verify_ip_all_sessions(&user_id, &ip).await?;
 
@@ -878,6 +908,109 @@ impl Services {
 
         Ok(())
     }
+
+/*
+                                 _                    _
+ ___ ___ ___ ___ _ _ _ ___ ___ _| |   ___ ___ ___ ___| |_
+| . | .'|_ -|_ -| | | | . |  _| . |  |  _| -_|_ -| -_|  _|
+|  _|__,|___|___|_____|___|_| |___|  |_| |___|___|___|_|
+|_|
+*/
+
+    pub async fn send_password_reset_email(
+        &self,
+        email_address: &str,
+    ) -> Result<()> {
+
+        let user_maybe = self.get_user_email(&email_address).await?;
+        match user_maybe {
+            None => {
+                Err(anyhow!("User does not exist!"))
+            },
+            Some(user) => {
+                let user_id = user.id;
+
+                let mut redis_connection = self.application_redis.get_async_connection().await?;
+                let password_reset_token = Uuid::new_v4().to_string();
+                let key = format!("password_reset_token:${}", password_reset_token);
+
+                redis_connection.set_ex(&key, user_id.to_string(), PASSWORD_RESET_TIMEOUT_SECONDS).await?;
+
+                let public_address = self.config_get_public_address();
+
+                let password_reset_link = format!("{}/auth/password_reset/stage_2?token={}", public_address, password_reset_token);
+
+                self.email.send_password_reset_email(&EmailAddress::new(email_address.to_string())?, &password_reset_link).await?;
+
+                if ! self.is_production {
+                    let last_email_sent_key = format!("last_email_sent:${}", email_address);
+                    redis_connection.set(&last_email_sent_key, password_reset_link).await?;
+                }
+
+                Ok(())
+            }
+        }
+    }
+
+    pub async fn password_reset(&self, password_token: &Uuid, password: &str, ip: &IpAddr) -> Result<SessionToken> {
+        // 1. verify the token and find the associated user id
+        let mut redis_connection = self.application_redis.get_async_connection().await?;
+        let verification_token_key = format!("password_reset_token:${}", password_token.to_string());
+        let user_id: String = redis_connection.get(&verification_token_key).await?;
+        let user_id = Uuid::parse_str(&user_id)?;
+        let user_id = UserId(user_id);
+
+        // 2. hash the password and save it against the associated user id
+        let hashed_password: String;
+        if self.is_production{
+            hashed_password = password_hash_async(&password).await?;
+        }
+        else{
+            hashed_password = lazy_password_hash_async(&password).await?;
+        }
+
+        self.scylla
+            .session
+            .execute(
+                &self
+                    .scylla
+                    .prepared_queries
+                    .get("change_user_password")
+                    .expect("Query missing!"),
+                (hashed_password, user_id.to_uuid(),),
+            ).await?;
+
+        // 3. while we're here, save that IP as a known IP for this user
+        self.remember_ip(&user_id, &ip).await?;
+
+        // 4. get that user, create a session token, and return it
+        let user = self.get_user(&user_id).await?.unwrap();
+        let user_session = UserSession{
+            user_id: UserId::from_uuid(user.id),
+            display_name: user.display_name,
+            thumbnail_url: user.thumbnail_url,
+            is_verified: user.is_verified,
+            is_admin: user.is_admin,
+            is_known_ip: true,
+            ip: *ip,
+            tags: user.tags,
+        };
+
+        let session_token = self.create_session_token(&user_session).await?;
+
+        Ok(session_token)
+    }
+
+
+/*
+ ______     ______     ______   ______        __         __     __    __     __     ______   ______
+/\  == \   /\  __ \   /\__  _\ /\  ___\      /\ \       /\ \   /\ "-./  \   /\ \   /\__  _\ /\  ___\
+\ \  __<   \ \  __ \  \/_/\ \/ \ \  __\      \ \ \____  \ \ \  \ \ \-./\ \  \ \ \  \/_/\ \/ \ \___  \
+ \ \_\ \_\  \ \_\ \_\    \ \_\  \ \_____\     \ \_____\  \ \_\  \ \_\ \ \_\  \ \_\    \ \_\  \/\_____\
+  \/_/ /_/   \/_/\/_/     \/_/   \/_____/      \/_____/   \/_/   \/_/  \/_/   \/_/     \/_/   \/_____/
+
+*/
+
 
     pub async fn rate_limit(&self, key: &String, requests_per_hour: usize) -> Result<()> {
         /*

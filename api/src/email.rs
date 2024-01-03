@@ -148,4 +148,16 @@ impl EmailProvider{
         Ok(())
     }
 
+    pub async fn send_password_reset_email(&self, to: &EmailAddress, verification_link: &str) -> Result<()> {
+        let templates = &self.templates;
+        let mut context = tera::Context::new();
+        context.insert("verification_link", verification_link);
+        context.insert("site_name", "Groovelet");
+        let message_html = templates.render("email_password_reset.html.tera", &context)?;
+        let message_text: String = format!("Please follow the password reset link: {}", verification_link);
+        self.send(to, "Change that password!", &message_text, &message_html).await?;
+
+        Ok(())
+    }
+
 }
