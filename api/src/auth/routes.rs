@@ -80,7 +80,7 @@ async fn login_post(services: &State<Services>, cookies: &CookieJar<'_>, login: 
     match services.rate_limits(&rate_limit_factors, MAXIMUM_LOGIN_ATTEMPTS_PER_HOUR).await{
         Ok(()) => {
         },
-        Err(e) => {
+        Err(_e) => {
             return Err(Template::render("login", context! {
                 csrf_token: csrf_token_new,
                 error: "Attempting logins too fast, please wait a bit and try again!",
@@ -153,6 +153,20 @@ async fn test_create_user(services: &State<Services>, cookies: &CookieJar<'_>, i
 
     Ok(Json(hashmap))
 }
+
+#[get("/test/forget_ip")]
+async fn test_forget_ip(service: &State<Services>, cookies: &CookieJar<'_>, ip: BestGuessIpAddress, user: model::VerifiedUserSession) -> Result<Redirect, Status> {
+    if service.is_production {
+        return Err(Status::Forbidden);
+    }
+
+    service.forget_ip(&user.user_id, &ip.to_ip()).await.expect("should be able to forget ip");
+
+    cookies.remove_private(Cookie::from("session_token"));
+
+    Ok(Redirect::to("/"))
+}
+
 
 #[get("/test/get_last_email?<email>")]
 async fn test_get_last_email(services: &State<Services>, email: &str) -> Result<Json<HashMap<String, String>>, Status> {
@@ -413,7 +427,7 @@ impl<'r> FromRequest<'r> for model::VerifiedUserSession {
                 Ok(session_token) => {
                     match services.get_user_from_session_token(&session_token).await{
                         Ok(user) => {
-                            if user.is_verified{
+                            if user.is_verified && user.is_known_ip{
                                 return Outcome::Success(user.to_verified_user_session());
                             }
                             else{
@@ -550,6 +564,37 @@ async fn verify_email_nobody() -> Redirect{
     Redirect::to("/auth/login")
 }
 
+#[get("/verify_ip", rank=1)]
+async fn verify_ip_ok(_user: model::VerifiedUserSession) -> Redirect{
+    /* if the user is already verified, no need to show them anything, move them along */
+    Redirect::to("/auth/ok")
+}
+
+#[get("/verify_ip", rank=3)]
+async fn verify_ip_template(_user: model::UserSession) -> Template{
+    Template::render("verify_ip", context! {})
+}
+
+#[get("/verify_ip?<token>", rank=2)]
+async fn verify_ip(services: &State<Services>, token: Uuid, ip: BestGuessIpAddress) -> Redirect {
+    let maybe_error = services.verify_ip(&token, &ip.to_ip()).await;
+
+    match maybe_error{
+        Ok(_) => Redirect::to("/auth/ok"),
+        Err(e) => {
+            println!("Error verifying ip: {}", e);
+            Redirect::to("/auth/ip_error")
+        }
+    }
+}
+
+#[get("/verify_ip", rank=4)]
+async fn verify_ip_nobody() -> Redirect{
+    /* if the user is already verified, no need to show them anything, move them along */
+    Redirect::to("/auth/login")
+}
+
+
 #[get("/status")]
 async fn status_auth_user(_admin: model::AdminUserSession) -> &'static str {
     "ok, auth user"
@@ -575,14 +620,26 @@ async fn email_error() -> Template {
     Template::render("error", context! {error: "We tried to verify your email, but something went wrong. Please try again!"})
 }
 
+#[get("/ip_error")]
+async fn ip_error() -> Template {
+    Template::render("error", context! {error: "We tried to verify your location, but something went wrong. Please try again!"})
+}
+
 #[get("/ok")]
 async fn ok_verified_user(_user: model::VerifiedUserSession) -> Redirect {
     Redirect::to("/home")
 }
 
 #[get("/ok", rank=2)]
-async fn ok_user(_user: model::UserSession) -> Redirect {
-    Redirect::to("/auth/verify_email")
+async fn ok_user(user: model::UserSession) -> Redirect {
+    if !user.is_verified {
+        return Redirect::to("/auth/verify_email");
+    }
+    if !user.is_known_ip {
+        return Redirect::to("/auth/verify_ip");
+    }
+    // shouldn't be able to get here
+    Redirect::to("/home")
 }
 
 #[get("/ok", rank=3)]
@@ -592,6 +649,7 @@ async fn ok() -> Redirect {
 
 #[get("/logout")]
 async fn logout(cookies: &CookieJar<'_>) -> Redirect {
+
     cookies.remove_private(Cookie::from("session_token"));
 
     Redirect::to("/")
@@ -611,6 +669,7 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
             register,
             test_generate_invite_code,
             test_create_user,
+            test_forget_ip,
             test_get_last_email,
             invite,
             invite_post,
@@ -619,7 +678,12 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
             verify_email_template,
             verify_email,
             verify_email_nobody,
+            verify_ip_ok,
+            verify_ip_template,
+            verify_ip,
+            verify_ip_nobody,
             email_error,
+            ip_error,
             status_auth_user,
             status_verified_user,
             status_user,

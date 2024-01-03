@@ -60,6 +60,34 @@ pub async fn initialize(
                 updated_at timestamp);
         "#, &[], ).await?;
 
+        prepared_queries.insert(
+            "create_user",
+            scylla_session
+                .prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, is_admin, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);")
+                .await?,
+        );
+
+        prepared_queries.insert(
+            "get_user_exists",
+            scylla_session
+                .prepare("SELECT id FROM ks.user WHERE id = ?;")
+                .await?,
+        );
+
+        prepared_queries.insert(
+            "get_user",
+            scylla_session
+                .prepare("SELECT id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, is_admin, tags, created_at, updated_at FROM ks.user WHERE id = ?;")
+                .await?,
+        );
+
+        prepared_queries.insert(
+            "verify_user_email",
+            scylla_session
+                .prepare("UPDATE ks.user SET is_verified = true WHERE id = ?;")
+                .await?,
+        );
+
     scylla_session
         .query(r#"
             CREATE TABLE IF NOT EXISTS ks.user_invite (
@@ -67,34 +95,6 @@ pub async fn initialize(
                 invite_key uuid,
                 created_at timestamp );
             "#, &[], ).await?;
-
-    prepared_queries.insert(
-        "create_user",
-        scylla_session
-            .prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, is_admin, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);")
-            .await?,
-    );
-
-    prepared_queries.insert(
-        "get_user_exists",
-        scylla_session
-            .prepare("SELECT id FROM ks.user WHERE id = ?;")
-            .await?,
-    );
-
-    prepared_queries.insert(
-        "get_user",
-        scylla_session
-            .prepare("SELECT id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, is_admin, tags, created_at, updated_at FROM ks.user WHERE id = ?;")
-            .await?,
-    );
-
-    prepared_queries.insert(
-        "verify_user_email",
-        scylla_session
-            .prepare("UPDATE ks.user SET is_verified = true WHERE id = ?;")
-            .await?,
-    );
 
     scylla_session
         .query(r#"
@@ -128,32 +128,38 @@ pub async fn initialize(
                 PRIMARY KEY(user_id, ip));
             "#, &[], ).await?;
 
-    /* we don't have a plan for this one yet: get all of the ips for a given user */
-    prepared_queries.insert(
-        "get_user_ips",
-        scylla_session
-            .prepare("SELECT ip FROM ks.user_ips WHERE user_id = ?;")
-            .await?,
-    );
+        /* we don't have a plan for this one yet: get all of the ips for a given user */
+        prepared_queries.insert(
+            "get_user_ips",
+            scylla_session
+                .prepare("SELECT ip FROM ks.user_ips WHERE user_id = ?;")
+                .await?,
+        );
 
-    // register an ip against a user
-    // this lasts forever: if you've _ever_ logged in from an IP, it's good forever
-    //   TODO: maybe show users the list and let them remove entries?
-    prepared_queries.insert(
-        "set_user_ip",
-        scylla_session
-            .prepare("INSERT INTO ks.user_ips (user_id, ip) VALUES (?, ?);")
-            .await?,
-    );
+        // register an ip against a user
+        // this lasts forever: if you've _ever_ logged in from an IP, it's good forever
+        prepared_queries.insert(
+            "set_user_ip",
+            scylla_session
+                .prepare("INSERT INTO ks.user_ips (user_id, ip) VALUES (?, ?);")
+                .await?,
+        );
 
-    // this one's mostly here to test whether or not any given ip is "known" to us
-    // if not, we need to send a verification email
-    prepared_queries.insert(
-        "get_user_ip",
-        scylla_session
-            .prepare("SELECT ip FROM ks.user_ips WHERE user_id = ? AND ip = ?;")
-            .await?,
-    );
+        prepared_queries.insert(
+            "delete_user_ip",
+            scylla_session
+                .prepare("DELETE FROM ks.user_ips WHERE user_id = ? AND ip = ?;")
+                .await?,
+        );
+
+        // this one's mostly here to test whether or not any given ip is "known" to us
+        // if not, we need to send a verification email
+        prepared_queries.insert(
+            "get_user_ip",
+            scylla_session
+                .prepare("SELECT ip FROM ks.user_ips WHERE user_id = ? AND ip = ?;")
+                .await?,
+        );
 
     // email --> user
     scylla_session
@@ -163,19 +169,19 @@ pub async fn initialize(
                 user_id uuid)
             "#, &[], ).await?;
 
-    prepared_queries.insert(
-        "get_email_user",
-        scylla_session
-            .prepare("SELECT user_id FROM ks.email_user WHERE email = ?;")
-            .await?,
-    );
+        prepared_queries.insert(
+            "get_email_user",
+            scylla_session
+                .prepare("SELECT user_id FROM ks.email_user WHERE email = ?;")
+                .await?,
+        );
 
-    prepared_queries.insert(
-        "set_email_user",
-        scylla_session
-            .prepare("INSERT INTO ks.email_user (email, user_id) VALUES (?, ?);")
-            .await?,
-    );
+        prepared_queries.insert(
+            "set_email_user",
+            scylla_session
+                .prepare("INSERT INTO ks.email_user (email, user_id) VALUES (?, ?);")
+                .await?,
+        );
 
     // email_domain --> user
     scylla_session
@@ -707,6 +713,10 @@ impl Services {
 
             let known_ip = self.is_this_a_known_ip_for_this_user(&UserId::from_uuid(email_user.id), &ip).await?;
 
+            if !known_ip {
+                self.send_ip_verification_email(&email_user.id, &email).await?;
+            }
+
             if password_success {
                 let user_id: UserId = UserId::from_uuid(email_user.id);
                 let user_session: UserSession = UserSession{
@@ -753,6 +763,31 @@ impl Services {
         Ok(())
     }
 
+    pub async fn send_ip_verification_email(
+        &self,
+        user_id: &Uuid,
+        email_address: &str,
+    ) -> Result<()> {
+        let mut redis_connection = self.application_redis.get_async_connection().await?;
+        let email_verification_token = Uuid::new_v4().to_string();
+        let key = format!("ip_verification_token:${}", email_verification_token);
+
+        redis_connection.set_ex(&key, user_id.to_string(), EMAIL_VERIFICATION_TIMEOUT_SECONDS).await?;
+
+        let public_address = self.config_get_public_address();
+
+        let ip_verification_link = format!("{}/auth/verify_ip?token={}", public_address, email_verification_token);
+
+        self.email.send_ip_verification_email(&EmailAddress::new(email_address.to_string())?, &ip_verification_link).await?;
+
+        if ! self.is_production {
+            let last_email_sent_key = format!("last_email_sent:${}", email_address);
+            redis_connection.set(&last_email_sent_key, ip_verification_link).await?;
+        }
+
+        Ok(())
+    }
+
     pub async fn test_get_last_email(&self, email_address: &str) -> Result<String> {
         let mut redis_connection = self.application_redis.get_async_connection().await?;
         let last_email_sent_key = format!("last_email_sent:${}", email_address);
@@ -791,6 +826,59 @@ impl Services {
         redis_connection.unlink(&verification_token_key).await?;
 
         Ok(user_id)
+    }
+
+    pub async fn verify_ip(
+        &self,
+        email_verification_token: &Uuid,
+        ip: &IpAddr,
+    ) -> Result<()> {
+        let mut redis_connection = self.application_redis.get_async_connection().await?;
+        let verification_token_key = format!("ip_verification_token:${}", email_verification_token.to_string());
+        let user_id: String = redis_connection.get(&verification_token_key).await?;
+        let user_id = Uuid::parse_str(&user_id)?;
+        let user_id = UserId(user_id);
+
+        if ! self.get_user_exists(&user_id).await? {
+            return Err(anyhow!("User does not exist!"));
+        }
+
+        self.scylla
+            .session
+            .execute(
+                &self
+                    .scylla
+                    .prepared_queries
+                    .get("set_user_ip")
+                    .expect("Query missing!"),
+                (user_id.to_uuid(), ip,),
+            ).await?;
+
+        self.verify_ip_all_sessions(&user_id, &ip).await?;
+
+        redis_connection.unlink(&verification_token_key).await?;
+
+        Ok(())
+    }
+
+    pub async fn forget_ip(
+        &self,
+        user_id: &UserId,
+        ip: &IpAddr,
+    ) -> Result<()> {
+
+        self.scylla
+            .session
+            .execute(
+                &self
+                    .scylla
+                    .prepared_queries
+                    .get("delete_user_ip")
+                    .expect("Query missing!"),
+                (user_id.to_uuid(), ip,),
+            ).await?;
+
+        Ok(())
     }
 
     pub async fn rate_limit(&self, key: &String, requests_per_hour: usize) -> Result<()> {
@@ -898,6 +986,15 @@ s::::::::::::::s  e::::::::eeeeeeee  s::::::::::::::s s::::::::::::::s i::::::io
         Ok(())
     }
 
+    /*
+    pub async fn logout(&self, session_token: &SessionToken) -> Result<()>{
+        let user_session = self.get_user_from_session_token(&session_token).await?;
+        let user_id = user_session.user_id;
+        self.delete_session(&session_token, &user_id).await?;
+        Ok(())
+    }
+    */
+
     pub async fn delete_session(&self, session_token: &SessionToken, user_id: &UserId) -> Result<()>{
         let mut redis_connection = self.application_redis.get_async_connection().await?;
         redis_connection.unlink(&format!("session_token:{}", session_token.to_string())).await?;
@@ -931,6 +1028,24 @@ s::::::::::::::s  e::::::::eeeeeeee  s::::::::::::::s s::::::::::::::s i::::::io
         Ok(())
     }
 
+    pub async fn verify_session_ip(&self, session_token: &SessionToken, ip: &IpAddr) -> Result<()>{
+        let mut redis_connection = self.application_redis.get_async_connection().await?;
+        let key = format!("session_token:{}", session_token.to_string());
+        let session_json: String = redis_connection.get(&key).await?;
+
+        let mut user_session: UserSession = serde_json::from_str(&session_json)?;
+
+        if user_session.ip.to_string() == ip.to_string(){
+            user_session.is_known_ip = true;
+
+            let session_json = serde_json::to_string(&user_session)?;
+
+            redis_connection.set_ex(&key, session_json, USER_SESSION_TIMEOUT_SECONDS).await?;
+        }
+
+        Ok(())
+    }
+
     pub async fn get_all_sessions(&self, user_id: &UserId) -> Result<Vec<(SessionToken, i64)>> {
         let mut redis_connection = self.application_redis.get_async_connection().await?;
         let user_sessions: Vec<(String, i64)> = redis_connection.zrangebyscore_withscores(&format!("user_sessions:{}", user_id.to_string()), "-inf", "+inf").await?;
@@ -946,6 +1061,16 @@ s::::::::::::::s  e::::::::eeeeeeee  s::::::::::::::s s::::::::::::::s i::::::io
          */
         for (session_token, _timestamp) in self.get_all_sessions(&user_id).await? {
             self.verify_session(&session_token).await?;
+        }
+        Ok(())
+    }
+
+    pub async fn verify_ip_all_sessions(&self, user_id: &UserId, ip: &IpAddr) -> Result<()>{
+        /*
+            after the user has verified that their email address is valid, we should verify all of their sessions
+         */
+        for (session_token, _timestamp) in self.get_all_sessions(&user_id).await? {
+            self.verify_session_ip(&session_token, &ip).await?;
         }
         Ok(())
     }

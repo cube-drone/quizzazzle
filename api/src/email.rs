@@ -136,4 +136,16 @@ impl EmailProvider{
         Ok(())
     }
 
+    pub async fn send_ip_verification_email(&self, to: &EmailAddress, verification_link: &str) -> Result<()> {
+        let templates = &self.templates;
+        let mut context = tera::Context::new();
+        context.insert("verification_link", verification_link);
+        context.insert("site_name", "Groovelet");
+        let message_html = templates.render("email_ip_verification.html.tera", &context)?;
+        let message_text: String = format!("Please follow the verification link: {}", verification_link);
+        self.send(to, "Verify your location", &message_text, &message_html).await?;
+
+        Ok(())
+    }
+
 }

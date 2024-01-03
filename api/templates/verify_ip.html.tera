@@ -1,0 +1,31 @@
+{% extends "base" %}
+
+{% block title %} Verify Email {% endblock title %}
+
+{% block head %}
+    {{ super() }}
+{% endblock head %}
+
+{% block content %}
+<div class="primary-card">
+    <div class="content">
+        <header>
+            <h2><a href="/">home</a> / Verify Location </h2>
+        </header>
+        <div class="everything">
+            {% if error %}
+                <div class="error">{{error}}</div>
+            {% endif %}
+            <p>Uh, as far as I can tell you've never logged in from that location before - I've
+                sent you an email to make sure you are who you say you are. If you could click on
+                the link in that email that would be great. </p>
+            <form method="get" action="/auth/verify_ip">
+                <button name="submit" value="Ok">I did!</button>
+            </form>
+            <form method="post" action="/auth/resend_ip_verification_email">
+                <button name="submit" value="Resend">Resend IP Verification Email</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock content %}
