@@ -22,9 +22,6 @@
             <form method="get" action="/auth/verify_ip">
                 <button name="submit" value="Ok">I did!</button>
             </form>
-            <form method="post" action="/auth/resend_ip_verification_email">
-                <button name="submit" value="Resend">Resend IP Verification Email</button>
-            </form>
         </div>
     </div>
 </div>
