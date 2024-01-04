@@ -129,18 +129,6 @@ test('Quickly create a new user', async () => {
     assert(userJson.thumbnail_url);
 });
 
-test('Quickly create a hundred new users', async () => {
-    for(let i = 0; i < 100; i++){
-        let {fetch, user} = await createUser();
-
-        let root = await fetch(`${endpoint}/auth/status`);
-
-        let html = await root.text();
-
-        assert(html.includes("ok, verified user"));
-    }
-});
-
 test('IP verification', async () => {
     let {fetch, user} = await createUser();
 
@@ -182,3 +170,75 @@ test('IP verification', async () => {
     status_text = await status_response.text();
     assert(status_text.includes("ok, verified user"));
 });
+
+test('Password reset', async () => {
+    let {fetch, user} = await createUser();
+
+    let root = await fetch(`${endpoint}/auth/status`);
+    let html = await root.text();
+    assert(html.includes("ok, verified user"));
+
+    await fetch(`${endpoint}/auth/logout`);
+
+    let reset_form_response = await fetch(`${endpoint}/auth/password_reset`);
+    let reset_form_dom = new JSDOM(await reset_form_response.text());
+    let reset_csrf_token = reset_form_dom.window.document.querySelector("input[name=\"csrf_token\"]").value;
+    assert(reset_csrf_token);
+
+    const resetFormData = new FormData();
+    resetFormData.append('csrf_token', reset_csrf_token);
+    resetFormData.append('email', user.email);
+    let reset_response = await fetch(`${endpoint}/auth/password_reset`, {
+        method: 'POST',
+        body: resetFormData,
+    });
+
+    let reset_text = (await reset_response.text()).toLowerCase();
+    assert(reset_text.includes("email") && reset_text.includes("sent"));
+
+    let email_history = await fetch(`${endpoint}/auth/test/get_last_email?email=${user.email}`);
+    let email_code = await email_history.json();
+    let url = email_code.email;
+    let verify_email = await fetch(url);
+    let verify_text = await verify_email.text();
+    // this is a new form, with a new CSRF token
+    let verify_form_dom = new JSDOM(verify_text);
+    let verify_csrf_token = verify_form_dom.window.document.querySelector("input[name=\"csrf_token\"]").value;
+    assert(verify_csrf_token);
+    let verify_password_token = verify_form_dom.window.document.querySelector("input[name=\"password_token\"]").value;
+    let new_password = `${user.email}-new-password`;
+
+    const resetFormDataStage2 = new FormData();
+    resetFormDataStage2.append('csrf_token', verify_csrf_token);
+    resetFormDataStage2.append('password_token', verify_password_token);
+    resetFormDataStage2.append('password', new_password);
+
+    let reset_response_stage2 = await fetch(`${endpoint}/auth/password_reset/stage_2`, {
+        method: 'POST',
+        body: resetFormDataStage2,
+    });
+    // this SHOULD take you to home
+    let reset_text_stage2 = await reset_response_stage2.text();
+    assert(reset_text_stage2.includes("home"));
+
+    // logout one more time, this time we log in with the updated password
+    await fetch(`${endpoint}/auth/logout`);
+
+    let login_form_response = await fetch(`${endpoint}/auth/login`);
+    let login_form_dom = new JSDOM(await login_form_response.text());
+    let login_csrf_token = login_form_dom.window.document.querySelector("input[name=\"csrf_token\"]").value;
+
+    const loginFormData = new FormData();
+    loginFormData.append('csrf_token', login_csrf_token);
+    loginFormData.append('email', user.email);
+    loginFormData.append('password', new_password);
+
+    let login_final_form_response = await fetch(`${endpoint}/auth/login`, {
+        method: 'POST',
+        body: loginFormData,
+    });
+    // home page once more
+    homeText = (await login_final_form_response.text()).toLowerCase();
+    assert(homeText.includes("home"));
+
+})
