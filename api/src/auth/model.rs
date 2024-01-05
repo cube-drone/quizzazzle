@@ -449,9 +449,19 @@ impl Services {
     }
 
     pub async fn generate_invite_code(
-        &self) -> Result<InviteCode> {
+        &self,
+        _user_id: &UserId,
+    ) -> Result<InviteCode> {
         // for testing, generate a new invite code from the root user
         Ok(InviteCode::new())
+    }
+
+    pub async fn get_my_invites(
+        &self,
+        _user_id: &UserId,
+    ) -> Result<Vec<InviteCode>> {
+        // for testing, generate a new invite code from the root user
+        Ok(vec![])
     }
 
     pub async fn get_user_exists(
