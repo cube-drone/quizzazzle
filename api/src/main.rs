@@ -186,9 +186,17 @@ async fn rocket() -> Rocket<Build> {
     app = app.attach(crate::fairings::timing::RequestTimer)
              .attach(Template::fairing());
 
+    app = app.register("/", catchers![
+        error::not_found,
+        error::you_done_fucked_up,
+        error::unprocessable,
+        error::server_error
+    ]);
+
 	// Mount Routes
     app = app.mount("/static", FileServer::from("/tmp/static"));
     app = app.mount("/build", FileServer::from("/tmp/build"));
+
     // home is where "/" lives.
     app = home::routes::mount_routes(app);
     // basic is a whole module intended to demonstrate basic functionality, it's not intended to be used in production
