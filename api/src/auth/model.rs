@@ -83,6 +83,13 @@ pub async fn initialize(
         );
 
         prepared_queries.insert(
+            "delete_user",
+            scylla_session
+                .prepare("DELETE FROM ks.user WHERE id = ?;")
+                .await?,
+        );
+
+        prepared_queries.insert(
             "verify_user_email",
             scylla_session
                 .prepare("UPDATE ks.user SET is_verified = true WHERE id = ?;")
@@ -442,9 +449,19 @@ impl Services {
     }
 
     pub async fn generate_invite_code(
-        &self) -> Result<InviteCode> {
+        &self,
+        _user_id: &UserId,
+    ) -> Result<InviteCode> {
         // for testing, generate a new invite code from the root user
         Ok(InviteCode::new())
+    }
+
+    pub async fn get_my_invites(
+        &self,
+        _user_id: &UserId,
+    ) -> Result<Vec<InviteCode>> {
+        // for testing, generate a new invite code from the root user
+        Ok(vec![])
     }
 
     pub async fn get_user_exists(
@@ -594,7 +611,8 @@ impl Services {
             else{
                 // TODO: delete the unverified user
                 // and just create a new one, now
-                return Err(anyhow!("Email already exists, but is not verified!"));
+                // suck it, chump
+                self.delete_user(&UserId::from_uuid(email_user.id)).await?;
             }
         }
 
@@ -741,6 +759,25 @@ impl Services {
             }
         }
         Err(anyhow!("Invalid email or password!"))
+    }
+
+    pub async fn delete_user(
+        &self,
+        user_id: &UserId,
+    ) -> Result<()> {
+        self.scylla
+            .session
+            .execute(
+                &self
+                    .scylla
+                    .prepared_queries
+                    .get("delete_user")
+                    .expect("Query missing!"),
+                (user_id.to_uuid(),),
+            )
+            .await?;
+
+        Ok(())
     }
 
 /*

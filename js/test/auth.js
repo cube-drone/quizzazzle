@@ -242,3 +242,99 @@ test('Password reset', async () => {
     assert(homeText.includes("home"));
 
 })
+
+test("Once a user exists, a second user can't be created with that same email address", async () => {
+    let {user} = await createUser();
+
+    const fetchCookie = makeFetchHappen(fetch)
+
+    // check our status
+    let status_response = await fetchCookie(`${endpoint}/auth/status`);
+    let status_text = await status_response.text();
+    assert(status_text.includes("ok, not logged in"));
+
+    let root = await fetch(`${endpoint}/auth/test/generate_invite_code`);
+    let json = await root.json();
+    let invite_code = json.invite_code;
+
+    const formData = new FormData();
+    formData.append('invite_code', invite_code);
+
+    let invite_form_response = await fetchCookie(`${endpoint}/auth/invite`, {
+        method: 'POST',
+        body: formData,
+    });
+
+    const formDom = new JSDOM(await invite_form_response.text());
+    const csrf_token = formDom.window.document.querySelector("input[name=\"csrf_token\"]").value;
+    const invite_code_again = formDom.window.document.querySelector("input[name=\"invite_code\"]").value;
+    assert.strictEqual(invite_code, invite_code_again);
+
+    const registerFormData = new FormData();
+    let email = testy.email();
+    let password = `${email}-password`;
+    registerFormData.append('invite_code', invite_code);
+    registerFormData.append('csrf_token', csrf_token);
+    registerFormData.append('display_name', testy.name());
+    registerFormData.append('email', user.email);
+    registerFormData.append('password', password);
+    registerFormData.append('tos', true);
+    registerFormData.append('age', true);
+
+    let register_form_response = await fetchCookie(`${endpoint}/auth/register`, {
+        method: 'POST',
+        body: registerFormData,
+    });
+
+    // This should take us to an error page
+    let responseText = (await register_form_response.text()).toLowerCase();
+    assert(responseText.includes('error'));
+});
+
+test("Unverified users just get overwritten if you create a new user account", async () => {
+    let {user} = await createUser({is_verified: false});
+
+    const fetchCookie = makeFetchHappen(fetch)
+
+    // check our status
+    let status_response = await fetchCookie(`${endpoint}/auth/status`);
+    let status_text = await status_response.text();
+    assert(status_text.includes("ok, not logged in"));
+
+    let root = await fetch(`${endpoint}/auth/test/generate_invite_code`);
+    let json = await root.json();
+    let invite_code = json.invite_code;
+
+    const formData = new FormData();
+    formData.append('invite_code', invite_code);
+
+    let invite_form_response = await fetchCookie(`${endpoint}/auth/invite`, {
+        method: 'POST',
+        body: formData,
+    });
+
+    const formDom = new JSDOM(await invite_form_response.text());
+    const csrf_token = formDom.window.document.querySelector("input[name=\"csrf_token\"]").value;
+    const invite_code_again = formDom.window.document.querySelector("input[name=\"invite_code\"]").value;
+    assert.strictEqual(invite_code, invite_code_again);
+
+    const registerFormData = new FormData();
+    let email = testy.email();
+    let password = `${email}-password`;
+    registerFormData.append('invite_code', invite_code);
+    registerFormData.append('csrf_token', csrf_token);
+    registerFormData.append('display_name', testy.name());
+    registerFormData.append('email', user.email);
+    registerFormData.append('password', password);
+    registerFormData.append('tos', true);
+    registerFormData.append('age', true);
+
+    let register_form_response = await fetchCookie(`${endpoint}/auth/register`, {
+        method: 'POST',
+        body: registerFormData,
+    });
+
+    // This should not take us to an error page
+    let responseText = (await register_form_response.text()).toLowerCase();
+    assert(!responseText.includes('error'));
+});
