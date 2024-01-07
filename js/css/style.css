@@ -27,7 +27,7 @@ p, li{
     background: linear-gradient(221deg, #18e7e4, #f2b815, #ec15f2);
     background-size: 300% 300%;
 
-    animation: gradient-bg-crawl 20s ease infinite;
+    animation: gradient-bg-crawl 15s ease infinite;
 
     display: flex;
     flex-direction: column;
@@ -48,6 +48,24 @@ p, li{
     margin: auto;
     overflow: hidden;
     background: rgba(255, 255, 255, 0.3);
+
+    .everything{
+        width: 350px;
+        height: 550px;
+        max-height: 100%;
+        padding: 10px 0;
+        box-sizing: border-box;
+        margin: auto;
+        margin-top: 60px;
+        overflow-y: scroll;
+        font-size: small;
+    }
+
+    .gutters {
+        width: 100%;
+        padding: 0 10px;
+        box-sizing: border-box;
+    }
 }
 .primary-card .content-transparent{
     position: relative;
@@ -59,18 +77,6 @@ p, li{
     margin: auto;
     overflow: hidden;
     background: rgba(255, 255, 255, 0.05);
-}
-
-.primary-card .content .everything {
-    width: 350px;
-    height: 550px;
-    max-height: 100%;
-    padding: 10px 30px;
-    box-sizing: border-box;
-    margin: auto;
-    margin-top: 60px;
-    overflow-y: scroll;
-    font-size: small;
 }
 
 .primary-card header{
@@ -101,5 +107,183 @@ p, li{
 
 .primary-card header div {
     width: 40px;
+    text-align: center;
+}
+
+nav#primary_nav{
+    margin: 0;
+    padding: 0;
+    width: 100%;
+
+    ul{
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        display: flex;
+        justify-content: space-evenly;
+
+        li{
+            display: block;
+            width: 40px;
+            height: 40px;
+            margin: 0;
+            padding-top: 5px;
+
+            a{
+                filter: blur(1px);
+                transition: filter 1s ease 100ms;
+            }
+
+            a svg{
+                width: 40px;
+                height: 40px;
+
+                path{
+                    fill: white;
+                }
+            }
+
+            a .hide-sometimes{
+                transition: opacity 1s ease 100ms;
+                opacity: 1;
+            }
+
+            a:hover{
+                filter: none;
+            }
+
+            a:hover .hide-sometimes{
+                opacity: 0.2;
+            }
+        }
+
+        li a.selected{
+            filter: none;
+            border-bottom: 2px solid white;
+        }
+    }
+}
+
+.panel{
+    border-radius: 5px;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.4);
+    margin: 5px 0
+}
+
+.panel h1, .panel h2, .panel h3, .panel h4, .panel h5, .panel h6{
+    margin: 0;
+    padding: 0;
+}
+
+form {
+    margin-bottom: 10px;
+}
+
+form p {
+    margin: 0 0 1em 0;
+    padding: 0;
+}
+
+form.panel input[type="text"], form.panel input[type="password"]{
+    width: 95%;
+    padding: 5px;
+    margin: 5px 0;
+    border: 2px solid grey;
+    border-radius: 5px;
+}
+
+form.panel input[type="text"]:focus, form.panel input[type="password"]:focus{
+    outline: none;
+    border: 2px solid black;
+}
+
+form.panel input[type="checkbox"]{
+    accent-color: rgba(73, 112, 21, 0.8);
+    width: 28px;
+    height: 28px;
+
+    margin: 0 5px 0 0;
+}
+
+form.panel input[type="checkbox"]:focus{
+    border: 5px solid black;
+}
+
+.checkbox-group{
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-end;
+    align-items: center;
+    border: 2px solid white;
+    margin: 5px 0;
+    padding: 5px;
+
+    label{
+        margin-right: 10px;
+    }
+}
+
+.button-horizontal-right{
+    display: flex;
+    justify-content: flex-end;
+}
+
+.button-horizontal-left{
+    display: flex;
+    justify-content: flex-start;
+}
+.button-horizontal-center{
+    display: flex;
+    justify-content: center;
+}
+
+button.pushbutton {
+    display: block;
+    padding: 10px;
+    margin: 10px 5px;
+    overflow: visible;
+    border-radius: 100px;
+    border: 1px solid black;
+    background-color: darkslategray;
+    cursor: pointer;
+    box-shadow: 0 8px 0 0 rgba(0, 0, 0, 0.9);
+    mix-blend-mode: multiply;
+    transition: all 100ms ease 10ms;
+
+    svg{
+        width: 30px;
+        height: 30px;
+    }
+    svg path{
+        fill: white;
+    }
+}
+
+
+button:hover{
+    margin: 14px 5px 6px 5px;
+    box-shadow: 0 4px 0 0 rgba(0, 0, 0, 0.9);
+}
+
+.green, .nice, .success {
+    background-color: rgba(73, 112, 21, 0.8) !important;
+}
+
+.red, .error, .danger{
+    background-color: rgba(112, 21, 21, 0.8) !important;
+}
+
+.yellow, .warning, .caution, .info{
+    background-color: rgba(92, 85, 6, 0.8) !important;
+}
+
+.panel .message{
+    padding: 5px;
+    margin: 5px 0;
+    color: white;
+    mix-blend-mode: multiply;
+    font-weight: bold;
     text-align: center;
 }
