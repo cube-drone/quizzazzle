@@ -19,8 +19,10 @@ use scylla::transport::session::Session;
 use scylla::SessionBuilder;
 use comrak::{markdown_to_html, Options};
 
+
 mod fairings;
 mod error; // provides the no_shit! macro
+mod icons;
 
 mod config;
 mod email;
@@ -184,7 +186,20 @@ async fn rocket() -> Rocket<Build> {
 
     app = app.manage(services);
     app = app.attach(crate::fairings::timing::RequestTimer)
-             .attach(Template::fairing());
+             .attach(Template::custom(|engines|{
+                engines.tera.register_function("sbubby", icons::sbubby);
+                engines.tera.register_function("icon_heart", icons::icon_heart);
+                engines.tera.register_function("icon_profile", icons::icon_profile);
+                engines.tera.register_function("icon_applications", icons::icon_applications);
+                engines.tera.register_function("icon_relationships", icons::icon_relationships);
+                engines.tera.register_function("icon_search", icons::icon_search);
+                engines.tera.register_function("icon_circle_cross", icons::icon_circle_cross);
+                engines.tera.register_function("icon_circle_check", icons::icon_circle_check);
+                engines.tera.register_function("icon_circle_chevron_left", icons::icon_circle_chevron_left);
+                engines.tera.register_function("icon_circle_chevron_up", icons::icon_circle_chevron_up);
+                engines.tera.register_function("icon_circle_chevron_right", icons::icon_circle_chevron_right);
+                engines.tera.register_function("icon_circle_hamburger", icons::icon_circle_hamburger);
+             }));
 
     app = app.register("/", catchers![
         error::not_found,

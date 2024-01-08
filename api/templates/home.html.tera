@@ -17,6 +17,9 @@
             <p>
             <input type="text" />
             </p>
+            <p>
+            {{ sbubby() }}
+            </p>
             <ul>
                 <li><a href="/auth/login">Login</a>
                 <li><a href="/auth/invite">Register</a>

@@ -450,7 +450,6 @@ impl Services {
 
     pub async fn generate_invite_code(
         &self,
-        _user_id: &UserId,
     ) -> Result<InviteCode> {
         // for testing, generate a new invite code from the root user
         Ok(InviteCode::new())
