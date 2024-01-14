@@ -1,0 +1,201 @@
+
+body{
+    font-family: "Radio Canada", Arial, Helvetica, sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+}
+
+p, li{
+    font-weight: 300;
+}
+
+svg {
+    /* this is a useful backstop for svg's that don't have any height or width */
+    min-height: 10px;
+    min-width: 10px;
+}
+
+/* the primary card is the central frame, the card that sits around all of the content */
+.primary-card {
+    width: 100px;
+    width: 98vw;
+    height: 100px;
+    height: 96vh;
+    box-sizing: border-box;
+    color: black;
+    font-weight: bold;
+    font-size: large;
+    padding: 10px;
+
+    background: linear-gradient(221deg, #18e7e4, #f2b815, #ec15f2);
+    background-size: 300% 300%;
+
+    animation: gradient-bg-crawl 15s ease infinite;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+
+    min-width: 400px;
+    margin: auto;
+    border: 5px solid white;
+}
+
+.primary-card .content{
+    position: relative;
+    width: 350px;
+    height: 600px;
+    max-height: 100%;
+    border: 5px solid black;
+    padding: 0;
+    margin: auto;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.3);
+
+    .everything{
+        width: 350px;
+        height: 550px;
+        max-height: 100%;
+        padding: 10px 0;
+        box-sizing: border-box;
+        margin: auto;
+        margin-top: 60px;
+        overflow-y: scroll;
+        font-size: small;
+    }
+
+    .gutters {
+        width: 100%;
+        padding: 0 10px;
+        box-sizing: border-box;
+    }
+}
+.primary-card .content-transparent{
+    position: relative;
+    width: 350px;
+    height: 600px;
+    max-height: 100%;
+    border: 5px solid black;
+    padding: 0;
+    margin: auto;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.primary-card header{
+    display: block;
+    color: white;
+    mix-blend-mode: multiply;
+    width: 100%;
+    height: 60px;
+    background-color: black;
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex;
+    justify-content: space-between;
+}
+
+.primary-card header h1, .primary-card header h2{
+    margin: 0;
+    padding: 0;
+    line-height: 60px;
+    padding-left: 15px;
+}
+
+.primary-card header a, .primary-card header a:visited{
+    color: white;
+    font-weight: 300;
+}
+
+.primary-card header div {
+    width: 40px;
+    text-align: center;
+}
+
+nav#primary_nav{
+    margin: 0;
+    padding: 0;
+    width: 100%;
+
+    ul{
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        display: flex;
+        justify-content: space-evenly;
+
+        li{
+            display: block;
+            width: 40px;
+            height: 40px;
+            margin: 0;
+            padding-top: 5px;
+
+            a{
+                filter: blur(1px);
+                transition: filter 1s ease 100ms;
+            }
+
+            a svg{
+                width: 40px;
+                height: 40px;
+
+                path{
+                    fill: white;
+                }
+            }
+
+            a .hide-sometimes, a .opt{
+                transition: opacity 1s ease 100ms;
+                opacity: 1;
+            }
+
+            a:hover{
+                filter: none;
+            }
+
+            a:hover .hide-sometimes, a:hover .opt{
+                opacity: 0.2;
+            }
+        }
+
+        li a.selected{
+            filter: none;
+            border-bottom: 2px solid white;
+        }
+    }
+}
+
+/* a lil white panel that sits inside the primary card */
+.panel{
+    border-radius: 5px;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.4);
+    margin: 5px 0
+}
+
+.panel h1, .panel h2, .panel h3, .panel h4, .panel h5, .panel h6{
+    margin: 0;
+    padding: 0;
+}
+
+.panel .message{
+    padding: 5px;
+    margin: 5px 0;
+    color: white;
+    mix-blend-mode: multiply;
+    font-weight: bold;
+    text-align: center;
+}
+
+.panel .hero-icon{
+    width: 50px;
+    height: 50px;
+    margin: 10px auto;
+    text-align: center;
+
+}

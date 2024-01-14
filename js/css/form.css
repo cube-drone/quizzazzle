@@ -1,0 +1,62 @@
+
+form {
+    margin-bottom: 10px;
+}
+
+form p {
+    margin: 0 0 1em 0;
+    padding: 0;
+}
+
+form.panel input[type="text"], form.panel input[type="password"]{
+    width: 95%;
+    padding: 5px;
+    margin: 5px 0;
+    border: 2px solid grey;
+    border-radius: 5px;
+}
+
+form.panel input[type="text"]:focus, form.panel input[type="password"]:focus{
+    outline: none;
+    border: 2px solid black;
+}
+
+form.panel input[type="checkbox"]{
+    accent-color: rgba(73, 112, 21, 0.8);
+    width: 28px;
+    height: 28px;
+
+    margin: 0 5px 0 0;
+}
+
+form.panel input[type="checkbox"]:focus{
+    border: 5px solid black;
+}
+
+.checkbox-group{
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-end;
+    align-items: center;
+    border: 2px solid white;
+    margin: 5px 0;
+    padding: 5px;
+
+    label{
+        margin-right: 10px;
+    }
+}
+
+.button-horizontal-right{
+    display: flex;
+    justify-content: flex-end;
+}
+
+.button-horizontal-left{
+    display: flex;
+    justify-content: flex-start;
+}
+.button-horizontal-center{
+    display: flex;
+    justify-content: center;
+}

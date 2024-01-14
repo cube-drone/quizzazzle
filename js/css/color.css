@@ -1,0 +1,18 @@
+:root {
+    --green: rgba(73, 112, 21, 0.8);
+    --red: rgba(112, 21, 21, 0.8);
+    --info: rgba(92, 85, 6, 0.8);
+}
+
+
+.green, .nice, .success {
+    background-color: var(--green) !important;
+}
+
+.red, .error, .danger{
+    background-color: var(--red) !important;
+}
+
+.yellow, .warning, .caution, .info{
+    background-color: var(--info) !important;
+}

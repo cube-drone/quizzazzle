@@ -13,7 +13,14 @@
                 <h2><a href="/">home</a> / Oh no!</h2>
             </header>
             <div class="everything">
-                {{error | safe}}
+                <div class="gutters">
+                    <div class="panel">
+                        <div class="hero-icon">
+                            {{ icon_circle_question() | safe }}
+                        </div>
+                        {{error | safe}}
+                    </div>
+                </div>
             </div>
         </div>
     </div>

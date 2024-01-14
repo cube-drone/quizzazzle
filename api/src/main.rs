@@ -188,7 +188,7 @@ async fn rocket() -> Rocket<Build> {
     app = app.attach(crate::fairings::timing::RequestTimer)
              .attach(Template::custom(|engines|{
                 engines.tera.register_function("sbubby", icons::sbubby);
-                engines.tera.register_function("icon_heart", icons::icon_heart);
+                engines.tera.register_function("icon_home", icons::icon_home);
                 engines.tera.register_function("icon_profile", icons::icon_profile);
                 engines.tera.register_function("icon_applications", icons::icon_applications);
                 engines.tera.register_function("icon_relationships", icons::icon_relationships);
@@ -198,7 +198,9 @@ async fn rocket() -> Rocket<Build> {
                 engines.tera.register_function("icon_circle_chevron_left", icons::icon_circle_chevron_left);
                 engines.tera.register_function("icon_circle_chevron_up", icons::icon_circle_chevron_up);
                 engines.tera.register_function("icon_circle_chevron_right", icons::icon_circle_chevron_right);
+                engines.tera.register_function("icon_circle_chevron_down", icons::icon_circle_chevron_down);
                 engines.tera.register_function("icon_circle_hamburger", icons::icon_circle_hamburger);
+                engines.tera.register_function("icon_circle_question", icons::icon_circle_question);
              }));
 
     app = app.register("/", catchers![
