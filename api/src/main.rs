@@ -201,6 +201,7 @@ async fn rocket() -> Rocket<Build> {
                 engines.tera.register_function("icon_circle_chevron_down", icons::icon_circle_chevron_down);
                 engines.tera.register_function("icon_circle_hamburger", icons::icon_circle_hamburger);
                 engines.tera.register_function("icon_circle_question", icons::icon_circle_question);
+                engines.tera.register_function("icon_mailbox", icons::icon_mailbox);
              }));
 
     app = app.register("/", catchers![

@@ -1,18 +1,36 @@
 :root {
-    --green: rgba(73, 112, 21, 0.8);
-    --red: rgba(112, 21, 21, 0.8);
-    --info: rgba(92, 85, 6, 0.8);
+    --green-glass: rgba(73, 112, 21, 0.8);
+    --success-glass: rgba(73, 112, 21, 0.8);
+
+    --red-glass: rgba(112, 21, 21, 0.8);
+    --error-glass: rgba(112, 21, 21, 0.8);
+    --danger-glass: rgba(112, 21, 21, 0.8);
+
+    --yellow-glass: rgba(81, 89, 5, 0.8);
+    --warning-glass: rgba(81, 89, 5, 0.8);
+
+    --blue-glass: rgba(5, 8, 89, 0.8);
+    --info-glass: rgba(5, 8, 89, 0.8);
 }
 
 
 .green, .nice, .success {
-    background-color: var(--green) !important;
+    background-color: var(--green-glass) !important;
 }
 
 .red, .error, .danger{
-    background-color: var(--red) !important;
+    background-color: var(--red-glass) !important;
 }
 
-.yellow, .warning, .caution, .info{
-    background-color: var(--info) !important;
+.yellow, .warning, .caution {
+    background-color: var(--yellow-glass) !important;
+}
+
+.blue, .info{
+    background-color: var(--info-glass) !important;
+}
+
+.disabled {
+    background-color: var(--info-glass) !important;
+    cursor: not-allowed !important;
 }

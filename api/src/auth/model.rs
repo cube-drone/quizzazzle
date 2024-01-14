@@ -823,6 +823,27 @@ impl Services {
         Ok(())
     }
 
+    pub async fn resend_verification_email(
+        &self,
+        user_id: &UserId,
+    ) -> Result<()> {
+        let user_maybe = self.get_user(user_id).await?;
+        match user_maybe {
+            None => {
+                Err(anyhow!("User does not exist!"))
+            },
+            Some(user) => {
+                if user.is_verified {
+                    Err(anyhow!("User is already verified!"))
+                }
+                else{
+                    self.send_verification_email(&user_id.to_uuid(), &user.email).await?;
+                    Ok(())
+                }
+            }
+        }
+    }
+
     pub async fn send_ip_verification_email(
         &self,
         user_id: &Uuid,

@@ -36,8 +36,10 @@ struct Login<'r> {
     password: &'r str,
 }
 
+const MAXIMUM_INVITE_CODE_ATTEMPTS_PER_HOUR: usize = 15;
 const MAXIMUM_LOGIN_ATTEMPTS_PER_HOUR: usize = 15;
 const MAXIMUM_PASSWORD_EMAILS_PER_HOUR: usize = 2;
+const MAXIMUM_EMAIL_ATTEMPTS_PER_HOUR: usize = 2;
 
 #[post("/login", data = "<login>")]
 async fn login_post(services: &State<Services>, cookies: &CookieJar<'_>, login: Form<Login<'_>>, ip: BestGuessIpAddress) -> Result<Redirect, Template> {
@@ -191,19 +193,38 @@ struct Invite<'r> {
 }
 
 #[post("/invite", data = "<invite>")]
-async fn invite_post(services: &State<Services>, cookies: &CookieJar<'_>, invite: Form<Invite<'_>>) -> Template {
+async fn invite_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: BestGuessIpAddress, invite: Form<Invite<'_>>) -> Template {
+
+    if invite.invite_code == "" {
+        // just do nothing
+        return Template::render("invite", context! {
+        });
+    }
+
+    if services.is_production {
+        match services.rate_limit(&ip.to_string(), MAXIMUM_INVITE_CODE_ATTEMPTS_PER_HOUR).await{
+            Ok(()) => {
+            },
+            Err(_e) => {
+                return Template::render("invite", context! {
+                    error: "Attempting too fast, please wait a bit and try again!",
+                });
+            }
+        }
+    }
+
     match invite.validate() {
         Ok(_) => (),
-        Err(e) => return Template::render("invite", context! {
-            error: e.to_string(),
+        Err(_e) => return Template::render("invite", context! {
+            error: "Invalid invite code",
         }),
       };
 
     let invite_code = match model::InviteCode::from_string(invite.invite_code){
         Ok(invite_code) => invite_code,
-        Err(e) => {
+        Err(_e) => {
             return Template::render("invite", context! {
-                error: e.to_string(),
+                error: "Invalid invite code",
             });
         }
     };
@@ -687,6 +708,41 @@ async fn verify_email_ok(_user: model::VerifiedUserSession) -> Redirect{
     Redirect::to("/auth/ok")
 }
 
+#[post("/verify_email")]
+async fn verify_email_retry(user: model::UserSession, services: &State<Services>, ip: BestGuessIpAddress) -> Result<Redirect, Template> {
+
+    if user.is_verified {
+        return Ok(Redirect::to("/auth/ok"));
+    }
+
+    if services.is_production {
+        match services.rate_limit(&ip.to_string(), MAXIMUM_EMAIL_ATTEMPTS_PER_HOUR).await{
+            Ok(()) => {
+            },
+            Err(_e) => {
+                return Err(Template::render("verify_email", context! {
+                    error: "Attempting too fast, please wait a bit and try again!",
+                }));
+            }
+        }
+    }
+
+    match services.resend_verification_email(&user.user_id).await{
+        Ok(_) => {
+            // we sent the email, now we wait
+            return Err(Template::render("verify_email", context! {
+                again: true,
+            }));
+        },
+        Err(e) => {
+            println!("Error sending verification email: {}", e);
+            return Err(Template::render("verify_email", context! {
+                error: "Error sending verification email",
+            }));
+        }
+    }
+}
+
 #[get("/verify_email", rank=3)]
 async fn verify_email_template(_user: model::UserSession) -> Template{
     Template::render("verify_email", context! {})
@@ -827,6 +883,7 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
             password_reset_stage_2,
             password_reset_stage_2_post,
             verify_email_ok,
+            verify_email_retry,
             verify_email_template,
             verify_email,
             verify_email_nobody,

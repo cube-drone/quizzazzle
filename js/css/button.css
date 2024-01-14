@@ -1,5 +1,5 @@
 
-button.pushbutton {
+button.pushbutton, a.pushbutton {
     display: block;
     padding: 10px;
     margin: 10px 5px;
@@ -22,16 +22,16 @@ button.pushbutton {
 }
 
 
-button:hover{
+button.pushbutton:hover, a.pushbutton:hover{
     margin: 14px 5px 6px 5px;
     box-shadow: 0 4px 0 0 rgba(0, 0, 0, 0.9);
 }
 
-button .hide-sometimes, button .opt{
+button.pushbutton .hide-sometimes, button.pushbutton .opt, a.pushbutton .hide-sometimes, a.pushbutton .opt{
     transition: opacity 1s ease 100ms;
     opacity: 1;
 }
 
-button:hover .hide-sometimes, button:hover .opt{
+button.pushbutton:hover .hide-sometimes, button.pushbutton:hover .opt, a.pushbutton:hover .hide-sometimes, a.pushbutton:hover .opt{
     opacity: 0.2;
 }

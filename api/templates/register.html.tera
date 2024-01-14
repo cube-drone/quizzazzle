@@ -14,49 +14,55 @@
         </header>
         <div class="bump"></div>
         <div class="everything">
-            {% if error %}
-                <div class="error">{{error}}</div>
-            {% endif %}
-            <form method="post" action="/auth/register">
-                <input name="csrf_token" type="hidden" value="{{ csrf_token }}" />
-                <input name="invite_code" type="hidden" value="{{ invite_code }}" />
-
-                <label for="display_name">Display Name</label>
-                {% if display_name %}
-                    <input name="display_name" type="text" placeholder="Supercool Funkpiotr" value="{{ display_name }}"/>
-                {% else %}
-                    <input name="display_name" type="text" placeholder="Supercool Funkpiotr"/>
+            <div class="gutters">
+                {% if error %}
+                    <div class="error message">{{error}}</div>
                 {% endif %}
-                <br/>
+                <form method="post" action="/auth/register" class="panel">
+                    <input name="csrf_token" type="hidden" value="{{ csrf_token }}" />
+                    <input name="invite_code" type="hidden" value="{{ invite_code }}" />
 
-                <label for="email">Email</label>
-                {% if email %}
-                    <input name="email" type="text" placeholder="farts@toots.poots" value="{{ email }}" />
-                {% else %}
-                    <input name="email" type="text" placeholder="farts@toots.poots" />
-                {% endif %}
-                <br/>
+                    <label for="display_name">Display Name</label>
+                    {% if display_name %}
+                        <input name="display_name" type="text" placeholder="Supercool Funkpiotr" value="{{ display_name }}"/>
+                    {% else %}
+                        <input name="display_name" type="text" placeholder="Supercool Funkpiotr"/>
+                    {% endif %}
+                    <br/>
 
-                <label for="password">Password</label>
-                {% if password %}
-                    <input name="password" type="password" value="{{ password }}" />
-                {% else %}
-                    <input name="password" type="password" />
-                {% endif %}
+                    <label for="email">Email</label>
+                    {% if email %}
+                        <input name="email" type="text" placeholder="farts@toots.poots" value="{{ email }}" />
+                    {% else %}
+                        <input name="email" type="text" placeholder="farts@toots.poots" />
+                    {% endif %}
+                    <br/>
 
-                <br/>
-                <p><small>password must be at least 11 characters long</small></p>
+                    <label for="password">Password</label>
+                    {% if password %}
+                        <input name="password" type="password" value="{{ password }}" />
+                    {% else %}
+                        <input name="password" type="password" />
+                    {% endif %}
 
-                <label for="tos">i agree to the <a href="/tos">ToS</a></label>
-                <input name="tos" type="checkbox" checked />
-                <br/>
+                    <br/>
+                    <p><small>password must be at least 11 characters long</small></p>
 
-                <label for="age">i am age 13+</label>
-                <input name="age" type="checkbox" checked />
-                <br/>
+                    <div class="checkbox-group">
+                        <label for="tos">i agree to the <a href="/tos">ToS</a></label>
+                        <input name="tos" type="checkbox" checked />
+                    </div>
 
-                <button name="submit" value="Ok">Ok</button>
-            </form>
+                    <div class="checkbox-group">
+                        <label for="age">i am age 13+</label>
+                        <input name="age" type="checkbox" checked />
+                    </div>
+
+                    <div class="button-horizontal-center">
+                        <button title="Register" class="pushbutton green" name="submit" value="Login">{{ icon_circle_check() | safe }}</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 </div>
