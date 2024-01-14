@@ -14,29 +14,33 @@
         </header>
         <div class="bump"></div>
         <div class="everything">
-            {% if error %}
-                <div class="error">{{error}}</div>
-            {% endif %}
-            <form method="post" action="/auth/login">
-                <input name="csrf_token" type="hidden" value="{{ csrf_token }}" />
+            <div class="gutters">
+                <form method="post" action="/auth/login" class="panel">
+                    {% if error %}
+                        <div class="error message">{{error}}</div>
+                    {% endif %}
+                    <input name="csrf_token" type="hidden" value="{{ csrf_token }}" />
 
-                <label for="email">Email</label>
-                {% if email %}
-                    <input name="email" type="text" placeholder="farts@toots.poots" value="{{ email }}" />
-                {% else %}
-                    <input name="email" type="text" placeholder="farts@toots.poots" />
-                {% endif %}
-                <br/>
+                    <label for="email">Email</label>
+                    {% if email %}
+                        <input name="email" type="text" placeholder="farts@toots.poots" value="{{ email }}" />
+                    {% else %}
+                        <input name="email" type="text" placeholder="farts@toots.poots" />
+                    {% endif %}
+                    <br/>
 
-                <label for="password">Password</label>
-                {% if password %}
-                    <input name="password" type="password" value="{{ password }}" />
-                {% else %}
-                    <input name="password" type="password" />
-                {% endif %}
+                    <label for="password">Password</label>
+                    {% if password %}
+                        <input name="password" type="password" value="{{ password }}" />
+                    {% else %}
+                        <input name="password" type="password" />
+                    {% endif %}
 
-                <button name="submit" value="Login">Login</button>
-            </form>
+                    <div class="button-horizontal-center">
+                        <button class="pushbutton green" name="submit" value="Login">{{ icon_circle_check() | safe }}</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 </div>
