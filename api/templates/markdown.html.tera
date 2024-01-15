@@ -13,7 +13,11 @@
                 <h2><a href="/">home</a> / {{title}}</h2>
             </header>
             <div class="everything">
-                {{content | safe}}
+                <div class="gutter">
+                    <div class="panel">
+                        {{content | safe}}
+                    </div>
+                </div>
             </div>
         </div>
     </div>

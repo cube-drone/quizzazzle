@@ -37,7 +37,8 @@
                     {% endif %}
 
                     <div class="button-horizontal-center">
-                        <button class="pushbutton green" name="submit" value="Login">{{ icon_circle_check() | safe }}</button>
+                        <a class="pushbutton warning" href="/auth/password_reset" title="I forgot my password">{{ icon_nervous() | safe }}</a>
+                        <button class="pushbutton green" name="submit" value="Login" title="Login">{{ icon_circle_check() | safe }}</button>
                     </div>
                 </form>
             </div>

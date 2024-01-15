@@ -29,6 +29,14 @@ async fn faq(services: &State<Services>) -> Template {
     })
 }
 
+#[get("/pricing")]
+async fn pricing(services: &State<Services>) -> Template {
+    Template::render("markdown", context!{
+        title: "Pricing",
+        content: services.static_markdown.get("pricing").expect("pricing should be available")
+    })
+}
+
 #[get("/home")]
 async fn user_home(_user: crate::auth::model::VerifiedUserSession) -> Template {
     let current_date = chrono::Utc::now();
@@ -45,6 +53,7 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
             home,
             tos,
             faq,
+            pricing,
             user_home
         ],
     )

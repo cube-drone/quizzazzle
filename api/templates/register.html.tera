@@ -49,12 +49,12 @@
                     <p><small>password must be at least 11 characters long</small></p>
 
                     <div class="checkbox-group">
-                        <label for="tos">i agree to the <a href="/tos">ToS</a></label>
+                        <label for="tos">i agree to the <a href="/tos">ToS</a>&nbsp;</label>
                         <input name="tos" type="checkbox" checked />
                     </div>
 
                     <div class="checkbox-group">
-                        <label for="age">i am age 13+</label>
+                        <label for="age">i am age 13+&nbsp;</label>
                         <input name="age" type="checkbox" checked />
                     </div>
 

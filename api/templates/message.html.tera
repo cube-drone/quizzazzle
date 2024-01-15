@@ -13,7 +13,14 @@
                 <h2><a href="/">home</a> / {{ title }}</h2>
             </header>
             <div class="everything">
-                <p>{{message | safe}}</p>
+                <div class="gutters">
+                    <div class="panel">
+                        <div class="hero-icon">
+                            {{ icon_exclamation() | safe }}
+                        </div>
+                        <p>{{message | safe}}</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

@@ -142,6 +142,7 @@ async fn rocket() -> Rocket<Build> {
     let mut static_hashmap = HashMap::new();
     static_hashmap.insert("tos", static_markdownify("tos.md"));
     static_hashmap.insert("faq", static_markdownify("faq.md"));
+    static_hashmap.insert("pricing", static_markdownify("pricing.md"));
 
     // Email Setup
     let email_provider = email::EmailProvider::setup(is_production).await;
@@ -202,6 +203,8 @@ async fn rocket() -> Rocket<Build> {
                 engines.tera.register_function("icon_circle_hamburger", icons::icon_circle_hamburger);
                 engines.tera.register_function("icon_circle_question", icons::icon_circle_question);
                 engines.tera.register_function("icon_mailbox", icons::icon_mailbox);
+                engines.tera.register_function("icon_nervous", icons::icon_nervous);
+                engines.tera.register_function("icon_exclamation", icons::icon_exclamation);
              }));
 
     app = app.register("/", catchers![

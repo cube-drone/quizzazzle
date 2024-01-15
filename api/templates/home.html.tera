@@ -24,7 +24,7 @@
                 <li><a href="/auth/login">Login</a>
                 <li><a href="/auth/invite">Register</a>
                 <li><a href="/faq">FAQ</a></li>
-                <li><a href="/faq">Pricing</a></li>
+                <li><a href="/pricing">Pricing</a></li>
                 <li><a href="/tos">Legal</a></li>
             </ul>
         </div>

@@ -3,10 +3,6 @@
 
 It's a website, dummy!
 
-## Pricing?
+## Does it DO anything, yet?
 
-it doesn't cost any money
-
-### You Need Some Kind of Business Model, Obviously
-
-not yet I don't
+No! _(note to self: update this when you implement some functionality)_
