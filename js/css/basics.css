@@ -1,6 +1,8 @@
 
-body{
+
+html{
     font-family: "Radio Canada", Arial, Helvetica, sans-serif;
+    overscroll-behavior: none;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -68,12 +70,19 @@ svg {
         width: 350px;
         height: 550px;
         max-height: 100%;
-        padding: 10px 0;
         box-sizing: border-box;
-        margin: auto;
-        margin-top: 60px;
+        margin: 60px auto 0 auto;
+        padding-top: 0px;
         overflow-y: scroll;
-        font-size: small;
+        transition: all 1000ms;
+        overscroll-behavior: none;
+    }
+
+    .tall{
+        width: 350px;
+        height: 600px;
+        max-height: 100%;
+        margin: 0 auto 0 auto;
     }
 
     .gutter, .gutters {
