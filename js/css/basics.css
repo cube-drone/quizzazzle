@@ -142,64 +142,53 @@ svg {
     text-align: center;
 }
 
-nav#primary-nav{
+#primary-nav{
     margin: 0;
     padding: 0;
     width: 100%;
+}
 
-    ul{
-        list-style-type: none;
-        margin: 0;
-        padding: 0;
-        width: 100%;
-        display: flex;
-        flex-direction: row;
-        justify-content: space-evenly;
+#primary-nav ul {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-evenly;
+}
 
-        li{
-            display: block;
-            width: 40px;
-            height: 40px;
-            margin: 0;
-            padding-top: 5px;
+#primary-nav ul li {
+    list-style-type: none;
+    display: block;
+    width: 40px;
+    height: 40px;
+    margin: 0;
+    padding-top: 5px;
+    color: white;
+}
 
-            a{
-                /*
-                filter: blur(1px);
-                transition: filter 1s ease 100ms;
-                */
-            }
+#primary-nav a svg{
+    width: 40px;
+    height: 40px;
+}
 
-            a svg{
-                width: 40px;
-                height: 40px;
+#primary-nav a svg path{
+    fill: white;
+}
 
-                path{
-                    fill: white;
-                }
-            }
+#primary-nav a .opt{
+    transition: opacity 1s ease 100ms;
+    opacity: 1;
+}
 
-            a .hide-sometimes, a .opt{
-                transition: opacity 1s ease 100ms;
-                opacity: 1;
-            }
+#primary-nav a:hover .hide-sometimes, a:hover .opt{
+    opacity: 0.2;
+}
 
-            a:hover{
-                /*
-                filter: none;
-                */
-            }
-
-            a:hover .hide-sometimes, a:hover .opt{
-                opacity: 0.2;
-            }
-        }
-
-        li a.selected{
-            filter: none;
-            border-bottom: 2px solid white;
-        }
-    }
+#primary-nav a.selected{
+    filter: none;
+    border-bottom: 2px solid white;
 }
 
 /* a lil white panel that sits inside the primary card */
