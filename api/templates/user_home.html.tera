@@ -17,7 +17,10 @@
             <p>
             <input type="text" />
             </p>
-            <p> u did it </p>
+            <p> u did it, {{ display_name }}</p>
+            <ul>
+                <li><a href="/auth/logout">Logout</a></li>
+            </ul>
         </div>
     </div>
 </div>

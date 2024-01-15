@@ -1,5 +1,6 @@
 use rocket::{Build, Rocket, State};
 use rocket_dyn_templates::{Template, context};
+use rocket::response::Redirect;
 use chrono::Datelike;
 
 use crate::Services;
@@ -38,13 +39,18 @@ async fn pricing(services: &State<Services>) -> Template {
 }
 
 #[get("/home")]
-async fn user_home(_user: crate::auth::model::VerifiedUserSession) -> Template {
-    let current_date = chrono::Utc::now();
-    let year = current_date.year();
+async fn user_home(user: crate::auth::model::VerifiedUserSession) -> Template {
+    let display_name = user.display_name;
     Template::render("user_home", context! {
-        year: year,
+        display_name: display_name,
     })
 }
+
+#[get("/home", rank = 2)]
+async fn user_home_bounce() -> Redirect {
+    Redirect::to("/auth/login")
+}
+
 
 pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
     app.mount(
@@ -54,7 +60,8 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
             tos,
             faq,
             pricing,
-            user_home
+            user_home,
+            user_home_bounce
         ],
     )
 }
