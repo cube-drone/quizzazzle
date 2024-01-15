@@ -18,6 +18,12 @@ use crate::Services;
 use crate::auth::model;
 
 #[get("/login")]
+async fn login_bounce(_user: model::UserSession) -> Redirect {
+    /* you're already logged in */
+    Redirect::to("/auth/ok")
+}
+
+#[get("/login", rank = 2)]
 async fn login(cookies: &CookieJar<'_>) -> Template {
 
     let csrf_token = Uuid::new_v4().to_string();
@@ -867,6 +873,7 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
     app.mount(
         "/auth",
         routes![
+            login_bounce,
             login,
             login_post,
             register,
