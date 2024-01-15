@@ -13,21 +13,21 @@ p, li{
 
 svg {
     /* this is a useful backstop for svg's that don't have any height or width */
-    min-height: 10px;
-    min-width: 10px;
+    min-height: 20px;
+    min-width: 20px;
 }
 
 /* the primary card is the central frame, the card that sits around all of the content */
 .primary-card {
     width: 100px;
-    width: 98vw;
+    width: 96vw;
     height: 100px;
-    height: 96vh;
+    height: 92vh;
     box-sizing: border-box;
     color: black;
     font-weight: bold;
     font-size: large;
-    padding: 10px;
+    padding: 5px;
 
     background: linear-gradient(221deg, #18e7e4, #f2b815, #ec15f2);
     background-size: 300% 300%;
@@ -38,10 +38,20 @@ svg {
     flex-direction: column;
     justify-content: center;
 
-    min-width: 400px;
+    min-width: 360px;
     margin: auto;
     border: 5px solid white;
 }
+
+@media only screen and (max-width: 600px) {
+    body{
+        margin: 0;
+    }
+    .primary-card {
+        border: none;
+        padding: 0;
+    }
+  }
 
 .primary-card .content{
     position: relative;
@@ -72,6 +82,7 @@ svg {
         box-sizing: border-box;
     }
 }
+
 .primary-card .content-transparent{
     position: relative;
     width: 350px;
