@@ -56,7 +56,7 @@ let visibilityObserver = new IntersectionObserver((entries) => {
 , {
     root: null, // use the viewport
     rootMargin: '0px', // anywhere in the viewport
-    threshold: 0.1 // a tiny fraction of the element must be visible
+    threshold: 0.01 // a tiny fraction of the element must be visible
 });
 let primaryShowHandlers = {};
 let primaryHideHandlers = {};
@@ -201,11 +201,12 @@ class App extends Component {
         this.state = {
             scrollDirection: "backward",
         }
+        this.lastScrollTop = 0;
     }
 
     componentDidMount(){
         let element = this.base;
-        let everything = element.querySelector('.everything');
+        let everything = element.querySelector('.everything-feed');
         everything.addEventListener('scroll', (e) => {
             let scrollTop = everything.scrollTop;
             let changeDirection = debounce((direction) => {
@@ -233,13 +234,14 @@ class App extends Component {
 
     render(){
         let headerVisible = this.state.scrollDirection == "backward" ? "header-visible" : "header-invisible";
-        let tall = this.state.scrollDirection == "backward" ? "" : "tall";
+        let disableTransparentIcons = this.lastScrollTop > 60 ? "disable-transparent-icons" : "";
+
         return html`<div class="primary-card">
             <div class="content">
-                <header class="${headerVisible}">
+                <header class="${headerVisible} ${disableTransparentIcons}">
                     hi
                 </header>
-                <div class="everything ${tall}">
+                <div class="everything-feed">
                     <h2>Hi!</h2>
                     <div class="frames">
                     <${VisibilityTrigger} />
