@@ -3,7 +3,8 @@
 
 @import "color.css";
 @import "basics.css";
+@import "header.css";
 @import "form.css";
 @import "button.css";
 
-@import "thingie.css";
+@import "feed.css";

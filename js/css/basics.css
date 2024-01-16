@@ -65,33 +65,32 @@ svg {
     margin: auto;
     overflow: hidden;
     background: rgba(255, 255, 255, 0.3);
+}
+.primary-card .content .everything{
+    width: 350px;
+    height: 550px;
+    max-height: 100%;
+    box-sizing: border-box;
+    margin: 60px auto 0 auto;
+    padding-top: 0px;
+    overflow-y: scroll;
+}
 
-    .everything{
-        width: 350px;
-        height: 550px;
-        max-height: 100%;
-        box-sizing: border-box;
-        margin: 60px auto 0 auto;
-        padding-top: 0px;
-        overflow-y: scroll;
-    }
+.primary-card .content .everything-feed{
+    width: 350px;
+    height: 600px;
+    max-height: 100%;
+    box-sizing: border-box;
+    margin: 0 auto;
+    padding-top: 60px;
+    overflow-y: scroll;
+    overscroll-behavior: none;
+}
 
-    .everything-feed{
-        width: 350px;
-        height: 600px;
-        max-height: 100%;
-        box-sizing: border-box;
-        margin: 0 auto;
-        padding-top: 60px;
-        overflow-y: scroll;
-        overscroll-behavior: none;
-    }
-
-    .gutter, .gutters {
-        width: 100%;
-        padding: 0 10px;
-        box-sizing: border-box;
-    }
+.primary-card .gutter, .primary-card .gutters {
+    width: 100%;
+    padding: 0 10px;
+    box-sizing: border-box;
 }
 
 .primary-card .content-transparent{
@@ -104,91 +103,6 @@ svg {
     margin: auto;
     overflow: hidden;
     background: rgba(255, 255, 255, 0.05);
-}
-
-.primary-card header{
-    display: block;
-    color: white;
-    mix-blend-mode: multiply;
-    width: 100%;
-    height: 60px;
-    background-color: black;
-    position: absolute;
-    z-index: 10;
-    top: 0;
-    left: 0;
-    display: flex;
-    justify-content: space-between;
-}
-
-.primary-card header.disable-transparent-icons{
-    mix-blend-mode: normal;
-}
-
-.primary-card header h1, .primary-card header h2{
-    margin: 0;
-    padding: 0;
-    line-height: 60px;
-    padding-left: 15px;
-}
-
-.primary-card header a, .primary-card header a:visited{
-    color: white;
-    font-weight: 300;
-}
-
-.primary-card header div {
-    width: 40px;
-    text-align: center;
-}
-
-#primary-nav{
-    margin: 0;
-    padding: 0;
-    width: 100%;
-}
-
-#primary-nav ul {
-    list-style-type: none;
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    display: flex;
-    flex-direction: row;
-    justify-content: space-evenly;
-}
-
-#primary-nav ul li {
-    list-style-type: none;
-    display: block;
-    width: 40px;
-    height: 40px;
-    margin: 0;
-    padding-top: 5px;
-    color: white;
-}
-
-#primary-nav a svg{
-    width: 40px;
-    height: 40px;
-}
-
-#primary-nav a svg path{
-    fill: white;
-}
-
-#primary-nav a .opt{
-    transition: opacity 1s ease 100ms;
-    opacity: 1;
-}
-
-#primary-nav a:hover .hide-sometimes, a:hover .opt{
-    opacity: 0.2;
-}
-
-#primary-nav a.selected{
-    filter: none;
-    border-bottom: 2px solid white;
 }
 
 /* a lil white panel that sits inside the primary card */
