@@ -1,5 +1,5 @@
 
-.primary-card header{
+.primary-card #primary-header{
     display: block;
     color: white;
     mix-blend-mode: multiply;
@@ -46,13 +46,30 @@ header.header-invisible{
     text-align: center;
 }
 
+#full-header{
+    height: 1px;
+    width: 100%;
+    overflow: hidden;
+    background-color: black;
+    position: absolute;
+    z-index: 20;
+    top: 0;
+    left: 0;
+    transition: 500ms ease 100ms;
+}
+
+#full-header.expanded{
+    height: 600px;
+    width: 100%;
+}
+
 #primary-nav{
     margin: 0;
     padding: 0;
     width: 100%;
 }
 
-#primary-nav ul {
+#primary-nav ul, #full-nav ul {
     list-style-type: none;
     margin: 0;
     padding: 0;
@@ -62,7 +79,7 @@ header.header-invisible{
     justify-content: space-evenly;
 }
 
-#primary-nav ul li {
+#primary-nav ul li, #full-nav ul li {
     list-style-type: none;
     display: block;
     width: 40px;
@@ -72,26 +89,26 @@ header.header-invisible{
     color: white;
 }
 
-#primary-nav a svg{
+#primary-nav a svg, #full-nav a svg{
     width: 40px;
     height: 40px;
     cursor: pointer;
 }
 
-#primary-nav a svg path{
+#primary-nav a svg path, #full-nav a svg path{
     fill: white;
 }
 
-#primary-nav a .opt{
+#primary-nav a .opt, #full-nav a .opt{
     transition: opacity 1s ease 100ms;
     opacity: 1;
 }
 
-#primary-nav a:hover .hide-sometimes, a:hover .opt{
+#primary-nav a:hover .hide-sometimes, a:hover .opt, #full-nav a:hover .hide-sometimes, #full-nav a:hover .opt{
     opacity: 0.2;
 }
 
-#primary-nav a.selected{
+#primary-nav a.selected, #full-nav a.selected{
     filter: none;
     border-bottom: 2px solid white;
 }

@@ -5,7 +5,6 @@ import { marked } from 'marked';
 import insane from 'insane';
 import { hash128 } from './lib/murmurhash3.js'
 import { v4 as uuid } from "uuid";
-import anime from 'animejs'
 
 function debounce(func, timeout = 300){
     let timer;
@@ -259,7 +258,7 @@ function Icon({name}){
 
 }
 
-function Nav({onTop, onBottom, onDown, onUp, onHome, onMenu }){
+function Nav({onTop, onBottom, onDown, onUp, onMenu }){
     if(!onTop){
         onTop = () => {};
     }
@@ -275,38 +274,50 @@ function Nav({onTop, onBottom, onDown, onUp, onHome, onMenu }){
     if(!onMenu){
         onMenu = () => {};
     }
-
     return html`<nav id="primary-nav">
+            <ul>
+                <li>
+                    <a onClick=${onTop} title="top">
+                        <${Icon} name="double-up" />
+                    </a>
+                </li>
+                <li>
+                    <a onClick=${onUp} title="up">
+                        <${Icon} name="chevron-up" />
+                    </a>
+                </li>
+                <li>
+                    <a onClick=${onMenu} title="Menu">
+                        <${Icon} name="hamburger" />
+                    </a>
+                </li>
+                <li>
+                    <a onClick=${onDown} title="down">
+                        <${Icon} name="chevron-down" />
+                    </a>
+                </li>
+                <li>
+                    <a onClick=${onBottom} title="bottom">
+                        <${Icon} name="double-down" />
+                    </a>
+                </li>
+            </ul>
+        </nav>`;
+}
+
+function FullNav({onMenu}){
+    return html`<nav id="full-nav">
         <ul>
             <li>
-                <a id="end" onClick=${onTop} title="beginning">
-                    <${Icon} name="double-up" />
-                </a>
-            </li>
-            <li>
-                <a id="end" onClick=${onUp} title="end">
-                    <${Icon} name="chevron-up" />
-                </a>
-            </li>
-            <li>
-                <a id="end" onClick=${onMenu} title="Menu">
+                <a onClick=${onMenu} title="Menu">
                     <${Icon} name="hamburger" />
-                </a>
-            </li>
-            <li>
-                <a id="end" onClick=${onDown} title="end">
-                    <${Icon} name="chevron-down" />
-                </a>
-            </li>
-            <li>
-                <a id="end" onClick=${onBottom} title="end">
-                    <${Icon} name="double-down" />
                 </a>
             </li>
         </ul>
     </nav>`;
-
 }
+
+
 class App extends Component {
 
     constructor(props){
@@ -314,6 +325,7 @@ class App extends Component {
         this.lastScrollTop;
         this.state = {
             scrollDirection: "backward",
+            expandedMenu: false
         }
         this.lastScrollTop = 0;
         this.lastNavInteraction = Date.now();
@@ -370,14 +382,30 @@ class App extends Component {
         }
         let disableTransparentIcons = this.lastScrollTop > 60 ? "disable-transparent-icons" : "";
 
+        let fullNavExpandedClass = this.state.expandedMenu ? "expanded" : "";
+        let onMenu = () => {
+            this.setState({
+                expandedMenu: !this.state.expandedMenu
+            });
+        }
+
         let items = index.map((item) => {
             return html`<${VisibilityTrigger} />`;
         });
 
         return html`<div class="primary-card">
             <div class="content">
-                <header class="${headerVisible} ${disableTransparentIcons}">
-                    <${Nav} onTop=${this.goToTop.bind(this)} onBottom=${this.goToBottom.bind(this)}/>
+                <header id="primary-header" class="${headerVisible} ${disableTransparentIcons}">
+                    <${Nav}
+                        onTop=${this.goToTop.bind(this)}
+                        onBottom=${this.goToBottom.bind(this)}
+                        onMenu=${onMenu}
+                    />
+                </header>
+                <header id="full-header" class="${fullNavExpandedClass} disable-transparent-icons">
+                    <${FullNav}
+                        onMenu=${onMenu}
+                    />
                 </header>
                 <div class="everything-feed">
                     <h2>Hi!</h2>
