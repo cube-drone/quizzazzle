@@ -15,7 +15,7 @@
 }
 
 .primary-card header.disable-transparent-icons{
-    mix-blend-mode: normal;
+    mix-blend-mode: normal !important;
 }
 
 header.header-visible{
@@ -104,7 +104,7 @@ header.header-invisible{
     opacity: 1;
 }
 
-#primary-nav a:hover .hide-sometimes, a:hover .opt, #full-nav a:hover .hide-sometimes, #full-nav a:hover .opt{
+#primary-nav a:hover .hide-sometimes, #primary-nav a:hover .opt, #full-nav a:hover .hide-sometimes, #full-nav a:hover .opt{
     opacity: 0.2;
 }
 
