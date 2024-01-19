@@ -9,7 +9,7 @@
 {% block content %}
 <div class="primary-card">
     <div class="content">
-        <header>
+        <header id="primary-header">
             <h2><a href="/">home</a> / Verify Email </h2>
         </header>
         <div class="everything">

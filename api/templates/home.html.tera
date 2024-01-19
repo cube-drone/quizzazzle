@@ -9,7 +9,7 @@
 {% block content %}
 <div class="primary-card">
     <div class="content">
-        <header>
+        <header id="primary-header">
             <h1>groovelet</h1>
         </header>
         <div class="bump"></div>
