@@ -68,6 +68,9 @@ class StubServer{
         else if(endIndex){
             return stubContent.slice(endIndex - pageSize/2, endIndex);
         }
+        else {
+            return stubContent.slice(0, pageSize);
+        }
     }
 }
 
@@ -100,9 +103,25 @@ class Data{
         }
     }
 
-    async loadIndex({user, indexId, contentId}){
+    async _loadIndexFromBeginning({user, indexId}){
+        let {index, afterRange} = await Promise.all([
+            this.server.getIndex({user, indexId}),
+            this.server.getRange({user, indexId}),
+        ]);
+
+        this.index = index;
+        this.fullyLoadedBakedPotato = false;
+        if(this.index.count < pageSize){
+            // if the index is small enough, we could absolutely have loaded the whole thing in one go
+            this.fullyLoadedBakedPotato = true;
+        }
+
+        this._addItems([index.firstNode, index.secondNode, index.penultimateNode, index.lastNode, ...afterRange]);
+    }
+
+    async _loadIndexFromMiddle({user, indexId, contentId}){
         let {index, beforeRange, afterRange} = await Promise.all([
-            this.server.getIndex({user, indexId, contentId}),
+            this.server.getIndex({user, indexId}),
             this.server.getRange({user, indexId, endId: contentId}),
             this.server.getRange({user, indexId, startId: contentId}),
         ]);
@@ -115,6 +134,17 @@ class Data{
         }
 
         this._addItems([index.firstNode, index.secondNode, index.penultimateNode, index.lastNode, ...beforeRange, ...afterRange]);
+
+        this.currentLocation = this.content.findIndex(node => node.id === contentId);
+    }
+
+    async loadIndex({user, indexId, contentId}){
+        if(contentId == null){
+            return this._loadIndexFromBeginning({user, indexId});
+        }
+        else{
+            return this._loadIndexFromMiddle({user, indexId, contentId});
+        }
     }
 
     async loadMoreContent({user, indexId, contentId}){
@@ -130,6 +160,10 @@ class Data{
         // set the current location in the content
         // this will be used to determine what content to load next
         this.currentLocation = indexInContent;
+    }
+
+    async getCurrentLocation(){
+        return this.currentLocation ?? 0;
     }
 
     async _findEmptyRange(){
@@ -204,6 +238,10 @@ class Data{
             await this.loadMoreContent({user, indexId, contentId: id});
         }
         return this.content[order];
+    }
+
+    async getContent(){
+        return this.content;
     }
 
 }

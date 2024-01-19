@@ -314,16 +314,14 @@ class App extends Component {
     constructor(props){
         super(props);
         this.data = props.data;
-        this.index = props.initialIndex;
+        let index = this.data.getIndex();
 
         this.lastScrollTop;
         this.state = {
             scrollDirection: "backward",
             expandedMenu: false,
             length: this.index.count,
-            currentIndex: this.index.currentIndex,
-            knownItemsByIndex,
-            knownItemsById
+            content: this.data.getContent(),
         }
         this.lastScrollTop = 0;
         this.lastNavInteraction = Date.now();
@@ -387,7 +385,7 @@ class App extends Component {
             });
         }
 
-        let items = index.map((item) => {
+        let items = this.state.content.map((item) => {
             return html`<${VisibilityTrigger} />`;
         });
 
@@ -425,8 +423,8 @@ let Data = initialize({serverUrl: null});
 // determine where we are in the index, using the hash
 
 async function main(){
-    let index = await Data.getIndex({user: null, indexId: null, contentId: null});
-    let app = html`<${App} data=${Data} initialIndex=${index} />`;
+    await Data.loadIndex({user: null, indexId: null, contentId: null});
+    let app = html`<${App} data=${Data} />`;
     render(app, document.getElementById('app'));
 }
 
