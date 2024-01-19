@@ -5,6 +5,7 @@ import { marked } from 'marked';
 import insane from 'insane';
 import { hash128 } from './lib/murmurhash3.js'
 import { v4 as uuid } from "uuid";
+import { initialize } from './data.js';
 
 function debounce(func, timeout = 300){
     let timer;
@@ -170,15 +171,6 @@ class VisibilityTrigger extends Component {
     }
 }
 
-let index = [];
-for(let i = 0; i < 100; i++){
-    index.push({
-        id: i,
-        type: "text",
-        content: `hi ${i}`
-    });
-}
-
 function Icon({name}){
     if(name == "chevron-down"){
         return html`<svg viewBox="0 0 64 64" class="svg-icon icon-circle-chevron-down">
@@ -321,10 +313,17 @@ class App extends Component {
 
     constructor(props){
         super(props);
+        this.data = props.data;
+        this.index = props.initialIndex;
+
         this.lastScrollTop;
         this.state = {
             scrollDirection: "backward",
-            expandedMenu: false
+            expandedMenu: false,
+            length: this.index.count,
+            currentIndex: this.index.currentIndex,
+            knownItemsByIndex,
+            knownItemsById
         }
         this.lastScrollTop = 0;
         this.lastNavInteraction = Date.now();
@@ -420,9 +419,15 @@ class App extends Component {
 
 console.log(hash128(rendered));
 
+let Data = initialize({serverUrl: null});
 
 // load the index
 // determine where we are in the index, using the hash
 
+async function main(){
+    let index = await Data.getIndex({user: null, indexId: null, contentId: null});
+    let app = html`<${App} data=${Data} initialIndex=${index} />`;
+    render(app, document.getElementById('app'));
+}
 
-render(html`<${App} />`, document.getElementById('app'));
+main();

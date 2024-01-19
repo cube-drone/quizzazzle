@@ -12,7 +12,7 @@ function generateRandomNode(order){
     let id = uuid();
     return {
         id,
-        order: order*100,
+        order,
         type: 'markdown',
         content: `
             ## Node ${order}
@@ -25,7 +25,8 @@ function generateRandomNode(order){
 }
 
 let stubContent = [];
-for(let i = 0; i < 100000; i++){
+let contentLength = 1000;
+for(let i = 0; i < contentLength; i++){
     stubContent.push(generateRandomNode(i));
 }
 
@@ -33,62 +34,43 @@ let index = {
     id: uuid(),
     name: 'Test Index',
     order: 'newest content first', // feeds use "newest content first", stories use "oldest content first"
-    count: 100000,
+    count: stubContent.length,
     created_at: new Date(),
     updated_at: new Date(),
     content: stubContent,
     firstNode: stubContent[0],
+    secondNode: stubContent[1],
+    secondToLastNode: stubContent[stubContent.length - 2],
     lastNode: stubContent[stubContent.length - 1],
 }
 
-export class StubServer{
+class StubServer{
 
     async getIndex({user, indexId, contentId }) {
         if(contentId == null){
             // we want the index starting from the beginning
             let indexCopy = {
-                id: index.id,
-                name: index.name,
-                order: index.order,
-                created_at: index.created_at,
-                updated_at: index.updated_at,
+                ...index,
                 content: index.content.slice(0, 100),
-                firstNode: index.firstNode,
-                lastNode: index.lastNode,
+                currentIndex: 0,
             }
             return indexCopy;
         }
-
-        // where is the contentId in the index?
-        // we want the 50 nodes before and after it
-    }
-
-    async get({user, contentId}){
-        return {
-            type: 'markdown',
-            content: sampleMarkdown1,
-
-
+        else{
+            // find the contentId in the index
+            // return the 50 nodes before and after it
+            let contentIndex = index.content.findIndex(node => node.id === contentId);
+            let indexCopy = {
+                ...index,
+                content: index.content.slice(contentIndex - 50, contentIndex + 50),
+                currentIndex: contentIndex,
+            }
+            return indexCopy;
         }
-
-    }
-
-    async get({user, slug}){
-
-    }
-
-    /*
-    * Preload a content item: this fetches the content item from the
-    * server and caches it locally.
-    * if the content item requires rendering, it will render it in the background as well
-    * notably, in stub mode, this doesn't do anything at all
-    */
-    async preload({user, slug}){
-
     }
 }
 
-export class RealServer{
+class RealServer{
 
 }
 
@@ -99,4 +81,15 @@ export async function initialize({serverUrl}={}){
     else{
         return new RealServer({serverUrl})
     }
+}
+
+class Data{
+    constructor({server}){
+        this.server = server;
+    }
+
+    async getIndex({user, indexId, contentId}){
+        return this.server.getIndex({user, indexId, contentId});
+    }
+
 }
