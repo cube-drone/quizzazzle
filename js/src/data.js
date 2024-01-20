@@ -1,4 +1,5 @@
 import { v4 as uuid } from "uuid";
+import { assert } from "./assert.js";
 
 
 let PAGE_SIZE = 100;
@@ -35,25 +36,25 @@ class StubServer{
             order,
             type: 'markdown',
             content: `
-                ## Node ${order}
-                _${id}_
-                This is markdown content!
+## Node ${order}
+_${id}_
+This is markdown content!
 
-                I gaze upon the roast,
+I gaze upon the roast,
 
-                that is sliced and laid out
+that is sliced and laid out
 
-                on my plate,
+on my plate,
 
-                and over it
+and over it
 
-                I spoon the juices
+I spoon the juices
 
-                of carrot and onion.
+of carrot and onion.
 
-                And for once I do not regret
+And for once I do not regret
 
-                the passage of time.
+the passage of time.
             `,
             created_at: new Date(),
             updated_at: new Date(),
@@ -100,11 +101,9 @@ class StubServer{
 }
 
 class RealServer{
-
     constructor({serverUrl}){
         this.serverUrl = serverUrl;
     }
-
 }
 
 class Data{
@@ -136,22 +135,25 @@ class Data{
             return;
         }
         let [firstNode, secondNode, penultimateNode, lastNode] = await this.server.getContents({
-            indexId: indexId,
+            indexId: this.index.id,
             contentIds: [
-                this.index.contentIds[0],
+                firstNodeId,
                 this.index.contentIds[1],
-                this.index.contentIds[index.contentIds.length - 2],
-                this.index.contentIds[index.contentIds.length - 1]
+                this.index.contentIds[this.index.contentIds.length - 2],
+                lastNodeId
             ]
         });
 
         this._addItems([firstNode, secondNode, penultimateNode, lastNode]);
+
+        assert(this.content[firstNodeId] != null, `first node ${firstNodeId} not loaded`);
+        assert(this.content[firstNodeId].id === firstNodeId, `first node ${firstNodeId} not loaded properly`);
     }
 
     async _loadIndexFromBeginning({indexId}){
         let [index, afterRange] = await Promise.all([
-            this.server.getIndex({user, indexId}),
-            this.server.getRange({user, indexId}),
+            this.server.getIndex({indexId}),
+            this.server.getRange({indexId}),
         ]);
 
         if(index == null){
@@ -197,10 +199,10 @@ class Data{
         let indexId = await this.server.getIndexId({userSlug, contentSlug});
 
         if(contentId == null){
-            return this._loadIndexFromBeginning({user, indexId});
+            return this._loadIndexFromBeginning({indexId});
         }
         else{
-            return this._loadIndexFromMiddle({user, indexId, contentId});
+            return this._loadIndexFromMiddle({indexId, contentId});
         }
     }
 
@@ -275,7 +277,7 @@ class Data{
             return;
         }
 
-        let freshContent = await this.server.getRange({user, indexId, ...range});
+        let freshContent = await this.server.getRange({indexId: this.index.id, ...range});
         this._addItems(...freshContent);
     }
 
@@ -284,10 +286,14 @@ class Data{
     }
 
     async getContent({id}){
-        if(this.contentById[id] == null){
-            await this.loadMoreContent({user, indexId, contentId: id});
+        if(this.content[id] == null){
+            await this.loadMoreContent({indexId: this.index.id, contentId: id});
         }
-        return this.contentById[id];
+        let content = this.content[id];
+        assert(content != null, `content ${id} not found`);
+        assert(content.id === id, `content ${id} not found properly`);
+        assert(content.type != null, `content ${id} has no type`);
+        return this.content[id];
     }
 
 }

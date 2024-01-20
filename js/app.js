@@ -5,7 +5,7 @@ import { marked } from 'marked';
 import insane from 'insane';
 import { hash128 } from './lib/murmurhash3.js'
 import { v4 as uuid } from "uuid";
-import { initialize } from './data.js';
+import { initialize } from './src/data.js';
 
 function debounce(func, timeout = 300){
     let timer;
@@ -102,6 +102,36 @@ function unobserve(id, element){
     primaryObserver.unobserve(element);
 }
 
+class RenderedContent extends Component {
+    constructor(props){
+        super(props);
+        //console.dir(Object.keys(props.content));
+        console.dir(props);
+        let {id, order, type, content, created_at, updated_at} = props.content;
+        this.state = {
+            id,
+            order,
+            type,
+            content,
+            created_at,
+            updated_at
+        }
+    }
+
+    render(){
+        let {type, content} = this.state;
+
+        let maybeContent = "";
+        if(content){
+            maybeContent = html`<div class="frame-content" dangerouslySetInnerHTML=${{ __html: insane(marked.parse(content)) }}></div>`;
+        }
+
+        return html`<div class="rendered-content" class="frame-${type}">
+            ${maybeContent}
+        </div>`;
+    }
+}
+
 class VisibilityTrigger extends Component {
     constructor(props){
         super(props);
@@ -118,10 +148,8 @@ class VisibilityTrigger extends Component {
         this.setState({
             visible: true
         });
-        let content = await this.data.getContent({id: this.state.id});
-        this.setState({
-            content: content
-        })
+        let node = await this.data.getContent({id: this.state.id});
+        this.setState({node})
     }
 
     invisible(){
@@ -163,7 +191,7 @@ class VisibilityTrigger extends Component {
 
     render(){
         let frameClass = "";
-        let content = this.state.content?.content;
+        let node = this.state.node;
         if(this.state.primary){
             frameClass = "frame-primary";
         }
@@ -173,8 +201,14 @@ class VisibilityTrigger extends Component {
         else{
             frameClass = "frame-invisible";
         }
+
+        let maybeContent = "";
+        if(node){
+            maybeContent = html`<${RenderedContent} content=${node} />`;
+        }
+
         return html`<div class="frame ${frameClass}">
-            ${content}
+            ${maybeContent}
         </div>`;
     }
 }
