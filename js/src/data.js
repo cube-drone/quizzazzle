@@ -1,6 +1,9 @@
 import { v4 as uuid } from "uuid";
 import { assert } from "./assert.js";
 
+// TODO: add a random delay to the stub server so that we can see what it's like to load content
+let delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 
 let PAGE_SIZE = 100;
 
@@ -9,7 +12,7 @@ class StubServer{
     constructor(){
         this.stubContent = [];
         this.stubContentById = {};
-        this.contentLength = 1000;
+        this.contentLength = 10000;
 
         for(let i = 0; i < this.contentLength; i++){
             let randomNode = this.generateRandomNode(i);
@@ -66,10 +69,12 @@ the passage of time.
     }
 
     async getIndex({indexId}) {
+        await delay(300);
         return this.index;
     }
 
     async getRange({indexId, startId, endId}){
+        await delay(300);
         let startIndex, endIndex;
         if(startId){
             startIndex = this.stubContent.findIndex(node => node.id === startId);
@@ -92,10 +97,12 @@ the passage of time.
     }
 
     async getContent({indexId, contentId}){
+        await delay(100);
         return this.stubContentById[contentId];
     }
 
     async getContents({indexId, contentIds}){
+        await delay(300);
         return contentIds.map(contentId => this.stubContentById[contentId]);
     }
 }
@@ -115,6 +122,7 @@ class Data{
         this.fullyLoadedBakedPotato = false;
         this.content = {};
         this.currentLocation = 0;
+        setTimeout(this.ping.bind(this), 2000);
     }
 
     async _addItem({node}){
@@ -279,6 +287,11 @@ class Data{
 
         let freshContent = await this.server.getRange({indexId: this.index.id, ...range});
         this._addItems(...freshContent);
+    }
+
+    async ping(){
+        await this.loadSomeNearbyContent();
+        setTimeout(this.ping.bind(this), 2000);
     }
 
     getIndex(){
