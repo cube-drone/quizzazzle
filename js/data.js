@@ -1,96 +1,122 @@
 import { v4 as uuid } from "uuid";
 
-let sampleMarkdown1 = `
-# This is a header
-`
 
-let sampleMarkdown2 = `
-# this is also a header
-`
-
-function generateRandomNode(order){
-    let id = uuid();
-    return {
-        id,
-        order,
-        type: 'markdown',
-        content: `
-            ## Node ${order}
-            _${id}_
-            This is markdown content!
-
-            I gaze upon the roast,
-
-            that is sliced and laid out
-
-            on my plate,
-
-            and over it
-
-            I spoon the juices
-
-            of carrot and onion.
-
-            And for once I do not regret
-
-            the passage of time.
-        `,
-        created_at: new Date(),
-        updated_at: new Date(),
-    }
-}
-
-let stubContent = [];
-let contentLength = 1000;
-for(let i = 0; i < contentLength; i++){
-    stubContent.push(generateRandomNode(i));
-}
-
-let index = {
-    id: uuid(),
-    name: 'Test Index',
-    order: 'newest content first', // feeds use "newest content first", stories use "oldest content first"
-    count: stubContent.length,
-    firstNode: stubContent[0],
-    secondNode: stubContent[1],
-    penultimateNode: stubContent[stubContent.length - 2],
-    lastNode: stubContent[stubContent.length - 1],
-    created_at: new Date(),
-    updated_at: new Date(),
-}
-
-let pageSize = 100;
+let PAGE_SIZE = 100;
 
 class StubServer{
 
-    async getIndex({user, indexId }) {
-        return index;
+    constructor(){
+        this.stubContent = [];
+        this.stubContentById = {};
+        this.contentLength = 1000;
+
+        for(let i = 0; i < this.contentLength; i++){
+            let randomNode = this.generateRandomNode(i);
+            this.stubContentById[randomNode.id] = randomNode;
+            this.stubContent.push(randomNode);
+        }
+
+        this.index = {
+            id: uuid(),
+            name: 'Test Index',
+            order: 'newest content first', // feeds use "newest content first", stories use "oldest content first"
+            contentIds: this.stubContent.map(node => node.id),
+            created_at: new Date(),
+            updated_at: new Date(),
+        }
+
     }
 
-    async getRange({user, indexId, startId, endId}){
+    generateRandomNode(order){
+        // TODO: generate random notes in a variety of types (once we know how to display a variety of types of node)
+        let id = uuid();
+        return {
+            id,
+            order,
+            type: 'markdown',
+            content: `
+                ## Node ${order}
+                _${id}_
+                This is markdown content!
+
+                I gaze upon the roast,
+
+                that is sliced and laid out
+
+                on my plate,
+
+                and over it
+
+                I spoon the juices
+
+                of carrot and onion.
+
+                And for once I do not regret
+
+                the passage of time.
+            `,
+            created_at: new Date(),
+            updated_at: new Date(),
+        }
+    }
+
+    async getIndexId({userSlug, contentSlug}){
+        return this.index.id;
+    }
+
+    async getIndex({indexId}) {
+        return this.index;
+    }
+
+    async getRange({indexId, startId, endId}){
         let startIndex, endIndex;
         if(startId){
-            startIndex = stubContent.findIndex(node => node.id === startId);
+            startIndex = this.stubContent.findIndex(node => node.id === startId);
         }
         if(endId){
-            endIndex = stubContent.findIndex(node => node.id === endId);
+            endIndex = this.stubContent.findIndex(node => node.id === endId);
         }
         if(startIndex && endIndex){
-            return stubContent.slice(startIndex, endIndex);
+            return this.stubContent.slice(startIndex, endIndex);
         }
         else if(startIndex){
-            return stubContent.slice(startIndex, startIndex + pageSize/2);
+            return this.stubContent.slice(startIndex, startIndex + PAGE_SIZE/2);
         }
         else if(endIndex){
-            return stubContent.slice(endIndex - pageSize/2, endIndex);
+            return this.stubContent.slice(endIndex - PAGE_SIZE/2, endIndex);
         }
         else {
-            return stubContent.slice(0, pageSize);
+            return this.stubContent.slice(0, PAGE_SIZE);
         }
+    }
+
+    async getContent({indexId, contentId}){
+        return this.stubContentById[contentId];
+    }
+
+    async getContents({indexId, contentIds}){
+        for(let contentId of contentIds){
+            return this.stubContentById[contentId];
+        }
+
     }
 }
 
 class RealServer{
+
+    constructor({serverUrl}){
+        this.serverUrl = serverUrl;
+    }
+
+    async getIndex({user, indexId}) {
+        let response = await fetch(`${this.serverUrl}/index/${user}/${indexId}`);
+        return response.json();
+    }
+
+    async getRange({user, indexId, startId, endId}){
+        let response = await fetch(`${this.serverUrl}/index/${user}/${indexId}/range?startId=${startId}&endId=${endId}`);
+        return response.json();
+    }
 
 }
 
@@ -99,18 +125,14 @@ class Data{
         // the purpose of Data is to manage the stuff that we're pulling from the server
         this.server = server;
         this.index = {};
+        // this.index.contentIds is a list of every ID of a node in the index
         this.fullyLoadedBakedPotato = false;
-        this.content = [];
-        this.contentById = {};
+        this.content = {};
         this.currentLocation = 0;
     }
 
     async _addItem({node}){
-        let nodeIndex = parseInt(node.order);
-        if(!isNaN(nodeIndex)){
-            this.content[nodeIndex] = node;
-        }
-        this.contentById[node.id] = node;
+        this.content[node.id] = node;
     }
 
     async _addItems(nodes){
@@ -119,24 +141,31 @@ class Data{
         }
     }
 
-    async _loadIndexFromBeginning({user, indexId}){
-        let {index, afterRange} = await Promise.all([
+    async _loadIndexFromBeginning({indexId}){
+        let [index, afterRange] = await Promise.all([
             this.server.getIndex({user, indexId}),
             this.server.getRange({user, indexId}),
         ]);
 
+        if(index == null){
+            throw new Error(`Index ${indexId} not found`);
+        }
+
+        let [firstNode, secondNode, penultimateNode, lastNode] = await this.server.getNodes([index.contentIds[0], index.contentIds[1], index.contentIds[index.contentIds.length - 2], index.contentIds[index.contentIds.length - 1]);
+
         this.index = index;
         this.fullyLoadedBakedPotato = false;
-        if(this.index.count < pageSize){
+
+        if(index.count < PAGE_SIZE){
             // if the index is small enough, we could absolutely have loaded the whole thing in one go
             this.fullyLoadedBakedPotato = true;
         }
 
-        this._addItems([index.firstNode, index.secondNode, index.penultimateNode, index.lastNode, ...afterRange]);
+        this._addItems([...afterRange]);
     }
 
-    async _loadIndexFromMiddle({user, indexId, contentId}){
-        let {index, beforeRange, afterRange} = await Promise.all([
+    async _loadIndexFromMiddle({indexId, contentId}){
+        let [index, beforeRange, afterRange] = await Promise.all([
             this.server.getIndex({user, indexId}),
             this.server.getRange({user, indexId, endId: contentId}),
             this.server.getRange({user, indexId, startId: contentId}),
@@ -144,7 +173,7 @@ class Data{
 
         this.index = index;
         this.fullyLoadedBakedPotato = false;
-        if(this.index.count < pageSize/2){
+        if(this.index.count < PAGE_SIZE/2){
             // if the index is small enough, we could absolutely have loaded the whole thing in one go
             this.fullyLoadedBakedPotato = true;
         }
@@ -154,7 +183,9 @@ class Data{
         this.currentLocation = this.content.findIndex(node => node.id === contentId);
     }
 
-    async loadIndex({user, indexId, contentId}){
+    async loadIndex({userSlug, contentSlug, contentId}){
+        let indexId = await this.server.getIndexId({userSlug, contentSlug});
+
         if(contentId == null){
             return this._loadIndexFromBeginning({user, indexId});
         }
@@ -164,7 +195,7 @@ class Data{
     }
 
     async loadMoreContent({user, indexId, contentId}){
-        let {beforeRange, afterRange} = await Promise.all([
+        let [beforeRange, afterRange] = await Promise.all([
             this.server.getRange({user, indexId, endId: contentId}),
             this.server.getRange({user, indexId, startId: contentId}),
         ]);
@@ -238,7 +269,7 @@ class Data{
         this._addItems(...freshContent);
     }
 
-    async getIndex(){
+    getIndex(){
         return this.index;
     }
 
@@ -249,20 +280,9 @@ class Data{
         return this.contentById[id];
     }
 
-    async getContentByOrder({order}){
-        if(this.content[order] == null){
-            await this.loadMoreContent({user, indexId, contentId: id});
-        }
-        return this.content[order];
-    }
-
-    async getContent(){
-        return this.content;
-    }
-
 }
 
-export async function initialize({serverUrl}={}){
+export function initialize({serverUrl}={}){
     let server;
     if(serverUrl == null){
         server = new StubServer()

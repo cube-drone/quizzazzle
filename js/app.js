@@ -314,17 +314,18 @@ class App extends Component {
     constructor(props){
         super(props);
         this.data = props.data;
-        let index = this.data.getIndex();
+        this.index = this.data.getIndex();
 
-        this.lastScrollTop;
+        this.lastScrollTop = 0;
+        this.lastNavInteraction = Date.now();
+
         this.state = {
             scrollDirection: "backward",
             expandedMenu: false,
+            index: this.index,
             length: this.index.count,
             content: this.data.getContent(),
         }
-        this.lastScrollTop = 0;
-        this.lastNavInteraction = Date.now();
     }
 
     componentDidMount(){
@@ -385,8 +386,8 @@ class App extends Component {
             });
         }
 
-        let items = this.state.content.map((item) => {
-            return html`<${VisibilityTrigger} />`;
+        let items = this.state.content.map((item, n) => {
+            return html`<${VisibilityTrigger} data=${this.data} order=${n}/>`;
         });
 
         return html`<div class="primary-card">
