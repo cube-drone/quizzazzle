@@ -105,16 +105,23 @@ function unobserve(id, element){
 class VisibilityTrigger extends Component {
     constructor(props){
         super(props);
+        this.data = props.data;
+        this.order = props.order;
         this.state = {
             visible: false,
-            primary: false
+            primary: false,
+            id: this.props.id
         }
     }
 
-    visible(){
+    async visible(){
         this.setState({
             visible: true
         });
+        let content = await this.data.getContent({id: this.state.id});
+        this.setState({
+            content: content
+        })
     }
 
     invisible(){
@@ -123,7 +130,8 @@ class VisibilityTrigger extends Component {
         });
     }
 
-    primary(){
+    async primary(){
+        this.data.setCurrentLocation(this.order);
         this.setState({
             primary: true
         });
@@ -152,22 +160,22 @@ class VisibilityTrigger extends Component {
         unobserve(this.id, element);
     }
 
+
     render(){
+        let frameClass = "";
+        let content = this.state.content?.content;
         if(this.state.primary){
-            return html`<div class="frame frame-primary">
-                primary
-            </div>`;
+            frameClass = "frame-primary";
         }
-        if(this.state.visible){
-            return html`<div class="frame frame-visible">
-                visible
-            </div>`;
+        else if(this.state.visible){
+            frameClass = "frame-visible";
         }
         else{
-            return html`<div class="frame frame-invisible">
-                invisible
-            </div>`;
+            frameClass = "frame-invisible";
         }
+        return html`<div class="frame ${frameClass}">
+            ${content}
+        </div>`;
     }
 }
 
@@ -324,7 +332,6 @@ class App extends Component {
             expandedMenu: false,
             index: this.index,
             length: this.index.count,
-            content: this.data.getContent(),
         }
     }
 
@@ -386,8 +393,8 @@ class App extends Component {
             });
         }
 
-        let items = this.state.content.map((item, n) => {
-            return html`<${VisibilityTrigger} data=${this.data} order=${n}/>`;
+        let items = this.state.index.contentIds.map((id, n) => {
+            return html`<${VisibilityTrigger} data=${this.data} order=${n} id=${id}/>`;
         });
 
         return html`<div class="primary-card">

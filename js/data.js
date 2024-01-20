@@ -95,10 +95,7 @@ class StubServer{
     }
 
     async getContents({indexId, contentIds}){
-        for(let contentId of contentIds){
-            return this.stubContentById[contentId];
-        }
-
+        return contentIds.map(contentId => this.stubContentById[contentId]);
     }
 }
 
@@ -106,16 +103,6 @@ class RealServer{
 
     constructor({serverUrl}){
         this.serverUrl = serverUrl;
-    }
-
-    async getIndex({user, indexId}) {
-        let response = await fetch(`${this.serverUrl}/index/${user}/${indexId}`);
-        return response.json();
-    }
-
-    async getRange({user, indexId, startId, endId}){
-        let response = await fetch(`${this.serverUrl}/index/${user}/${indexId}/range?startId=${startId}&endId=${endId}`);
-        return response.json();
     }
 
 }
@@ -141,6 +128,26 @@ class Data{
         }
     }
 
+    async _loadEndCapItems(){
+        let firstNodeId = this.index.contentIds[0];
+        let lastNodeId = this.index.contentIds[this.index.contentIds.length - 1];
+        if(this.content[lastNodeId] != null && this.content[lastNodeId] != null){
+            // we already have the first and last nodes loaded
+            return;
+        }
+        let [firstNode, secondNode, penultimateNode, lastNode] = await this.server.getContents({
+            indexId: indexId,
+            contentIds: [
+                this.index.contentIds[0],
+                this.index.contentIds[1],
+                this.index.contentIds[index.contentIds.length - 2],
+                this.index.contentIds[index.contentIds.length - 1]
+            ]
+        });
+
+        this._addItems([firstNode, secondNode, penultimateNode, lastNode]);
+    }
+
     async _loadIndexFromBeginning({indexId}){
         let [index, afterRange] = await Promise.all([
             this.server.getIndex({user, indexId}),
@@ -150,18 +157,17 @@ class Data{
         if(index == null){
             throw new Error(`Index ${indexId} not found`);
         }
-
-        let [firstNode, secondNode, penultimateNode, lastNode] = await this.server.getNodes([index.contentIds[0], index.contentIds[1], index.contentIds[index.contentIds.length - 2], index.contentIds[index.contentIds.length - 1]);
-
         this.index = index;
         this.fullyLoadedBakedPotato = false;
+        this._addItems([...afterRange]);
 
         if(index.count < PAGE_SIZE){
             // if the index is small enough, we could absolutely have loaded the whole thing in one go
             this.fullyLoadedBakedPotato = true;
         }
-
-        this._addItems([...afterRange]);
+        else{
+            await this._loadEndCapItems();
+        }
     }
 
     async _loadIndexFromMiddle({indexId, contentId}){
@@ -173,13 +179,17 @@ class Data{
 
         this.index = index;
         this.fullyLoadedBakedPotato = false;
+        this._addItems([...beforeRange, ...afterRange]);
+
         if(this.index.count < PAGE_SIZE/2){
             // if the index is small enough, we could absolutely have loaded the whole thing in one go
             this.fullyLoadedBakedPotato = true;
         }
+        else{
+            await this._loadEndCapItems();
+        }
 
-        this._addItems([index.firstNode, index.secondNode, index.penultimateNode, index.lastNode, ...beforeRange, ...afterRange]);
-
+        // we keep track of where the user is in the content so that we can load more content as they scroll
         this.currentLocation = this.content.findIndex(node => node.id === contentId);
     }
 
@@ -203,10 +213,10 @@ class Data{
         this._addItems([...beforeRange, ...afterRange]);
     }
 
-    async setCurrentLocation({indexInContent}){
+    async setCurrentLocation(i){
         // set the current location in the content
         // this will be used to determine what content to load next
-        this.currentLocation = indexInContent;
+        this.currentLocation = i;
     }
 
     async getCurrentLocation(){
@@ -273,7 +283,7 @@ class Data{
         return this.index;
     }
 
-    async getContentById({id}){
+    async getContent({id}){
         if(this.contentById[id] == null){
             await this.loadMoreContent({user, indexId, contentId: id});
         }
