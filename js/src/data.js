@@ -22,18 +22,19 @@ class StubServer{
 
         this.index = {
             id: uuid(),
+            userSlug: "cubes",
+            contentSlug: "testyboy",
             name: 'Test Index',
             order: 'newest content first', // feeds use "newest content first", stories use "oldest content first"
             contentIds: this.stubContent.map(node => node.id),
             created_at: new Date(),
             updated_at: new Date(),
         }
-
     }
 
     generateRandomNode(order){
         // TODO: generate random notes in a variety of types (once we know how to display a variety of types of node)
-        let id = uuid();
+        let id = uuid().slice(-6);
         return {
             id,
             order,
@@ -43,21 +44,14 @@ class StubServer{
 _${id}_
 This is markdown content!
 
-I gaze upon the roast,
-
-that is sliced and laid out
-
-on my plate,
-
-and over it
-
-I spoon the juices
-
-of carrot and onion.
-
-And for once I do not regret
-
-the passage of time.
+* I gaze upon the roast,
+* that is sliced and laid out
+* on my plate,
+* and over it
+* I spoon the juices
+* of carrot and onion.
+* And for once I do not regret
+* the passage of time.
             `,
             created_at: new Date(),
             updated_at: new Date(),
@@ -69,12 +63,12 @@ the passage of time.
     }
 
     async getIndex({indexId}) {
-        await delay(300);
+        await delay(350);
         return this.index;
     }
 
     async getRange({indexId, startId, endId}){
-        await delay(300);
+        await delay(500);
         let startIndex, endIndex;
         if(startId){
             startIndex = this.stubContent.findIndex(node => node.id === startId);
@@ -97,12 +91,12 @@ the passage of time.
     }
 
     async getContent({indexId, contentId}){
-        await delay(100);
+        await delay(500);
         return this.stubContentById[contentId];
     }
 
     async getContents({indexId, contentIds}){
-        await delay(300);
+        await delay(500);
         return contentIds.map(contentId => this.stubContentById[contentId]);
     }
 }
@@ -122,6 +116,7 @@ class Data{
         this.fullyLoadedBakedPotato = false;
         this.content = {};
         this.currentLocation = 0;
+        this.currentId = null;
         setTimeout(this.ping.bind(this), 2000);
     }
 
@@ -156,6 +151,8 @@ class Data{
 
         assert(this.content[firstNodeId] != null, `first node ${firstNodeId} not loaded`);
         assert(this.content[firstNodeId].id === firstNodeId, `first node ${firstNodeId} not loaded properly`);
+
+        assert(this.index.contentIds[0] == this.content[firstNodeId].id);
     }
 
     async _loadIndexFromBeginning({indexId}){
@@ -223,10 +220,11 @@ class Data{
         this._addItems([...beforeRange, ...afterRange]);
     }
 
-    async setCurrentLocation(i){
+    async setCurrentLocation(n){
         // set the current location in the content
         // this will be used to determine what content to load next
-        this.currentLocation = i;
+        this.currentLocation = n;
+        this.currentId = this.index.contentIds[n];
     }
 
     async getCurrentLocation(){
@@ -307,6 +305,18 @@ class Data{
         assert(content.id === id, `content ${id} not found properly`);
         assert(content.type != null, `content ${id} has no type`);
         return this.content[id];
+    }
+
+    getContentOrder(id){
+        return this.index.contentIds.indexOf(id);
+    }
+
+    getNextContentId(){
+        return this.index.contentIds[this.currentLocation + 1];
+    }
+
+    getPreviousContentId(){
+        return this.index.contentIds[this.currentLocation - 1];
     }
 
 }

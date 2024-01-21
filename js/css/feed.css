@@ -23,3 +23,8 @@
 .frame-invisible{
     opacity: 0.1;
 }
+
+.frame-markdown{
+    padding: 5px;
+    font-size: small;
+}

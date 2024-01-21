@@ -18,23 +18,8 @@ function debounce(func, timeout = 300){
 
 let bootupTime = Date.now();
 
-const text = `
-## Markdown Markdown
-
-* **Officer Hyustus Staget** is back
-* This building was supposed to be under surveillance but apparently the patrols have been skipping it.
-* **secret**: They're looking for Urstul Floxin, a high-level Zhentarim gang-boss
-* if Renaer Neverember is alive and well, the players will get off scot-free and the police will be cool and chill, if not, they've got a LOT of explaining to do
-* the police don't want to get deeply involved in a gang war or go into the sewers. They'll advise the characters "keep the blood off the streets, okay?".
-`;
-
-const rendered = insane(marked.parse(text));
 
 const html = htm.bind(h);
-
-let Rendered = () => {
-    return html`<div class="hi" dangerouslySetInnerHTML=${{ __html: rendered }}></div>`;
-}
 
 let showHandlers = {};
 let hideHandlers = {};
@@ -108,14 +93,16 @@ class RenderedContent extends Component {
         super(props);
         //console.dir(Object.keys(props.content));
         console.dir(props);
-        let {id, order, type, content, created_at, updated_at} = props.content;
+        let {id, order, type, content, created_at, updated_at, primary, visible} = props.content;
         this.state = {
             id,
             order,
             type,
             content,
             created_at,
-            updated_at
+            updated_at,
+            primary,
+            visible
         }
     }
 
@@ -138,6 +125,12 @@ class VisibilityTrigger extends Component {
         super(props);
         this.data = props.data;
         this.order = props.order;
+        let noop = () => {};
+        this.onPrimary = props.onPrimary ?? noop;
+        this.onUnprimary = props.onUnprimary ?? noop;
+        this.onVisible = props.onVisible ?? noop;
+        this.onInvisible = props.onInvisible ?? noop;
+
         this.state = {
             visible: false,
             primary: false,
@@ -151,12 +144,14 @@ class VisibilityTrigger extends Component {
         });
         let node = await this.data.getContent({id: this.state.id});
         this.setState({node})
+        this.onVisible();
     }
 
     invisible(){
         this.setState({
             visible: false
         });
+        this.onInvisible();
     }
 
     async primary(){
@@ -164,17 +159,19 @@ class VisibilityTrigger extends Component {
         this.setState({
             primary: true
         });
+        this.onPrimary();
     }
 
     unprimary(){
         this.setState({
             primary: false
         });
+        this.onUnprimary();
     }
 
     componentDidMount(){
         let element = this.base;
-        this.id = uuid();
+        this.id = this.props.id ?? uuid();
         element.id = this.id;
         observe(this.id, element,
             this.visible.bind(this),
@@ -204,8 +201,8 @@ class VisibilityTrigger extends Component {
         }
 
         let maybeContent = "";
-        if(node){
-            maybeContent = html`<${RenderedContent} content=${node} />`;
+        if(node && (this.state.primary || this.state.visible)){
+            maybeContent = html`<${RenderedContent} content=${node} primary=${this.state.primary} visible=${this.state.visible}/>`;
         }
 
         return html`<div class="frame ${frameClass}">
@@ -288,6 +285,8 @@ class App extends Component {
             expandedMenu: false,
             index: this.index,
             length: this.index.count,
+            currentlySelected: null,
+            currentlySelectedOrder: 0
         }
     }
 
@@ -317,6 +316,16 @@ class App extends Component {
             }
             this.lastScrollTop = scrollTop;
         })
+
+        window.onkeyup = (e) => {
+            let key = e.key;
+            if (key === 'ArrowUp') {
+                this.goUpOne();
+            }
+            if (key === 'ArrowDown') {
+                this.goDownOne();
+            }
+        }
     }
 
     goToTop(){
@@ -326,11 +335,54 @@ class App extends Component {
         everything.scrollTop = 0;
     }
 
+    moveTo({id}){
+        let element = document.getElementById(id);
+        console.warn(`moving to ${id}`);
+        console.warn(element);
+        element.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+        });
+        this.setCurrentlySelected(id, this.data.getContentOrder(id));
+    }
+
+    goUpOne(){
+        this.lastNavInteraction = Date.now();
+        let upOneId = this.data.getPreviousContentId();
+        if(upOneId){
+            this.moveTo({id: upOneId});
+        }
+        else{
+            console.warn("no previous content");
+        }
+    }
+
     goToBottom(){
         this.lastNavInteraction = Date.now();
         let element = this.base;
         let everything = element.querySelector('.everything-feed');
         everything.scrollTop = everything.scrollHeight;
+    }
+
+    goDownOne(){
+        this.lastNavInteraction = Date.now();
+        let downOneId = this.data.getNextContentId();
+        if(downOneId){
+            this.moveTo({id: downOneId});
+        }
+        else{
+            console.warn("no next content");
+        }
+    }
+
+    setCurrentlySelected(id, n){
+        this.setState({
+            currentlySelected: id,
+            currentlySelectedOrder: n
+        });
+        // if this is an important header/toc content, we should pushState,
+        // otherwise we should just replaceState
+        history.replaceState(null, null, `#${id}`);
     }
 
     render(){
@@ -350,7 +402,10 @@ class App extends Component {
         }
 
         let items = this.state.index.contentIds.map((id, n) => {
-            return html`<${VisibilityTrigger} data=${this.data} order=${n} id=${id}/>`;
+            let select = () => {
+                this.setCurrentlySelected(id, n);
+            }
+            return html`<${VisibilityTrigger} data=${this.data} order=${n} id=${id} onPrimary=${select}/>`;
         });
 
         return html`<div class="primary-card">
@@ -359,6 +414,8 @@ class App extends Component {
                     <${Nav}
                         onTop=${this.goToTop.bind(this)}
                         onBottom=${this.goToBottom.bind(this)}
+                        onDown=${this.goDownOne.bind(this)}
+                        onUp=${this.goUpOne.bind(this)}
                         onMenu=${onMenu}
                     />
                 </header>
@@ -379,12 +436,21 @@ class App extends Component {
 
 }
 
-console.log(hash128(rendered));
-
 let Data = initialize({serverUrl: null});
 
 // load the index
 // determine where we are in the index, using the hash
+// userSlug and contentSlug are determined by the two parts of the URL leading up to this file, like:
+//   https://example.com/userSlug/contentSlug#contentId
+// so we can get the userSlug and contentSlug from the URL
+
+let userSlug = null;
+let contentSlug = null;
+let contentId = null;
+let path = window.location.pathname;
+let hash = window.location.hash;
+
+let pathParts = path.split('/');
 
 async function main(){
     await Data.loadIndex({user: null, indexId: null, contentId: null});
