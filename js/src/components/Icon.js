@@ -3,7 +3,7 @@ import htm from 'htm';
 
 const html = htm.bind(h);
 
-export function Icon({name}){
+export default function Icon({name}){
     if(name == "chevron-down"){
         return html`<svg viewBox="0 0 64 64" class="svg-icon icon-circle-chevron-down">
             <path class="opt" d="M32,1.8C15.3,1.8,1.8,15.3,1.8,32S15.3,62.3,32,62.3S62.3,48.7,62.3,32S48.7,1.8,32,1.8z M32,57.8
