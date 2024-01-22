@@ -425,7 +425,6 @@ class App extends Component {
                     />
                 </header>
                 <div class="everything-feed">
-                    <h2>Hi!</h2>
                     <div class="frames">
                     ${items}
                     </div>
