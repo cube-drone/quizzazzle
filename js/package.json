@@ -21,11 +21,11 @@
   "license": "COPYRIGHT",
   "scripts": {
     "help": "npm run",
-    "build": "esbuild app.js --bundle --outfile=build/out.js --target=ios16,firefox121",
+    "build": "esbuild app.js --bundle --outfile=build/feed.js --target=ios16,firefox121",
     "css": "esbuild css/style.css --bundle --outfile=build/style.css --target=ios16,firefox121",
     "csswatch": "esbuild css/style.css --bundle --watch --outfile=build/style.css --target=ios16,firefox121",
-    "prod": "esbuild app.js --minify --sourcemap --bundle --outfile=build/out.js",
-    "watch": "esbuild app.js --bundle --watch --outfile=build/out.js",
+    "prod": "esbuild app.js --minify --sourcemap --bundle --outfile=build/feed.js",
+    "watch": "esbuild app.js --bundle --watch --outfile=build/feed.js",
     "serve": "npx http-server -c-1 -p 3000",
     "test": "node --test"
   }
