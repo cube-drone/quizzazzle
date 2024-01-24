@@ -50,6 +50,23 @@ pub struct Index{
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
+pub enum Content {
+    Markdown{
+        content: String
+    },
+    Image{
+        url: String
+    },
+}
+
+
+pub struct ContentNode{
+    pub id: ContentId,
+    pub order: usize,
+    pub content: Content,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
 
 impl Services{
 
@@ -75,6 +92,22 @@ impl Services{
                 thumbnail_image_url: "test".to_string(),
                 order: "test".to_string(),
                 content_ids: vec![ContentId::new()],
+                created_at: chrono::Utc::now(),
+                updated_at: chrono::Utc::now(),
+            }));
+        }
+
+        Ok(None)
+    }
+
+    pub async fn get_content(&self, index_id: &IndexId, _content_id: &ContentId) -> Result<Option<ContentNode>> {
+        if index_id.to_string() == TEST_INDEX_ID.to_string() {
+            return Ok(Some(ContentNode{
+                id: ContentId::new(),
+                order: 0,
+                content: Content::Markdown{
+                    content: "test".to_string()
+                },
                 created_at: chrono::Utc::now(),
                 updated_at: chrono::Utc::now(),
             }));
