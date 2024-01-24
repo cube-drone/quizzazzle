@@ -25,6 +25,8 @@ class StubServer{
             userSlug: "cubes",
             contentSlug: "testyboy",
             name: 'Test Index',
+            description: "This is a test index.",
+            thumbnailImageUrl: "https://placekitten.com/330/400",
             order: 'newest content first', // feeds use "newest content first", stories use "oldest content first"
             contentIds: this.stubContent.map(node => node.id),
             created_at: new Date(),
