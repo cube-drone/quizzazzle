@@ -63,6 +63,50 @@ pub enum Content {
     Image{
         url: String
     },
+    Heading{
+        title: String
+    },
+    Dialogue{
+        character: String,
+        content: String
+    },
+    Quiz{
+        question: String,
+        answers: Vec<String>,
+    },
+    Link{
+        url: String,
+        title: String,
+    }
+}
+
+impl Content{
+    pub fn render(&self) -> String {
+        match self {
+            Content::Markdown{content} => {
+                content.to_string()
+            },
+            Content::Image{url} => {
+                format!("<img src=\"{}\" />", url)
+            },
+            Content::Heading { title } => {
+                format!("<h1>{}</h1>", title)
+            },
+            Content::Dialogue { character, content } => {
+                format!("<p><strong>{}</strong>: {}</p>", character, content)
+            },
+            Content::Quiz { question, answers } => {
+                let mut html = format!("<p>{}</p>", question);
+                for answer in answers {
+                    html += &format!("<p>{}</p>", answer);
+                }
+                html
+            },
+            Content::Link{ url, title } => {
+                format!("<a href=\"{}\">{}</a>", url, title)
+            },
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
