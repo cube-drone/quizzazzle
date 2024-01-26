@@ -57,6 +57,9 @@ pub async fn initialize(
                 is_verified boolean,
                 is_admin boolean,
                 tags set<text>,
+                opcount int,
+                logincount int,
+                invitecount int,
                 created_at timestamp,
                 updated_at timestamp);
         "#, &[], ).await?;
@@ -64,7 +67,22 @@ pub async fn initialize(
         prepared_queries.insert(
             "create_user",
             scylla_session
-                .prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, is_admin, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);")
+                .prepare(r#"INSERT INTO ks.user (
+                    id,
+                    display_name,
+                    parent_id,
+                    hashed_password,
+                    email,
+                    thumbnail_url,
+                    is_verified,
+                    is_admin,
+                    opcount,
+                    logincount,
+                    invitecount,
+                    created_at,
+                    updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?);"#
+                )
                 .await?,
         );
 
@@ -424,8 +442,23 @@ pub struct UserDatabaseRaw {
     pub is_verified: bool,
     pub is_admin: bool,
     pub tags: Option<Vec<String>>,
+    pub invitecount: i64,
+    pub opcount: i64,
+    pub logincount: i64,
     pub created_at: Duration,
     pub updated_at: Duration,
+}
+
+const INVITE_CODE_REGENERATION_TIME_MS: i64 = 86400 * 1000 * 4; // 4 days
+
+impl UserDatabaseRaw {
+    pub fn available_user_invites(&self) -> i64 {
+        let time_since_creation = (Utc::now() - self.created_at);
+        let time_in_ms = time_since_creation.timestamp_millis();
+        let invite_codes = time_in_ms as f64 / INVITE_CODE_REGENERATION_TIME_MS as f64;
+        let n_invite_codes: i64 = invite_codes.ceil() as i64;
+        return self.invitecount - n_invite_codes;
+    }
 }
 
 impl Services {
@@ -461,6 +494,20 @@ impl Services {
     ) -> Result<Vec<InviteCode>> {
         // for testing, generate a new invite code from the root user
         Ok(vec![])
+    }
+
+    pub async fn get_number_available_invites(
+        &self,
+        user_id: &UserId) -> Result<i64> {
+        let user_maybe = self.get_user(user_id).await?;
+        match user_maybe {
+            None => {
+                Err(anyhow!("User does not exist!"))
+            },
+            Some(user) => {
+                Ok(user.available_user_invites())
+            }
+        }
     }
 
     pub async fn get_user_exists(

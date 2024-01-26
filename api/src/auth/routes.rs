@@ -869,6 +869,12 @@ async fn auth_user(user: model::VerifiedUserSession) -> Json<model::VerifiedUser
     Json(user)
 }
 
+#[get("/user/invite")]
+async fn list_invites(services: &State<Services>, user: model::VerifiedUserSession) -> Template {
+    let invites = services.get_my_invites(&user.user_id).await.expect("should be able to list invites");
+    Template::render("list_invites", context! { invites: invites })
+}
+
 pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
     app.mount(
         "/auth",
