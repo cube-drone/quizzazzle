@@ -1,10 +1,13 @@
 use anyhow::Result;
 use rocket::serde::uuid::Uuid;
+use rocket::serde;
+use serde::{Deserialize, Serialize};
 
 use crate::Services;
 
 const TEST_INDEX_ID: IndexId = IndexId(Uuid::from_u128(0));
 
+#[derive(Serialize, Deserialize)]
 pub struct IndexId(Uuid);
 impl IndexId {
     pub fn new() -> Self {
@@ -24,6 +27,7 @@ impl IndexId {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct ContentId(String);
 impl ContentId {
     pub fn new() -> Self {
@@ -50,6 +54,8 @@ pub struct Index{
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub enum Content {
     Markdown{
         content: String
@@ -59,7 +65,8 @@ pub enum Content {
     },
 }
 
-
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub struct ContentNode{
     pub id: ContentId,
     pub order: usize,
@@ -74,7 +81,7 @@ impl Services{
         // take userSlug and indexSlug, => indexId
         // take contentId (if no contentId, use the first one)
 
-        if(user_slug == "test" && feed_slug == "test"){
+        if user_slug == "test" && feed_slug == "test" {
             return Ok(Some(TEST_INDEX_ID));
         }
 
