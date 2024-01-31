@@ -1,13 +1,11 @@
 
 use rocket::Request;
 use rocket::fairing::{Fairing, Info, Kind};
-use rocket::http::Status;
 use rocket::response::Response;
-use rocket::request::{self, FromRequest};
-use rocket::Data;
+use rand::Rng;
 
 
-const POWERED_BY: [&str] = [
+const POWERED_BY: [&str;25] = [
     "PHP/1.0.4",
     "ASP.NET.NET",
     "JavaServer PageMakers",
@@ -35,7 +33,7 @@ const POWERED_BY: [&str] = [
     "Esperanto",
 ];
 
-fn get_random_powered_by() -> &str {
+fn get_random_powered_by() -> &'static str {
     // return a random element from the POWERED_BY array
     POWERED_BY[rand::thread_rng().gen_range(0..POWERED_BY.len())]
 }
@@ -55,7 +53,7 @@ impl Fairing for PoweredBy {
 
     /// Adds a header to the response indicating how long the server took to
     /// process the request.
-    async fn on_response<'r>(&self, req: &'r Request<'_>, res: &mut Response<'r>) {
+    async fn on_response<'r>(&self, _req: &'r Request<'_>, res: &mut Response<'r>) {
         res.set_raw_header("X-Powered-By", get_random_powered_by());
     }
 }

@@ -188,6 +188,7 @@ async fn rocket() -> Rocket<Build> {
 
     app = app.manage(services);
     app = app.attach(crate::fairings::timing::RequestTimer)
+             .attach(crate::fairings::poweredby::PoweredBy)
              .attach(Template::custom(|engines|{
                 engines.tera.register_function("sbubby", icons::sbubby);
                 engines.tera.register_function("icon_home", icons::icon_home);
