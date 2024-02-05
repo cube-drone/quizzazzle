@@ -914,7 +914,8 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
             ok_user,
             ok,
             logout,
-            auth_user
+            auth_user,
+            list_invites,
         ],
     )
 }

@@ -453,7 +453,7 @@ const INVITE_CODE_REGENERATION_TIME_MS: i64 = 86400 * 1000 * 4; // 4 days
 
 impl UserDatabaseRaw {
     pub fn available_user_invites(&self) -> i64 {
-        let time_since_creation = (Utc::now() - self.created_at);
+        let time_since_creation = Utc::now() - self.created_at;
         let time_in_ms = time_since_creation.timestamp_millis();
         let invite_codes = time_in_ms as f64 / INVITE_CODE_REGENERATION_TIME_MS as f64;
         let n_invite_codes: i64 = invite_codes.ceil() as i64;
