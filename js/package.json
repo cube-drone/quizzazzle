@@ -27,6 +27,7 @@
     "prod": "esbuild app.js --minify --sourcemap --bundle --outfile=build/feed.js",
     "watch": "esbuild app.js --bundle --watch --outfile=build/feed.js",
     "serve": "npx http-server -c-1 -p 3000",
-    "test": "node --test"
+    "test": "node --test",
+    "testonly": "node --test --test-only"
   }
 }

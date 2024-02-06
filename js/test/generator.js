@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const makeFetchHappen = require('fetch-cookie');
 const testy = require('testytesterson');
+const assert = require('assert');
 
 const { endpoint } = require('./constants');
 
@@ -28,6 +29,9 @@ async function createUser(userCreate){
     });
 
     let returnValue = await root.json();
+
+    assert(returnValue.user_id, "User ID not returned");
+
 
     return {
         fetch: fetchCookie,

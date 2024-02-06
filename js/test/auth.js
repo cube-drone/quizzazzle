@@ -8,6 +8,13 @@ const { JSDOM } = jsdom;
 const { endpoint } = require('./constants');
 const { createUser } = require('./generator');
 
+let only = {only: true};
+/*
+i.e. test('hi', only, async () => {
+    ...
+})
+*/
+
 test('Can connect to localhost', async () => {
     let root = await fetch(`${endpoint}/auth/invite`);
 

@@ -14,3 +14,9 @@ j:
 	docker logs --follow ministry
 join:
 	docker logs --follow ministry
+
+
+scyllastatus:
+	docker exec -it some-scylla nodetool status
+cqlsh:
+	docker exec -it some-scylla cqlsh

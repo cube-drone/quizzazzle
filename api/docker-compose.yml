@@ -23,6 +23,7 @@ services:
       ROCKET_ADDRESS: 0.0.0.0
       ROCKET_PORT: 3333
       ROCKET_PUBLIC_ADDRESS: http://localhost:3333
+      USE_INSECURE_HASHES: "true"
       CACHE_REDIS_URLS: redis://:hamscramble@cache-redis-1:6888,redis://:hamscramble@cache-redis-2:6889,redis://:hamscramble@cache-redis-3:6890
       APPLICATION_REDIS_URLS: redis://:hamscramble@application-redis-1:6999,redis://:hamscramble@application-redis-2:6998,redis://:hamscramble@application-redis-3:6997
       ROCKET_SECRET_KEY: grPMXJszWoqdlGv1M7Y+9f0FsPhxsycGVjuQ6mfobIk=  # openssl rand -base64 32
@@ -33,7 +34,6 @@ services:
       # AWS_DEFAULT_REGION: us-west-2
     ports:
       - "3333:3333"
-      - "8000:8000"
   some-scylla:
     container_name: some-scylla
     image: scylladb/scylla

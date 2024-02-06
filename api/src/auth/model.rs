@@ -9,7 +9,6 @@ use redis::AsyncCommands;
 
 use anyhow::Result;
 use anyhow::anyhow;
-use rocket::tokio::task;
 
 use rocket::serde::uuid::Uuid;
 use scylla::prepared_statement::PreparedStatement;
@@ -18,19 +17,10 @@ use scylla::macros::FromRow;
 use scylla::Session;
 use chrono::{Utc, Duration};
 
-// hashing some stuff
-use ::argon2::{
-    password_hash::{
-        rand_core::OsRng,
-        PasswordHash, PasswordHasher, PasswordVerifier, SaltString
-    },
-    Argon2
-};
-use std::io::Cursor;
-use murmur3::murmur3_x86_128;
 
 use crate::email::EmailAddress;
 use crate::Services;
+use crate::auth::hashes;
 
 const ROOT_USER_ID: UserId = UserId(Uuid::from_u128(0));
 const DEFAULT_THUMBNAIL_URL: &str = "/static/chismas.png";
@@ -39,6 +29,7 @@ const USER_SESSION_TIMEOUT_SECONDS: usize = 86400 * 14; // two weeks
 const EMAIL_VERIFICATION_TIMEOUT_SECONDS: usize = 86400 * 3; // three days
 const PASSWORD_RESET_TIMEOUT_SECONDS: usize = 86400 * 1; // one day
 const USER_MAX_SESSION_COUNT: usize = 8; // how many sessions can a single user have active?
+
 
 pub async fn initialize(
     scylla_session: &Arc<Session>,
@@ -76,12 +67,13 @@ pub async fn initialize(
                     thumbnail_url,
                     is_verified,
                     is_admin,
+                    tags,
                     opcount,
                     logincount,
                     invitecount,
                     created_at,
                     updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?);"#
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, {'tag_default'}, 0, 0, 0, ?, ?);"#
                 )
                 .await?,
         );
@@ -96,7 +88,7 @@ pub async fn initialize(
         prepared_queries.insert(
             "get_user",
             scylla_session
-                .prepare("SELECT id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, is_admin, tags, created_at, updated_at FROM ks.user WHERE id = ?;")
+                .prepare("SELECT id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, is_admin, tags, opcount, logincount, invitecount, created_at, updated_at FROM ks.user WHERE id = ?;")
                 .await?,
         );
 
@@ -245,72 +237,6 @@ pub async fn initialize(
     Ok(prepared_queries)
 }
 
-pub fn password_hash(password: &str) -> Result<String> {
-    let peppered: String = format!("{}-{}-{}", password, env::var("GROOVELET_PEPPER").unwrap_or_else(|_| "peppa".to_string()), "SPUDJIBMSPLQPFFSPLBLBlBLBLPRT");
-    let salt = SaltString::generate(&mut OsRng);
-    let argon2 = Argon2::default();
-    let hashed_password = argon2.hash_password(peppered.as_bytes(), &salt).expect("strings should be hashable").to_string();
-    Ok(hashed_password)
-}
-
-pub async fn password_hash_async(password: &str) -> Result<String> {
-    let password = password.to_string();
-    let result = task::spawn_blocking(move || {
-        password_hash(&password)
-    }).await?;
-
-    result
-}
-
-pub fn password_test(password: &str, hashed_password: &str) -> Result<bool> {
-    let peppered: String = format!("{}-{}-{}", password, env::var("GROOVELET_PEPPER").unwrap_or_else(|_| "peppa".to_string()), "SPUDJIBMSPLQPFFSPLBLBlBLBLPRT");
-    let argon2 = Argon2::default();
-    let password_hash = PasswordHash::new(hashed_password).unwrap();
-    let is_valid = argon2
-        .verify_password(peppered.as_bytes(), &password_hash)
-        .is_ok();
-    Ok(is_valid)
-}
-
-pub async fn password_test_async(password: &str, hashed_password: &str) -> Result<bool> {
-    let password = password.to_string();
-    let hashed_password = hashed_password.to_string();
-    let result = task::spawn_blocking(move || {
-        password_test(&password, &hashed_password)
-    }).await?;
-
-    result
-}
-
-pub fn lazy_password_hash(password: &str) -> Result<String> {
-    let hash_result = murmur3_x86_128(&mut Cursor::new(password), 0).expect("hashing works");
-    Ok(hash_result.to_string())
-}
-
-pub async fn lazy_password_hash_async(password: &str) -> Result<String> {
-    let password = password.to_string();
-    let result = task::spawn_blocking(move || {
-        lazy_password_hash(&password)
-    }).await?;
-
-    result
-}
-
-pub fn lazy_password_test(password: &str, hashed_password: &str) -> Result<bool> {
-    let hash_result = murmur3_x86_128(&mut Cursor::new(password), 0).expect("hashing works");
-    Ok(hash_result.to_string() == hashed_password)
-}
-
-pub async fn lazy_password_test_async(password: &str, hashed_password: &str) -> Result<bool> {
-    let password = password.to_string();
-    let hashed_password = hashed_password.to_string();
-    let result = task::spawn_blocking(move || {
-        lazy_password_test(&password, &hashed_password)
-    }).await?;
-
-    result
-}
-
 #[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 pub struct InviteCode(Uuid);
 impl InviteCode {
@@ -391,7 +317,7 @@ pub struct UserSession {
     pub is_admin: bool,
     pub is_known_ip: bool,
     pub ip: IpAddr,
-    pub tags: Option<Vec<String>>,
+    pub tags: Vec<String>,
 }
 
 impl UserSession {
@@ -420,7 +346,7 @@ pub struct VerifiedUserSession {
     pub display_name: String,
     pub thumbnail_url: String,
     pub is_admin: bool,
-    pub tags: Option<Vec<String>>,
+    pub tags: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -428,7 +354,7 @@ pub struct AdminUserSession {
     pub user_id: UserId,
     pub display_name: String,
     pub thumbnail_url: String,
-    pub tags: Option<Vec<String>>,
+    pub tags: Vec<String>,
 }
 
 #[derive(FromRow)]
@@ -441,10 +367,10 @@ pub struct UserDatabaseRaw {
     pub thumbnail_url: String,
     pub is_verified: bool,
     pub is_admin: bool,
-    pub tags: Option<Vec<String>>,
-    pub invitecount: i64,
-    pub opcount: i64,
-    pub logincount: i64,
+    pub tags: Vec<String>,
+    pub invitecount: i32,
+    pub opcount: i32,
+    pub logincount: i32,
     pub created_at: Duration,
     pub updated_at: Duration,
 }
@@ -452,11 +378,11 @@ pub struct UserDatabaseRaw {
 const INVITE_CODE_REGENERATION_TIME_MS: i64 = 86400 * 1000 * 4; // 4 days
 
 impl UserDatabaseRaw {
-    pub fn available_user_invites(&self) -> i64 {
+    pub fn available_user_invites(&self) -> i32 {
         let time_since_creation = Utc::now() - self.created_at;
         let time_in_ms = time_since_creation.timestamp_millis();
         let invite_codes = time_in_ms as f64 / INVITE_CODE_REGENERATION_TIME_MS as f64;
-        let n_invite_codes: i64 = invite_codes.ceil() as i64;
+        let n_invite_codes: i32 = invite_codes.ceil() as i32;
         return self.invitecount - n_invite_codes;
     }
 }
@@ -498,7 +424,7 @@ impl Services {
 
     pub async fn get_number_available_invites(
         &self,
-        user_id: &UserId) -> Result<i64> {
+        user_id: &UserId) -> Result<i32> {
         let user_maybe = self.get_user(user_id).await?;
         match user_maybe {
             None => {
@@ -601,13 +527,7 @@ impl Services {
         let parent_id = "";
         let root_auth_password = env::var("GROOVELET_ROOT_AUTH_PASSWORD").unwrap_or_else(|_| "root".to_string());
 
-        let hashed_password: String;
-        if self.is_production{
-            hashed_password = password_hash_async(&root_auth_password).await?;
-        }
-        else{
-            hashed_password = lazy_password_hash_async(&root_auth_password).await?;
-        }
+        let hashed_password: String = hashes::password_hash_async(&root_auth_password).await?;
 
         self.scylla
             .session
@@ -617,7 +537,6 @@ impl Services {
                     .prepared_queries
                     .get("create_user")
                     .expect("Query missing!"),
-                //.prepare("INSERT INTO ks.user (id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, is_admin, created_at, updated_at) VALUES (?, ?, ?, ?, ?, false, ?, ?);")
                 (user_id, display_name, parent_id, hashed_password, email, DEFAULT_THUMBNAIL_URL, true, true, Utc::now().timestamp_millis(), Utc::now().timestamp_millis()),
             )
             .await?;
@@ -662,13 +581,7 @@ impl Services {
             }
         }
 
-        let hashed_password: String;
-        if self.is_production{
-            hashed_password = password_hash_async(&user_create.password).await?;
-        }
-        else{
-            hashed_password = lazy_password_hash_async(&user_create.password).await?;
-        }
+        let hashed_password: String = hashes::password_hash_async(&user_create.password).await?;
 
         let user_id = user_create.user_id.to_uuid();
 
@@ -684,7 +597,7 @@ impl Services {
                 (
                     user_id,
                     user_create.display_name,
-                    user_create.parent_id.0,
+                    user_create.parent_id.to_uuid(),
                     hashed_password,
                     user_create.email,
                     DEFAULT_THUMBNAIL_URL,
@@ -732,7 +645,7 @@ impl Services {
             is_admin: user_create.is_admin,
             is_known_ip: true,
             ip: ip,
-            tags: None,
+            tags: vec!["tag_default".to_string()],
         };
 
         let session_token = self.create_session_token(&user_session).await?;
@@ -773,13 +686,7 @@ impl Services {
     pub async fn login(&self, email: &str, password: &str, ip: IpAddr) -> Result<SessionToken> {
         let email_user = self.get_user_email(&email).await?;
         if let Some(email_user) = email_user {
-            let password_success:bool;
-            if self.is_production {
-                password_success = password_test_async(&password, &email_user.hashed_password).await?;
-            }
-            else{
-                password_success = lazy_password_test_async(&password, &email_user.hashed_password).await?;
-            }
+            let password_success:bool = hashes::password_test_async(&password, &email_user.hashed_password).await?;
 
             let known_ip = self.is_this_a_known_ip_for_this_user(&UserId::from_uuid(email_user.id), &ip).await?;
 
@@ -1065,13 +972,7 @@ impl Services {
         let user_id = UserId(user_id);
 
         // 2. hash the password and save it against the associated user id
-        let hashed_password: String;
-        if self.is_production{
-            hashed_password = password_hash_async(&password).await?;
-        }
-        else{
-            hashed_password = lazy_password_hash_async(&password).await?;
-        }
+        let hashed_password: String = hashes::password_hash_async(&password).await?;
 
         self.scylla
             .session
