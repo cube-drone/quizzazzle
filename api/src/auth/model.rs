@@ -22,6 +22,9 @@ use crate::email::EmailAddress;
 use crate::Services;
 use crate::auth::hashes;
 
+use crate::auth::tables::table_user;
+use crate::auth::tables::table_user_email;
+
 const ROOT_USER_ID: UserId = UserId(Uuid::from_u128(0));
 const DEFAULT_THUMBNAIL_URL: &str = "/static/chismas.png";
 
@@ -35,83 +38,11 @@ pub async fn initialize(
     scylla_session: &Arc<Session>,
 ) -> Result<HashMap<&'static str, PreparedStatement>> {
 
+    let mut user_queries: HashMap<&'static str, PreparedStatement> = table_user::initialize(scylla_session).await?;
+    let mut user_email_queries: HashMap<&'static str, PreparedStatement> = table_user_email::initialize(scylla_session).await?;
+
+
     let mut prepared_queries = HashMap::new();
-    scylla_session
-        .query(r#"
-            CREATE TABLE IF NOT EXISTS ks.user (
-                id uuid PRIMARY KEY,
-                display_name text,
-                parent_id uuid,
-                hashed_password text,
-                thumbnail_url text,
-                email text,
-                is_verified boolean,
-                is_admin boolean,
-                tags set<text>,
-                opcount int,
-                logincount int,
-                invitecount int,
-                created_at timestamp,
-                updated_at timestamp);
-        "#, &[], ).await?;
-
-        prepared_queries.insert(
-            "create_user",
-            scylla_session
-                .prepare(r#"INSERT INTO ks.user (
-                    id,
-                    display_name,
-                    parent_id,
-                    hashed_password,
-                    email,
-                    thumbnail_url,
-                    is_verified,
-                    is_admin,
-                    tags,
-                    opcount,
-                    logincount,
-                    invitecount,
-                    created_at,
-                    updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, {'tag_default'}, 0, 0, 0, ?, ?);"#
-                )
-                .await?,
-        );
-
-        prepared_queries.insert(
-            "get_user_exists",
-            scylla_session
-                .prepare("SELECT id FROM ks.user WHERE id = ?;")
-                .await?,
-        );
-
-        prepared_queries.insert(
-            "get_user",
-            scylla_session
-                .prepare("SELECT id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, is_admin, tags, opcount, logincount, invitecount, created_at, updated_at FROM ks.user WHERE id = ?;")
-                .await?,
-        );
-
-        prepared_queries.insert(
-            "delete_user",
-            scylla_session
-                .prepare("DELETE FROM ks.user WHERE id = ?;")
-                .await?,
-        );
-
-        prepared_queries.insert(
-            "verify_user_email",
-            scylla_session
-                .prepare("UPDATE ks.user SET is_verified = true WHERE id = ?;")
-                .await?,
-        );
-
-        prepared_queries.insert(
-            "change_user_password",
-            scylla_session
-                .prepare("UPDATE ks.user SET hashed_password = ? WHERE id = ?;")
-                .await?,
-        );
 
     scylla_session
         .query(r#"
@@ -186,28 +117,6 @@ pub async fn initialize(
                 .await?,
         );
 
-    // email --> user
-    scylla_session
-        .query(r#"
-            CREATE TABLE IF NOT EXISTS ks.email_user (
-                email text PRIMARY KEY,
-                user_id uuid)
-            "#, &[], ).await?;
-
-        prepared_queries.insert(
-            "get_email_user",
-            scylla_session
-                .prepare("SELECT user_id FROM ks.email_user WHERE email = ?;")
-                .await?,
-        );
-
-        prepared_queries.insert(
-            "set_email_user",
-            scylla_session
-                .prepare("INSERT INTO ks.email_user (email, user_id) VALUES (?, ?);")
-                .await?,
-        );
-
     // email_domain --> user
     scylla_session
         .query(r#"
@@ -233,6 +142,15 @@ pub async fn initialize(
     );
 
     */
+
+    let queries_to_merge = vec![
+        &mut user_queries,
+        &mut user_email_queries,
+    ];
+
+    for query_map in queries_to_merge {
+        prepared_queries.extend(query_map.drain());
+    }
 
     Ok(prepared_queries)
 }
@@ -357,27 +275,10 @@ pub struct AdminUserSession {
     pub tags: Vec<String>,
 }
 
-#[derive(FromRow)]
-pub struct UserDatabaseRaw {
-    pub id: Uuid,
-    pub display_name: String,
-    pub parent_id: Option<Uuid>,
-    pub hashed_password: String,
-    pub email: String,
-    pub thumbnail_url: String,
-    pub is_verified: bool,
-    pub is_admin: bool,
-    pub tags: Vec<String>,
-    pub invitecount: i32,
-    pub opcount: i32,
-    pub logincount: i32,
-    pub created_at: Duration,
-    pub updated_at: Duration,
-}
 
 const INVITE_CODE_REGENERATION_TIME_MS: i64 = 86400 * 1000 * 4; // 4 days
 
-impl UserDatabaseRaw {
+impl table_user::UserDatabaseRaw {
     pub fn available_user_invites(&self) -> i32 {
         let time_since_creation = Utc::now() - self.created_at;
         let time_in_ms = time_since_creation.timestamp_millis();
@@ -425,7 +326,7 @@ impl Services {
     pub async fn get_number_available_invites(
         &self,
         user_id: &UserId) -> Result<i32> {
-        let user_maybe = self.get_user(user_id).await?;
+        let user_maybe = self.table_user_get(user_id).await?;
         match user_maybe {
             None => {
                 Err(anyhow!("User does not exist!"))
@@ -436,79 +337,15 @@ impl Services {
         }
     }
 
-    pub async fn get_user_exists(
-        &self,
-        user_id: &UserId,
-    ) -> Result<bool> {
-        let result = self.scylla
-            .session
-            .execute(
-                &self
-                    .scylla
-                    .prepared_queries
-                    .get("get_user")
-                    .expect("Query missing!"),
-                (user_id.0,),
-            )
-            .await?;
-
-        if let Some(rows) = result.rows {
-            if rows.len() > 0 {
-                return Ok(true);
-            }
-            else{
-                return Ok(false);
-            }
-        }
-        else{
-            return Ok(false);
-        }
-    }
-
-    pub async fn get_user(
-        &self,
-        user_id: &UserId,
-    ) -> Result<Option<UserDatabaseRaw>> {
-        Ok(self.scylla
-            .session
-            .execute(
-                &self
-                    .scylla
-                    .prepared_queries
-                    .get("get_user")
-                    .expect("Query missing!"),
-                (user_id.to_uuid(),),
-            )
-            .await?
-            .maybe_first_row_typed::<UserDatabaseRaw>()?)
-    }
-
-    pub async fn get_user_email(
+    pub async fn get_user_via_email(
         &self,
         email: &str,
-    ) -> Result<Option<UserDatabaseRaw>> {
-        let result = self.scylla
-            .session
-            .execute(
-                &self
-                    .scylla
-                    .prepared_queries
-                    .get("get_email_user")
-                    .expect("Query missing!"),
-                (email,),
-            )
-            .await?;
+    ) -> Result<Option<table_user::UserDatabaseRaw>> {
 
-        if let Some(rows) = result.rows {
-            if rows.len() > 0 {
-                let row = rows.get(0).unwrap();
-                let user_id: Uuid = row.columns[0].as_ref().unwrap().as_uuid().unwrap();
-                let user_id = UserId(user_id);
-                return self.get_user(&user_id).await;
-            }
-            else{
-                return Ok(None);
-            }
+        let user_id_maybe = self.table_user_email_get_uuid(email).await?;
+
+        if let Some(user_id) = user_id_maybe {
+            return self.table_user_get(&user_id).await;
         }
         else{
             return Ok(None);
@@ -517,42 +354,31 @@ impl Services {
 
     pub async fn create_root_user(&self) -> Result<()>{
         // don't create a root user if one already exists
-        if self.get_user_exists(&ROOT_USER_ID).await? {
+        if self.table_user_exists(&ROOT_USER_ID).await? {
             return Ok(());
         }
 
-        let user_id = ROOT_USER_ID.to_uuid();
         let display_name = "root";
         let email = "root@gooble.email";
-        let parent_id = "";
         let root_auth_password = env::var("GROOVELET_ROOT_AUTH_PASSWORD").unwrap_or_else(|_| "root".to_string());
 
         let hashed_password: String = hashes::password_hash_async(&root_auth_password).await?;
 
-        self.scylla
-            .session
-            .execute(
-                &self
-                    .scylla
-                    .prepared_queries
-                    .get("create_user")
-                    .expect("Query missing!"),
-                (user_id, display_name, parent_id, hashed_password, email, DEFAULT_THUMBNAIL_URL, true, true, Utc::now().timestamp_millis(), Utc::now().timestamp_millis()),
-            )
-            .await?;
+        self.table_user_create(
+            &ROOT_USER_ID,
+            display_name,
+            None,
+            &hashed_password,
+            email,
+            true,
+            true,
+            DEFAULT_THUMBNAIL_URL,
+        ).await?;
 
-        // email -> user
-        self.scylla
-            .session
-            .execute(
-                &self
-                    .scylla
-                    .prepared_queries
-                    .get("set_email_user")
-                    .expect("query missing!"),
-                (email, user_id,),
-            )
-            .await?;
+        self.table_user_email_create(
+            email,
+            &ROOT_USER_ID,
+        ).await?;
 
         Ok(())
     }
@@ -562,22 +388,22 @@ impl Services {
         user_create: UserCreate<'_>,
         ip: IpAddr,
     ) -> Result<SessionToken> {
-        if self.get_user_exists(&user_create.user_id).await? {
+        if self.table_user_exists(&user_create.user_id).await? {
             return Err(anyhow!("User somehow already exists! Wow, UUIDs are not as unique as I thought!"));
         }
-        if !self.get_user_exists(&user_create.parent_id).await? {
+        if !self.table_user_exists(&user_create.parent_id).await? {
             return Err(anyhow!("Parent user does not exist!"));
         }
-        let email_user = self.get_user_email(&user_create.email).await?;
-        if let Some(email_user) = email_user {
-            if email_user.is_verified{
+        let existing_user_with_same_email = self.get_user_via_email(&user_create.email).await?;
+        if let Some(existing_user_with_same_email) = existing_user_with_same_email {
+            if existing_user_with_same_email.is_verified{
                 return Err(anyhow!("Email already exists!"));
             }
             else{
                 // TODO: delete the unverified user
                 // and just create a new one, now
                 // suck it, chump
-                self.delete_user(&UserId::from_uuid(email_user.id)).await?;
+                self.table_user_delete(&UserId::from_uuid(existing_user_with_same_email.id)).await?;
             }
         }
 
@@ -585,42 +411,21 @@ impl Services {
 
         let user_id = user_create.user_id.to_uuid();
 
-        // the core user record!
-        self.scylla
-            .session
-            .execute(
-                &self
-                    .scylla
-                    .prepared_queries
-                    .get("create_user")
-                    .expect("Query missing!"),
-                (
-                    user_id,
-                    user_create.display_name,
-                    user_create.parent_id.to_uuid(),
-                    hashed_password,
-                    user_create.email,
-                    DEFAULT_THUMBNAIL_URL,
-                    user_create.is_verified,
-                    user_create.is_admin,
-                    Utc::now().timestamp_millis(),
-                    Utc::now().timestamp_millis()
-                ),
-            )
-            .await?;
+        // core user table!
+        self.table_user_create(
+            &user_create.user_id,
+            user_create.display_name,
+            Some(&user_create.parent_id),
+            &hashed_password,
+            user_create.email,
+            user_create.is_verified,
+            user_create.is_admin,
+            DEFAULT_THUMBNAIL_URL).await?;
 
-        // email -> user
-        self.scylla
-            .session
-            .execute(
-                &self
-                    .scylla
-                    .prepared_queries
-                    .get("set_email_user")
-                    .expect("query missing!"),
-                (user_create.email, user_create.user_id.0,),
-            )
-            .await?;
+        self.table_user_email_create(
+            user_create.email,
+            &user_create.user_id
+        ).await?;
 
         // user -> ip
         self.scylla
@@ -684,7 +489,7 @@ impl Services {
     }
 
     pub async fn login(&self, email: &str, password: &str, ip: IpAddr) -> Result<SessionToken> {
-        let email_user = self.get_user_email(&email).await?;
+        let email_user = self.get_user_via_email(&email).await?;
         if let Some(email_user) = email_user {
             let password_success:bool = hashes::password_test_async(&password, &email_user.hashed_password).await?;
 
@@ -712,25 +517,6 @@ impl Services {
             }
         }
         Err(anyhow!("Invalid email or password!"))
-    }
-
-    pub async fn delete_user(
-        &self,
-        user_id: &UserId,
-    ) -> Result<()> {
-        self.scylla
-            .session
-            .execute(
-                &self
-                    .scylla
-                    .prepared_queries
-                    .get("delete_user")
-                    .expect("Query missing!"),
-                (user_id.to_uuid(),),
-            )
-            .await?;
-
-        Ok(())
     }
 
 /*
@@ -781,7 +567,7 @@ impl Services {
         &self,
         user_id: &UserId,
     ) -> Result<()> {
-        let user_maybe = self.get_user(user_id).await?;
+        let user_maybe = self.table_user_get(user_id).await?;
         match user_maybe {
             None => {
                 Err(anyhow!("User does not exist!"))
@@ -833,21 +619,11 @@ impl Services {
         let user_id = Uuid::parse_str(&user_id)?;
         let user_id = UserId(user_id);
 
-        if ! self.get_user_exists(&user_id).await? {
+        if ! self.table_user_exists(&user_id).await? {
             return Err(anyhow!("User does not exist!"));
         }
 
-        self.scylla
-            .session
-            .execute(
-                &self
-                    .scylla
-                    .prepared_queries
-                    .get("verify_user_email")
-                    .expect("Query missing!"),
-                (user_id.to_uuid(),),
-            )
-            .await?;
+        self.table_user_verify(&user_id).await?;
 
         self.verify_all_sessions(&user_id).await?;
 
@@ -887,7 +663,7 @@ impl Services {
         let user_id = Uuid::parse_str(&user_id)?;
         let user_id = UserId(user_id);
 
-        if ! self.get_user_exists(&user_id).await? {
+        if ! self.table_user_exists(&user_id).await? {
             return Err(anyhow!("User does not exist!"));
         }
 
@@ -933,7 +709,7 @@ impl Services {
         email_address: &str,
     ) -> Result<()> {
 
-        let user_maybe = self.get_user_email(&email_address).await?;
+        let user_maybe = self.get_user_via_email(&email_address).await?;
         match user_maybe {
             None => {
                 Err(anyhow!("User does not exist!"))
@@ -974,22 +750,13 @@ impl Services {
         // 2. hash the password and save it against the associated user id
         let hashed_password: String = hashes::password_hash_async(&password).await?;
 
-        self.scylla
-            .session
-            .execute(
-                &self
-                    .scylla
-                    .prepared_queries
-                    .get("change_user_password")
-                    .expect("Query missing!"),
-                (hashed_password, user_id.to_uuid(),),
-            ).await?;
+        self.table_user_password_change(&user_id, &hashed_password).await?;
 
         // 3. while we're here, save that IP as a known IP for this user
         self.remember_ip(&user_id, &ip).await?;
 
         // 4. get that user, create a session token, and return it
-        let user = self.get_user(&user_id).await?.unwrap();
+        let user = self.table_user_get(&user_id).await?.unwrap();
         let user_session = UserSession{
             user_id: UserId::from_uuid(user.id),
             display_name: user.display_name,
