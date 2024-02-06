@@ -12,10 +12,9 @@ use anyhow::anyhow;
 
 use rocket::serde::uuid::Uuid;
 use scylla::prepared_statement::PreparedStatement;
-use scylla::macros::FromRow;
 //use scylla::frame::value::Timestamp;
 use scylla::Session;
-use chrono::{Utc, Duration};
+use chrono::{Utc};
 
 
 use crate::email::EmailAddress;
@@ -76,23 +75,6 @@ pub async fn initialize(
                 descendant_id uuid,
                 PRIMARY KEY (user_id, descendant_id));
             "#, &[], ).await?;
-
-    /*
-    prepared_queries.insert(
-        "create_user_invite",
-        scylla_session
-            .prepare("INSERT INTO ks.user_invite (user_id, invite_key, uses_remaining, created_at, updated_at) VALUES (?, ?, ?, ?, ?);")
-            .await?,
-    );
-
-    prepared_queries.insert(
-        "update_user_password",
-        scylla_session
-            .prepare("UPDATE ks.user USING TTL 0 SET hashed_password = ? WHERE id = ?;")
-            .await?,
-    );
-
-    */
 
     let queries_to_merge = vec![
         &mut user_queries,

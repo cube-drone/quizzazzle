@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::net::IpAddr;
 use anyhow::Result;
-use rocket::serde::uuid::Uuid;
 use scylla::Session;
 use scylla::prepared_statement::PreparedStatement;
 
