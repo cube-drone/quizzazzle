@@ -4,10 +4,8 @@ use anyhow::Result;
 use rocket::serde::uuid::Uuid;
 use scylla::Session;
 use scylla::prepared_statement::PreparedStatement;
-use scylla::macros::FromRow;
-use chrono::{Utc, Duration};
 
-use crate::{email, Services};
+use crate::Services;
 use crate::auth::model::UserId;
 
 
