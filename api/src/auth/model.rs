@@ -117,15 +117,6 @@ pub async fn initialize(
                 .await?,
         );
 
-    // email_domain --> user
-    scylla_session
-        .query(r#"
-            CREATE TABLE IF NOT EXISTS ks.email_domain (
-                email_domain text,
-                user_id uuid,
-                PRIMARY KEY (email_domain, user_id))
-            "#, &[], ).await?;
-
     /*
     prepared_queries.insert(
         "create_user_invite",
@@ -423,6 +414,11 @@ impl Services {
             DEFAULT_THUMBNAIL_URL).await?;
 
         self.table_user_email_create(
+            user_create.email,
+            &user_create.user_id
+        ).await?;
+
+        self.table_user_email_domain_create(
             user_create.email,
             &user_create.user_id
         ).await?;

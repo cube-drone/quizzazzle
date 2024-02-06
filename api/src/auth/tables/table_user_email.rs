@@ -7,7 +7,7 @@ use scylla::prepared_statement::PreparedStatement;
 use scylla::macros::FromRow;
 use chrono::{Utc, Duration};
 
-use crate::Services;
+use crate::{email, Services};
 use crate::auth::model::UserId;
 
 
@@ -38,6 +38,33 @@ pub async fn initialize(
                 .prepare("INSERT INTO ks.email_user (email, user_id) VALUES (?, ?);")
                 .await?,
         );
+
+    // email_domain --> user
+    scylla_session
+        .query(r#"
+            CREATE TABLE IF NOT EXISTS ks.email_domain (
+                email_domain text,
+                user_id uuid,
+                PRIMARY KEY (email_domain, user_id))
+            "#, &[], ).await?;
+
+        // TODO: limit and paginate this query
+        /*
+        prepared_queries.insert(
+            "get_email_domain_users",
+            scylla_session
+                .prepare("SELECT user_id FROM ks.email_domain WHERE email_domain = ?;")
+                .await?,
+        );
+         */
+
+        prepared_queries.insert(
+            "set_email_domain_user",
+            scylla_session
+                .prepare("INSERT INTO ks.email_domain (email_domain, user_id) VALUES (?, ?);")
+                .await?,
+        );
+
 
     Ok(prepared_queries)
 }
@@ -93,6 +120,27 @@ impl Services {
         else{
             return Ok(None);
         }
+    }
+
+    pub async fn table_user_email_domain_create(
+        &self,
+        email: &str,
+        user_id: &UserId,
+    ) -> Result<()> {
+        let email_domain = email.split('@').last().unwrap();
+
+        self.scylla
+            .session
+            .execute(
+                &self
+                    .scylla
+                    .prepared_queries
+                    .get("set_email_domain_user")
+                    .expect("Query missing! (set_email_domain_user)"),
+                (email_domain, user_id.to_uuid()),
+            )
+            .await?;
+        Ok(())
     }
 
 }
