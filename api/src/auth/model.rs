@@ -14,7 +14,7 @@ use rocket::serde::uuid::Uuid;
 use scylla::prepared_statement::PreparedStatement;
 //use scylla::frame::value::Timestamp;
 use scylla::Session;
-use chrono::{Utc};
+use chrono::Utc;
 
 
 use crate::email::EmailAddress;
