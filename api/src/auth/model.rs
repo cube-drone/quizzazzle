@@ -45,13 +45,6 @@ pub async fn initialize(
 
     let mut prepared_queries = HashMap::new();
 
-    scylla_session
-        .query(r#"
-            CREATE TABLE IF NOT EXISTS ks.user_invite (
-                user_id uuid PRIMARY KEY,
-                invite_key uuid,
-                created_at timestamp );
-            "#, &[], ).await?;
 
     scylla_session
         .query(r#"
