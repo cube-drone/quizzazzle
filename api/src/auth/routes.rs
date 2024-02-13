@@ -872,7 +872,9 @@ async fn auth_user(user: model::VerifiedUserSession) -> Json<model::VerifiedUser
 #[get("/user/invite")]
 async fn list_invites(services: &State<Services>, user: model::VerifiedUserSession) -> Template {
     let invites = services.get_my_invites(&user.user_id).await.expect("should be able to list invites");
-    Template::render("list_invites", context! { invites: invites })
+    let number_available_invites: i32 = services.get_number_available_invites(&user.user_id).await.expect("should be able to get number of available invites");
+
+    Template::render("list_invites", context! { invites: invites, number_available_invites: number_available_invites })
 }
 
 pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {

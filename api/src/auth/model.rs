@@ -24,6 +24,7 @@ use crate::auth::hashes;
 use crate::auth::tables::table_user;
 use crate::auth::tables::table_user_email;
 use crate::auth::tables::table_user_ip;
+use crate::auth::tables::table_user_invite;
 
 const ROOT_USER_ID: UserId = UserId(Uuid::from_u128(0));
 const DEFAULT_THUMBNAIL_URL: &str = "/static/chismas.png";
@@ -100,6 +101,12 @@ impl InviteCode {
     pub fn to_uuid(&self) -> Uuid {
         self.0
     }
+}
+
+#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
+pub struct Invite{
+    pub invite_code: InviteCode,
+    pub is_used: bool,
 }
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug)]
@@ -245,7 +252,7 @@ impl Services {
     pub async fn get_my_invites(
         &self,
         _user_id: &UserId,
-    ) -> Result<Vec<InviteCode>> {
+    ) -> Result<Vec<Invite>> {
         // for testing, generate a new invite code from the root user
         Ok(vec![])
     }
@@ -286,7 +293,7 @@ impl Services {
         }
 
         let display_name = "root";
-        let email = "root@gooble.email";
+        let email = env::var("GROOVELET_ROOT_EMAIL").unwrap_or_else(|_| "root@gooble.email".to_string());
         let root_auth_password = env::var("GROOVELET_ROOT_AUTH_PASSWORD").unwrap_or_else(|_| "root".to_string());
 
         let hashed_password: String = hashes::password_hash_async(&root_auth_password).await?;
@@ -296,14 +303,14 @@ impl Services {
             display_name,
             None,
             &hashed_password,
-            email,
+            &email,
             true,
             true,
             DEFAULT_THUMBNAIL_URL,
         ).await?;
 
         self.table_user_email_create(
-            email,
+            &email,
             &ROOT_USER_ID,
         ).await?;
 

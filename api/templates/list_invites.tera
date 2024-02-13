@@ -1,0 +1,27 @@
+{% extends "base" %}
+
+{% block title %} home{% endblock title %}
+
+{% block head %}
+    {{ super() }}
+{% endblock head %}
+
+{% block content %}
+<div class="primary-card">
+    <div class="content">
+        <header id="primary-header">
+            <h1>invites</h1>
+        </header>
+        <div class="bump"></div>
+        <div class="everything">
+            <p>
+            <input type="text" />
+            </p>
+            <p> u did it, {{ display_name }}</p>
+            <ul>
+                <li><a href="/auth/logout">Logout</a></li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock content %}

@@ -29,6 +29,7 @@ services:
       ROCKET_SECRET_KEY: grPMXJszWoqdlGv1M7Y+9f0FsPhxsycGVjuQ6mfobIk=  # openssl rand -base64 32
       SCYLLA_URL: some-scylla:9042
       RUST_BACKTRACE: 1
+      GROOVELET_ROOT_EMAIL: "root@gooble.email"
       GROOVELET_ROOT_AUTH_PASSWORD: "jimscrimble"
       # AWS_ACCESS_KEY_ID: <fill this in if you want to test email locally>
       # AWS_SECRET_ACCESS_KEY: <you keep it in keepass, under ses-groovelet access key
