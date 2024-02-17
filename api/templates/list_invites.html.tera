@@ -1,6 +1,6 @@
 {% extends "base" %}
 
-{% block title %} home{% endblock title %}
+{% block title %} invites{% endblock title %}
 
 {% block head %}
     {{ super() }}
@@ -14,13 +14,7 @@
         </header>
         <div class="bump"></div>
         <div class="everything">
-            <p>
-            <input type="text" />
-            </p>
-            <p> u did it, {{ display_name }}</p>
-            <ul>
-                <li><a href="/auth/logout">Logout</a></li>
-            </ul>
+            <p> list some invites </p>
         </div>
     </div>
 </div>

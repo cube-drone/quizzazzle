@@ -20,7 +20,6 @@ pub struct UserInviteDatabaseRaw {
     pub used_at: Option<Duration>,
 }
 
-
 pub async fn initialize(
     scylla_session: &Arc<Session>,
 ) -> Result<HashMap<&'static str, PreparedStatement>> {
@@ -30,32 +29,36 @@ pub async fn initialize(
     scylla_session
         .query(r#"
             CREATE TABLE IF NOT EXISTS ks.user_invite (
-                user_id uuid PRIMARY KEY,
-                invite_code uuid,
-                created_at timestamp,
+                invite_code uuid PRIMARY KEY,
+                user_id uuid,
                 is_used boolean,
+                created_at timestamp,
                 used_at timestamp
             );
             "#, &[], ).await?;
 
+    println!("set_user_invite");
     prepared_queries.insert(
         "set_user_invite",
         scylla_session
             .prepare("INSERT INTO ks.user_invite (user_id, invite_code, created_at, is_used) VALUES (?, ?, ?, false);")
             .await?,
     );
+    /*
+        println!("does_invite_exist");
+        prepared_queries.insert(
+            "does_invite_exist",
+            scylla_session
+                .prepare("SELECT invite_code FROM ks.user_invite WHERE user_id = ? AND invite_code = ?;")
+                .await?,
+        );
+     */
 
-    prepared_queries.insert(
-        "does_invite_exist",
-        scylla_session
-            .prepare("SELECT invite_code FROM ks.user_invite WHERE user_id = ? AND invite_code = ?;")
-            .await?,
-    );
-
+    println!("use_invite");
     prepared_queries.insert(
         "use_invite",
         scylla_session
-            .prepare("UPDATE ks.user_invite SET is_used = true, used_at = ? WHERE user_id = ? AND invite_code = ?;")
+            .prepare("UPDATE ks.user_invite SET is_used = true, used_at = ? WHERE invite_code = ?;")
             .await?,
     );
 
@@ -102,7 +105,7 @@ impl Services {
                     .prepared_queries
                     .get("use_user_invite")
                     .expect("Query missing!"),
-                (used_at, user_id.to_uuid(), invite_code.to_uuid(),),
+                (invite_code.to_uuid(),),
             ).await?;
 
         Ok(())

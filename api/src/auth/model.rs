@@ -42,7 +42,7 @@ pub async fn initialize(
     let mut user_queries: HashMap<&'static str, PreparedStatement> = table_user::initialize(scylla_session).await?;
     let mut user_email_queries: HashMap<&'static str, PreparedStatement> = table_user_email::initialize(scylla_session).await?;
     let mut user_ip_queries: HashMap<&'static str, PreparedStatement> = table_user_ip::initialize(scylla_session).await?;
-
+    let mut user_invite_queries: HashMap<&'static str, PreparedStatement> = table_user_invite::initialize(scylla_session).await?;
 
     let mut prepared_queries = HashMap::new();
 
@@ -74,6 +74,7 @@ pub async fn initialize(
         &mut user_queries,
         &mut user_email_queries,
         &mut user_ip_queries,
+        &mut user_invite_queries,
     ];
 
     for query_map in queries_to_merge {
