@@ -31,6 +31,27 @@ test('Get a valid invite code from the bin', async () => {
     assert(json.invite_code);
 });
 
+test('Log in as the root user', async () => {
+    const fetchCookie = makeFetchHappen(fetch)
+
+    let login_form_response = await fetchCookie(`${endpoint}/auth/login`);
+    let login_form_dom = new JSDOM(await login_form_response.text());
+    let login_csrf_token = login_form_dom.window.document.querySelector("input[name=\"csrf_token\"]").value;
+
+    const loginFormData = new FormData();
+    loginFormData.append('csrf_token', login_csrf_token);
+    loginFormData.append('email', "root@gooble.email");
+    loginFormData.append('password', "jimscrimble");
+
+    let login_final_form_response = await fetchCookie(`${endpoint}/auth/login`, {
+        method: 'POST',
+        body: loginFormData,
+    });
+    let homeText = (await login_final_form_response.text()).toLowerCase();
+    assert(homeText.includes("home"));
+    assert(!homeText.includes("error"));
+});
+
 test('Create, verify, and log in as a new user', async () => {
     const fetchCookie = makeFetchHappen(fetch)
 
@@ -118,6 +139,7 @@ test('Create, verify, and log in as a new user', async () => {
     });
     homeText = (await login_final_form_response.text()).toLowerCase();
     assert(homeText.includes("home"));
+    assert(!homeText.includes("error"));
 });
 
 test('Quickly create a new user', async () => {
