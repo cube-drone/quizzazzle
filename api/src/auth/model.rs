@@ -534,6 +534,22 @@ impl Services {
         Ok(())
     }
 
+    pub async fn resend_ip_verification_email(
+        &self,
+        user_id: &UserId,
+    ) -> Result<()> {
+        let user_maybe = self.table_user_get(user_id).await?;
+        match user_maybe {
+            None => {
+                Err(anyhow!("User does not exist!"))
+            },
+            Some(user) => {
+                self.send_ip_verification_email(&user_id.to_uuid(), &user.email).await?;
+                Ok(())
+            }
+        }
+    }
+
     pub async fn verify_email(
         &self,
         email_verification_token: &Uuid,

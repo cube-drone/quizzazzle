@@ -14,17 +14,26 @@
         </header>
         <div class="everything">
             <div class="gutters">
-                <div class="panel">
+                <form method="post" action="/auth/verify_ip" class="panel">
+                    {% if again %}
+                        <div class="info message">Ok, I've sent the email again, maybe that will help?</div>
+                    {% endif %}
+
                     {% if error %}
                         <div class="error">{{error}}</div>
                     {% endif %}
-                    <p>Uh, as far as I can tell you've never logged in from that location before - I've
+                    <p>You've never logged in from that location before.</p>
+                    <p> I've
                         sent you an email to make sure you are who you say you are. If you could click on
                         the link in that email that would be great. </p>
-                    <form method="get" action="/auth/verify_ip">
-                        <button name="submit" value="Ok">I did!</button>
-                    </form>
-                </div>
+                    <div class="button-horizontal-center">
+                        {% if again %}
+                        {% else %}
+                            <button title="Try again?" class="pushbutton info" name="submit" value="Try Again?">{{ icon_circle_question() | safe }}</button>
+                        {% endif %}
+                        <a title="Ok!" class="pushbutton green" name="submit" href="/auth/verify_ip">{{ icon_mailbox() | safe }}</a>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

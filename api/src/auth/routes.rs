@@ -803,6 +803,38 @@ async fn verify_ip_nobody() -> Redirect{
     Redirect::to("/auth/login")
 }
 
+#[post("/verify_ip")]
+async fn verify_ip_retry(user: model::UserSession, services: &State<Services>, ip: BestGuessIpAddress) -> Result<Redirect, Template> {
+
+    if services.is_production {
+        match services.rate_limit(&ip.to_string(), MAXIMUM_EMAIL_ATTEMPTS_PER_HOUR).await{
+            Ok(()) => {
+            },
+            Err(_e) => {
+                return Err(Template::render("verify_ip", context! {
+                    error: "Attempting too fast, please wait a bit and try again!",
+                }));
+            }
+        }
+    }
+
+    match services.resend_ip_verification_email(&user.user_id).await{
+        Ok(_) => {
+            // we sent the email, now we wait
+            return Err(Template::render("verify_ip", context! {
+                again: true,
+            }));
+        },
+        Err(e) => {
+            println!("Error sending ip verification email: {}", e);
+            return Err(Template::render("verify_ip", context! {
+                error: "Error sending verification email",
+            }));
+        }
+    }
+}
+
+
 
 #[get("/status")]
 async fn status_auth_user(_admin: model::AdminUserSession) -> &'static str {
@@ -906,6 +938,7 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
             verify_ip_template,
             verify_ip,
             verify_ip_nobody,
+            verify_ip_retry,
             email_error,
             ip_error,
             status_auth_user,

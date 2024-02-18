@@ -37,24 +37,29 @@ pub async fn initialize(
             );
             "#, &[], ).await?;
 
-    println!("set_user_invite");
+    scylla_session
+        .query(r#"
+            CREATE TABLE IF NOT EXISTS ks.user_invite_by_user (
+                user_id uuid,
+                invite_code uuid,
+                PRIMARY KEY (user_id, invite_code)
+            );
+            "#, &[], ).await?;
+
     prepared_queries.insert(
         "set_user_invite",
         scylla_session
             .prepare("INSERT INTO ks.user_invite (user_id, invite_code, created_at, is_used) VALUES (?, ?, ?, false);")
             .await?,
     );
-    /*
-        println!("does_invite_exist");
-        prepared_queries.insert(
-            "does_invite_exist",
-            scylla_session
-                .prepare("SELECT invite_code FROM ks.user_invite WHERE user_id = ? AND invite_code = ?;")
-                .await?,
-        );
-     */
 
-    println!("use_invite");
+    prepared_queries.insert(
+        "set_user_invite_by_user",
+        scylla_session
+            .prepare("INSERT INTO ks.user_invite_by_user (user_id, invite_code) VALUES (?, ?);")
+            .await?,
+    );
+
     prepared_queries.insert(
         "use_invite",
         scylla_session
@@ -74,7 +79,6 @@ impl Services {
     ) -> Result<()> {
         let created_at = Utc::now().timestamp_millis();
 
-        // user -> ip
         self.scylla
             .session
             .execute(
@@ -87,12 +91,23 @@ impl Services {
             )
             .await?;
 
+        self.scylla
+            .session
+            .execute(
+                &self
+                    .scylla
+                    .prepared_queries
+                    .get("set_user_invite_by_user")
+                    .expect("Query missing!"),
+                (user_id.to_uuid(), invite_code.to_uuid()),
+            )
+            .await?;
+
         Ok(())
     }
 
     pub async fn table_user_invite_use(
         &self,
-        user_id: &UserId,
         invite_code: &InviteCode,
     ) -> Result<()> {
         let used_at = Utc::now().timestamp_millis();
@@ -105,42 +120,13 @@ impl Services {
                     .prepared_queries
                     .get("use_user_invite")
                     .expect("Query missing!"),
-                (invite_code.to_uuid(),),
+                (used_at, invite_code.to_uuid(),),
             ).await?;
 
         Ok(())
     }
 
-    pub async fn table_user_invite_exists(
-        &self,
-        user_id: &UserId,
-        invite_code: &InviteCode,
-    ) -> Result<bool> {
-        let result = self.scylla
-            .session
-            .execute(
-                &self
-                    .scylla
-                    .prepared_queries
-                    .get("does_invite_exist")
-                    .expect("Query missing!"),
-                (user_id.to_uuid(), invite_code.to_uuid(),),
-            )
-            .await?;
-
-        if let Some(rows) = result.rows {
-            if rows.len() > 0 {
-                return Ok(true);
-            }
-            else{
-                return Ok(false);
-            }
-        }
-        else{
-            return Ok(false);
-        }
-    }
-
+    /*
     pub async fn table_user_invite_get(
         &self,
         user_id: &UserId,
@@ -164,6 +150,7 @@ impl Services {
 
         Ok(invite_codes)
     }
+     */
 
 
 }
