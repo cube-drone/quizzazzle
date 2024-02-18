@@ -104,11 +104,13 @@ impl InviteCode {
     }
 }
 
+/*
 #[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 pub struct Invite{
     pub invite_code: InviteCode,
     pub is_used: bool,
 }
+*/
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 pub struct UserId(Uuid);
@@ -215,11 +217,17 @@ const INVITE_CODE_REGENERATION_TIME_MS: i64 = 86400 * 1000 * 4; // 4 days
 
 impl table_user::UserDatabaseRaw {
     pub fn available_user_invites(&self) -> i32 {
+        if self.is_admin {
+            return 1000000;
+        }
+        if self.tags.contains(&"unlimited_invites".to_string()) {
+            return 1000000;
+        }
         let time_since_creation = Utc::now() - self.created_at;
-        let time_in_ms = time_since_creation.timestamp_millis();
+        let time_in_ms = time_since_creation.num_milliseconds() as f64;
         let invite_codes = time_in_ms as f64 / INVITE_CODE_REGENERATION_TIME_MS as f64;
         let n_invite_codes: i32 = invite_codes.ceil() as i32;
-        return self.invitecount - n_invite_codes;
+        n_invite_codes
     }
 }
 
@@ -250,12 +258,19 @@ impl Services {
         Ok(InviteCode::new())
     }
 
+    pub async fn create_invite_code(
+        &self,
+        &UserId,
+    ) -> Result<()> {
+
+    }
+
     pub async fn get_my_invites(
         &self,
-        _user_id: &UserId,
-    ) -> Result<Vec<Invite>> {
+        user_id: &UserId,
+    ) -> Result<Vec<table_user_invite::UserInviteDatabaseRaw>> {
         // for testing, generate a new invite code from the root user
-        Ok(vec![])
+        self.table_user_invite_get_user(&user_id).await
     }
 
     pub async fn get_number_available_invites(

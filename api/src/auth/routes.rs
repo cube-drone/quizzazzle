@@ -905,9 +905,32 @@ async fn auth_user(user: model::VerifiedUserSession) -> Json<model::VerifiedUser
 async fn list_invites(services: &State<Services>, user: model::VerifiedUserSession) -> Template {
     let invites = services.get_my_invites(&user.user_id).await.expect("should be able to list invites");
     let number_available_invites: i32 = services.get_number_available_invites(&user.user_id).await.expect("should be able to get number of available invites");
+    let can_create_invite = invites.len() < number_available_invites as usize;
 
-    Template::render("list_invites", context! { invites: invites, number_available_invites: number_available_invites })
+    Template::render("list_invites", context! {
+        invites: invites,
+        number_available_invites: number_available_invites,
+        can_create_invite: can_create_invite,
+    })
 }
+
+#[post("/user/invite")]
+async fn create_invite(services: &State<Services>, user: model::VerifiedUserSession) -> Template {
+    let invites = services.get_my_invites(&user.user_id).await.expect("should be able to list invites");
+    let number_available_invites: i32 = services.get_number_available_invites(&user.user_id).await.expect("should be able to get number of available invites");
+    let can_create_invite = invites.len() < number_available_invites as usize;
+
+    if(can_create_invite){
+        //services.create_invite(&user.user_id).await.expect("should be able to create invite");
+    }
+
+    Template::render("list_invites", context! {
+        invites: invites,
+        number_available_invites: number_available_invites,
+        can_create_invite: can_create_invite,
+    })
+}
+
 
 pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
     app.mount(
@@ -951,6 +974,7 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
             logout,
             auth_user,
             list_invites,
+            create_invite
         ],
     )
 }

@@ -4,20 +4,21 @@ use anyhow::Result;
 use scylla::Session;
 use scylla::macros::FromRow;
 use scylla::prepared_statement::PreparedStatement;
-use chrono::{Utc, Duration};
+use chrono::{Utc, DateTime};
 
 use rocket::serde::uuid::Uuid;
+use serde::Serialize;
 
 use crate::Services;
-use crate::auth::model::{UserId, InviteCode, Invite};
+use crate::auth::model::{UserId, InviteCode};
 
-#[derive(FromRow)]
+#[derive(FromRow, Serialize)]
 pub struct UserInviteDatabaseRaw {
+    pub invite_code: Uuid,
     pub user_id: Uuid,
-    pub invite_key: Uuid,
-    pub created_at: Duration,
     pub is_used: bool,
-    pub used_at: Option<Duration>,
+    pub created_at: DateTime<Utc>,
+    pub used_at: Option<DateTime<Utc>>,
 }
 
 pub async fn initialize(
@@ -32,6 +33,7 @@ pub async fn initialize(
                 invite_code uuid PRIMARY KEY,
                 user_id uuid,
                 is_used boolean,
+                used_by uuid,
                 created_at timestamp,
                 used_at timestamp
             );
@@ -63,7 +65,21 @@ pub async fn initialize(
     prepared_queries.insert(
         "use_invite",
         scylla_session
-            .prepare("UPDATE ks.user_invite SET is_used = true, used_at = ? WHERE invite_code = ?;")
+            .prepare("UPDATE ks.user_invite SET is_used = true, used_at = ?, used_by = ? WHERE invite_code = ?;")
+            .await?,
+    );
+
+    prepared_queries.insert(
+        "get_user_invite_codes",
+        scylla_session
+            .prepare("SELECT invite_code FROM ks.user_invite_by_user WHERE user_id = ?;")
+            .await?,
+    );
+
+    prepared_queries.insert(
+        "get_user_invite_code",
+        scylla_session
+            .prepare("SELECT invite_code, user_id, is_used, created_at, used_at FROM ks.user_invite WHERE invite_code = ?;")
             .await?,
     );
 
@@ -109,6 +125,7 @@ impl Services {
     pub async fn table_user_invite_use(
         &self,
         invite_code: &InviteCode,
+        used_by: &UserId,
     ) -> Result<()> {
         let used_at = Utc::now().timestamp_millis();
 
@@ -120,37 +137,54 @@ impl Services {
                     .prepared_queries
                     .get("use_user_invite")
                     .expect("Query missing!"),
-                (used_at, invite_code.to_uuid(),),
+                (used_at, used_by.to_uuid(), invite_code.to_uuid(),),
             ).await?;
 
         Ok(())
     }
 
-    /*
     pub async fn table_user_invite_get(
         &self,
-        user_id: &UserId,
-    ) -> Result<Vec<Invite>> {
-        let rows = self
-            .scylla
+        invite_code: &InviteCode,
+    ) -> Result<Option<UserInviteDatabaseRaw>> {
+        Ok(self.scylla
             .session
-            .query(
-                "SELECT invite_key, is_used FROM ks.user_invite WHERE user_id = ?;",
-                (user_id.to_uuid(),),
-            )
-            .await?;
-
-        let mut invite_codes = Vec::new();
-        for row in rows.rows_typed::<UserInviteDatabaseRaw>()? {
-            let row_data = row?;
-            let invite_code = InviteCode::from_uuid(row_data.invite_key);
-            let is_used = row_data.is_used;
-            invite_codes.push(Invite{invite_code, is_used});
-        }
-
-        Ok(invite_codes)
+            .execute(
+                &self
+                    .scylla
+                    .prepared_queries
+                    .get("get_user_invite_code")
+                    .expect("Query missing!"),
+                (invite_code.to_uuid(), ),
+            ).await?
+            .maybe_first_row_typed::<UserInviteDatabaseRaw>()?)
     }
-     */
 
+    pub async fn table_user_invite_get_user(
+        &self,
+        user_id: &UserId,
+    ) -> Result<Vec<UserInviteDatabaseRaw>> {
+        let mut invites: Vec<UserInviteDatabaseRaw> = Vec::new();
 
+        if let Some(rows) = self.scylla
+            .session
+            .execute(
+                &self
+                    .scylla
+                    .prepared_queries
+                    .get("get_user_invite_codes")
+                    .expect("Query missing!"),
+                (user_id.to_uuid(), ),
+            ).await?.rows {
+                for row in rows {
+                    let (invite_code,): (Uuid,) = row.into_typed::<(Uuid,)>()?;
+                    let invite = self.table_user_invite_get(&InviteCode::from_uuid(invite_code)).await?;
+                    if let Some(invite) = invite {
+                        invites.push(invite);
+                    }
+                }
+            }
+
+        Ok(invites)
+    }
 }

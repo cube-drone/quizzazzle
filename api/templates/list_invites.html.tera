@@ -14,7 +14,26 @@
         </header>
         <div class="bump"></div>
         <div class="everything">
-            <p> list some invites </p>
+            <div class="gutter">
+                {% for invite in invites %}
+                <div class="panel">
+
+                </div>
+                {% endfor %}
+                <div class="panel">
+                </div>
+                <div class="panel">
+                    <p> {{ number_available_invites }} available invites </p>
+                </div>
+                {% if can_create_invite %}
+                    <form method="post" action="/auth/invite" class="panel">
+                        <h2>Create Invite</h2>
+                        <div class="button-horizontal-center">
+                            <button title="Create Invite" class="pushbutton green" name="submit" value="Login">{{ icon_circle_check() | safe }}</button>
+                        </div>
+                    </form>
+                {% endif %}
+            </div>
         </div>
     </div>
 </div>

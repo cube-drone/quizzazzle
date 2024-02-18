@@ -5,7 +5,7 @@ use rocket::serde::uuid::Uuid;
 use scylla::Session;
 use scylla::prepared_statement::PreparedStatement;
 use scylla::macros::FromRow;
-use chrono::{Utc, Duration};
+use chrono::{Utc, DateTime};
 
 use crate::Services;
 use crate::auth::model::UserId;
@@ -30,7 +30,6 @@ pub async fn initialize(
                 tags set<text>,
                 opcount int,
                 logincount int,
-                invitecount int,
                 created_at timestamp,
                 updated_at timestamp);
         "#, &[], ).await?;
@@ -50,10 +49,9 @@ pub async fn initialize(
                     tags,
                     opcount,
                     logincount,
-                    invitecount,
                     created_at,
                     updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, {'tag_default'}, 0, 0, 0, ?, ?);"#
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, {'tag_default'}, 0, 0, ?, ?);"#
                 )
                 .await?,
         );
@@ -68,7 +66,7 @@ pub async fn initialize(
         prepared_queries.insert(
             "get_user",
             scylla_session
-                .prepare("SELECT id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, is_admin, tags, opcount, logincount, invitecount, created_at, updated_at FROM ks.user WHERE id = ?;")
+                .prepare("SELECT id, display_name, parent_id, hashed_password, email, thumbnail_url, is_verified, is_admin, tags, opcount, logincount, created_at, updated_at FROM ks.user WHERE id = ?;")
                 .await?,
         );
 
@@ -107,11 +105,10 @@ pub struct UserDatabaseRaw {
     pub is_verified: bool,
     pub is_admin: bool,
     pub tags: Vec<String>,
-    pub invitecount: i32,
     pub opcount: i32,
     pub logincount: i32,
-    pub created_at: Duration,
-    pub updated_at: Duration,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>
 }
 
 impl Services {
