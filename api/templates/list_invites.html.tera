@@ -10,7 +10,7 @@
 <div class="primary-card">
     <div class="content">
         <header id="primary-header">
-            <h1>invites</h1>
+            <h2><a href="/home">home</a> / invites</h2>
         </header>
         <div class="bump"></div>
         <div class="everything">
