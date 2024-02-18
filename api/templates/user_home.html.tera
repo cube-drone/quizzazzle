@@ -10,7 +10,7 @@
 <div class="primary-card">
     <div class="content">
         <header id="primary-header">
-            <h1>home</h1>
+            <h1><a href="/home">home</a> / invites</h1>
         </header>
         <div class="bump"></div>
         <div class="everything">
@@ -20,6 +20,7 @@
             <p> u did it, {{ display_name }}</p>
             <ul>
                 <li><a href="/auth/logout">Logout</a></li>
+                <li><a href="/auth/user/invite">Manage Invites</a></li>
             </ul>
         </div>
     </div>
