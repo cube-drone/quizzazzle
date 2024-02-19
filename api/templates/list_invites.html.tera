@@ -15,24 +15,27 @@
         <div class="bump"></div>
         <div class="everything">
             <div class="gutter">
-                {% for invite in invites %}
-                <div class="panel">
-
-                </div>
-                {% endfor %}
-                <div class="panel">
-                </div>
                 <div class="panel">
                     <p> {{ number_available_invites }} available invites </p>
                 </div>
                 {% if can_create_invite %}
-                    <form method="post" action="/auth/invite" class="panel">
+                    <form method="post" action="/auth/user/invite" class="panel">
                         <h2>Create Invite</h2>
                         <div class="button-horizontal-center">
                             <button title="Create Invite" class="pushbutton green" name="submit" value="Login">{{ icon_circle_check() | safe }}</button>
                         </div>
                     </form>
                 {% endif %}
+                {% for invite in invites %}
+                <div class="panel">
+                    <h3>{{invite.created_at}}</h3>
+                    <a class="pushbutton green" href="/auth/invite/{{invite.invite_code}}">Invite Code</a>
+
+                    <form method="delete" action="/auth/user/invite/{{invite.invite_code}}">
+                        <button title="Revoke" class="pushbutton red" name="revoke">{{ icon_circle_cross() | safe }}</button>
+                    </form>
+                </div>
+                {% endfor %}
             </div>
         </div>
     </div>

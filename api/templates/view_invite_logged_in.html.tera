@@ -1,0 +1,27 @@
+{% extends "base" %}
+
+{% block title %} invites{% endblock title %}
+
+{% block head %}
+    {{ super() }}
+{% endblock head %}
+
+{% block content %}
+<div class="primary-card">
+    <div class="content">
+        <header id="primary-header">
+            <h2><a href="/">home</a> / invite</h2>
+        </header>
+        <div class="bump"></div>
+        <div class="everything">
+            <div class="gutter">
+                <div class="panel">
+                    Send people this link!
+
+                    {{invite_code}}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

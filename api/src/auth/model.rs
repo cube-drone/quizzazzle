@@ -260,9 +260,26 @@ impl Services {
 
     pub async fn create_invite_code(
         &self,
-        &UserId,
+        user_id: &UserId,
     ) -> Result<()> {
-
+        // first we need to check if the user has any available invites
+        let user_maybe = self.table_user_get(&user_id).await?;
+        let invite_count = self.table_user_invite_count(&user_id).await?;
+        match user_maybe {
+            None => {
+                Err(anyhow!("User does not exist!"))
+            },
+            Some(user) => {
+                let available_invites = user.available_user_invites();
+                if available_invites < invite_count {
+                    return Err(anyhow!("No available invites!"));
+                }
+                else{
+                    self.table_user_invite_create(&user_id, &InviteCode::new()).await?;
+                    Ok(())
+                }
+            }
+        }
     }
 
     pub async fn get_my_invites(

@@ -77,6 +77,13 @@ pub async fn initialize(
     );
 
     prepared_queries.insert(
+        "get_user_invite_count",
+        scylla_session
+            .prepare("SELECT COUNT(*) FROM ks.user_invite_by_user WHERE user_id = ?;")
+            .await?,
+    );
+
+    prepared_queries.insert(
         "get_user_invite_code",
         scylla_session
             .prepare("SELECT invite_code, user_id, is_used, created_at, used_at FROM ks.user_invite WHERE invite_code = ?;")
@@ -143,6 +150,24 @@ impl Services {
         Ok(())
     }
 
+    pub async fn table_user_invite_count(
+        &self,
+        user_id: &UserId,
+    ) -> Result<i32> {
+        let result = self.scylla
+            .session
+            .execute(
+                &self
+                    .scylla
+                    .prepared_queries
+                    .get("get_user_invite_count")
+                    .expect("Query missing!"),
+                (user_id.to_uuid(), ),
+            ).await?;
+
+        Ok(result.rows.unwrap().len() as i32)
+    }
+
     pub async fn table_user_invite_get(
         &self,
         invite_code: &InviteCode,
@@ -158,6 +183,13 @@ impl Services {
                 (invite_code.to_uuid(), ),
             ).await?
             .maybe_first_row_typed::<UserInviteDatabaseRaw>()?)
+    }
+
+    pub async fn table_user_invite_exists(
+        &self,
+        invite_code: &InviteCode,
+    ) -> Result<bool> {
+        Ok(self.table_user_invite_get(invite_code).await?.is_some())
     }
 
     pub async fn table_user_invite_get_user(

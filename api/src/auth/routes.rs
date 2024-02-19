@@ -208,7 +208,8 @@ async fn invite_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: Be
     }
 
     if services.is_production {
-        match services.rate_limit(&ip.to_string(), MAXIMUM_INVITE_CODE_ATTEMPTS_PER_HOUR).await{
+        let ip_key = format!("{}-{}", "invite-attempt", ip.to_string());
+        match services.rate_limit(&ip_key, MAXIMUM_INVITE_CODE_ATTEMPTS_PER_HOUR).await{
             Ok(()) => {
             },
             Err(_e) => {
@@ -444,7 +445,10 @@ async fn password_reset_post(services: &State<Services>, cookies: &CookieJar<'_>
         };
 
         if services.is_production {
-            let rate_limit_factors: Vec<String> = vec![format!("{}-{}", "password-reset", ip.to_string()), password_reset.email.to_string()];
+            let rate_limit_factors: Vec<String> = vec![
+                format!("{}-{}", "password-reset", ip.to_string()),
+                format!("{}-{}", "email", password_reset.email.to_string()),
+            ];
             match services.rate_limits(&rate_limit_factors, MAXIMUM_PASSWORD_EMAILS_PER_HOUR).await{
                 Ok(()) => {
                 },
@@ -722,7 +726,8 @@ async fn verify_email_retry(user: model::UserSession, services: &State<Services>
     }
 
     if services.is_production {
-        match services.rate_limit(&ip.to_string(), MAXIMUM_EMAIL_ATTEMPTS_PER_HOUR).await{
+        let rate_limit_key = format!("{}-{}", "verify-email", ip.to_string());
+        match services.rate_limit(&rate_limit_key, MAXIMUM_EMAIL_ATTEMPTS_PER_HOUR).await{
             Ok(()) => {
             },
             Err(_e) => {
@@ -915,20 +920,83 @@ async fn list_invites(services: &State<Services>, user: model::VerifiedUserSessi
 }
 
 #[post("/user/invite")]
-async fn create_invite(services: &State<Services>, user: model::VerifiedUserSession) -> Template {
-    let invites = services.get_my_invites(&user.user_id).await.expect("should be able to list invites");
-    let number_available_invites: i32 = services.get_number_available_invites(&user.user_id).await.expect("should be able to get number of available invites");
-    let can_create_invite = invites.len() < number_available_invites as usize;
+async fn create_invite(services: &State<Services>, user: model::VerifiedUserSession) -> Result<Redirect, Template> {
+    let creation_result = services.create_invite_code(&user.user_id).await;
 
-    if(can_create_invite){
-        //services.create_invite(&user.user_id).await.expect("should be able to create invite");
+    match creation_result{
+        Ok(()) => {
+            Ok(Redirect::to("/auth/user/invite"))
+        },
+        Err(e) => {
+            println!("Error creating invite code: {}", e);
+            Err( Template::render("error", context! {error: "Error creating invite code"}))
+        }
+    }
+}
+
+#[get("/invite/<id>")]
+async fn view_invite_logged_in(
+    services: &State<Services>,
+    id: Uuid,
+    ip: BestGuessIpAddress,
+    _user: model::VerifiedUserSession
+) -> Result<Template, Status> {
+
+    if services.is_production {
+        let rate_limit_key = format!("{}-{}", "invite-test", ip.to_string());
+        match services.rate_limit(&rate_limit_key, MAXIMUM_EMAIL_ATTEMPTS_PER_HOUR).await{
+            Ok(()) => {
+            },
+            Err(_e) => {
+                return Err(Status::TooManyRequests);
+            }
+        }
     }
 
-    Template::render("list_invites", context! {
-        invites: invites,
-        number_available_invites: number_available_invites,
-        can_create_invite: can_create_invite,
-    })
+    match services.table_user_invite_exists(&model::InviteCode::from_uuid(id)).await{
+        Ok(true) => (),
+        Ok(false) => return Err(Status::NotFound),
+        Err(e) => {
+            println!("Error checking if invite exists: {}", e);
+            return Err(Status::InternalServerError);
+        }
+    }
+    Ok(Template::render("view_invite_logged_in", context! {
+        invite_code: id
+    }))
+}
+
+#[get("/invite/<id>", rank=2)]
+async fn view_invite(
+    services: &State<Services>,
+    id: Uuid,
+    ip: BestGuessIpAddress,
+) -> Result<Template, Status> {
+
+    // CREATE A FORM THAT POSTS THE ID TO /auth/invite
+
+    if services.is_production {
+        let rate_limit_key = format!("{}-{}", "invite-test", ip.to_string());
+        match services.rate_limit(&rate_limit_key, MAXIMUM_EMAIL_ATTEMPTS_PER_HOUR).await{
+            Ok(()) => {
+            },
+            Err(_e) => {
+                return Err(Status::TooManyRequests);
+            }
+        }
+    }
+
+    match services.table_user_invite_exists(&model::InviteCode::from_uuid(id)).await{
+        Ok(true) => (),
+        Ok(false) => return Err(Status::NotFound),
+        Err(e) => {
+            println!("Error checking if invite exists: {}", e);
+            return Err(Status::InternalServerError);
+        }
+    }
+    Ok(Template::render("view_invite", context! {
+        invite_code: id
+    }))
 }
 
 
@@ -974,7 +1042,9 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
             logout,
             auth_user,
             list_invites,
-            create_invite
+            create_invite,
+            view_invite_logged_in,
+            view_invite
         ],
     )
 }
