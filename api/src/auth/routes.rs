@@ -12,6 +12,8 @@ use rocket::request::{FromRequest, Request, Outcome};
 use rocket::http::Status;
 use rocket::serde::json::Json;
 
+use chrono::{Utc, Duration};
+
 use validator::Validate;
 
 use crate::Services;
@@ -908,16 +910,24 @@ async fn auth_user(user: model::VerifiedUserSession) -> Json<model::VerifiedUser
 
 #[get("/user/invite")]
 async fn list_invites(services: &State<Services>, user: model::VerifiedUserSession) -> Template {
-    let invites = services.get_my_invites(&user.user_id).await.expect("should be able to list invites");
+    let mut invites = services.get_my_invites(&user.user_id).await.expect("should be able to list invites");
+
+    invites.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
     let number_available_invites: i32 = services.get_number_available_invites(&user.user_id).await.expect("should be able to get number of available invites");
     let number_remaining_invites: i32 = number_available_invites - invites.len() as i32;
     let can_create_invite = number_remaining_invites > 0;
+
+    let most_recent_invite_created_at = invites.first().map(|invite| invite.created_at);
+    let most_recent_invite_created_at = most_recent_invite_created_at.unwrap_or_else(|| Utc::now());
+    let created_recently = most_recent_invite_created_at > Utc::now() - Duration::milliseconds(200);
 
     Template::render("list_invites", context! {
         invites: invites,
         number_available_invites: number_available_invites,
         number_remaining_invites: number_remaining_invites,
         can_create_invite: can_create_invite,
+        created_recently: created_recently,
     })
 }
 

@@ -19,7 +19,7 @@ use scylla::transport::session::Session;
 use scylla::SessionBuilder;
 use comrak::{markdown_to_html, Options};
 
-use tera::{Value, to_value, Error};
+use tera::{Value, to_value};
 
 
 mod fairings;

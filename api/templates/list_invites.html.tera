@@ -28,7 +28,7 @@
                         </form>
                     {% endif %}
                     {% for invite in invites %}
-                    <div class="panel invite-list {% if invite.is_used %}invite-list-used{% endif %}">
+                    <div class="panel invite-list {% if invite.is_used %}invite-list-used{% endif %} {% if loop.index == 1 and created_recently %}fade-in{% endif %}">
                         <h3>{{invite.created_at}}</h3>
 
                         {% if not invite.is_used %}
