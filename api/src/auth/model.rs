@@ -282,6 +282,27 @@ impl Services {
         }
     }
 
+    pub async fn delete_invite_code(
+        &self,
+        user_id: &UserId,
+        invite_code: &InviteCode,
+    ) -> Result<()> {
+        let invite = self.table_user_invite_get(&invite_code).await?;
+
+        match invite {
+            None => {
+                return Err(anyhow!("Invite code does not exist!"));
+            },
+            Some(invite) => {
+                if invite.user_id != user_id.to_uuid() {
+                    return Err(anyhow!("You can't delete that invite code! It's not yours!"));
+                }
+                self.table_user_invite_delete(&invite_code).await?;
+                Ok(())
+            }
+        }
+    }
+
     pub async fn get_my_invites(
         &self,
         user_id: &UserId,

@@ -910,11 +910,13 @@ async fn auth_user(user: model::VerifiedUserSession) -> Json<model::VerifiedUser
 async fn list_invites(services: &State<Services>, user: model::VerifiedUserSession) -> Template {
     let invites = services.get_my_invites(&user.user_id).await.expect("should be able to list invites");
     let number_available_invites: i32 = services.get_number_available_invites(&user.user_id).await.expect("should be able to get number of available invites");
-    let can_create_invite = invites.len() < number_available_invites as usize;
+    let number_remaining_invites: i32 = number_available_invites - invites.len() as i32;
+    let can_create_invite = number_remaining_invites > 0;
 
     Template::render("list_invites", context! {
         invites: invites,
         number_available_invites: number_available_invites,
+        number_remaining_invites: number_remaining_invites,
         can_create_invite: can_create_invite,
     })
 }
@@ -999,6 +1001,17 @@ async fn view_invite(
     }))
 }
 
+#[post("/invite/<id>/delete")]
+async fn delete_invite(services: &State<Services>, id: Uuid, user: model::VerifiedUserSession) -> Result<Redirect, Status> {
+    match services.delete_invite_code(&user.user_id, &model::InviteCode::from_uuid(id)).await{
+        Ok(()) => Ok(Redirect::to("/auth/user/invite")),
+        Err(e) => {
+            println!("Error deleting invite code: {}", e);
+            Err(Status::InternalServerError)
+        }
+    }
+}
+
 
 pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
     app.mount(
@@ -1044,7 +1057,8 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
             list_invites,
             create_invite,
             view_invite_logged_in,
-            view_invite
+            view_invite,
+            delete_invite
         ],
     )
 }

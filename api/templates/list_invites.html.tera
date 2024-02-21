@@ -15,27 +15,37 @@
         <div class="bump"></div>
         <div class="everything">
             <div class="gutter">
-                <div class="panel">
-                    <p> {{ number_available_invites }} available invites </p>
-                </div>
-                {% if can_create_invite %}
-                    <form method="post" action="/auth/user/invite" class="panel">
-                        <h2>Create Invite</h2>
-                        <div class="button-horizontal-center">
-                            <button title="Create Invite" class="pushbutton green" name="submit" value="Login">{{ icon_circle_check() | safe }}</button>
-                        </div>
-                    </form>
-                {% endif %}
-                {% for invite in invites %}
-                <div class="panel">
-                    <h3>{{invite.created_at}}</h3>
-                    <a class="pushbutton green" href="/auth/invite/{{invite.invite_code}}">Invite Code</a>
+                {% if number_available_invites > 0 %}
+                    <div class="panel">
+                        <p> {{number_remaining_invites}} / {{ number_available_invites }} available invites </p>
+                    </div>
+                    {% if can_create_invite %}
+                        <form method="post" action="/auth/user/invite" class="panel">
+                            <h2>Create Invite</h2>
+                            <div class="button-horizontal-center">
+                                <button title="Create Invite" class="pushbutton green" name="submit" value="Login">{{ icon_circle_check() | safe }}</button>
+                            </div>
+                        </form>
+                    {% endif %}
+                    {% for invite in invites %}
+                    <div class="panel invite-list {% if invite.is_used %}invite-list-used{% endif %}">
+                        <h3>{{invite.created_at}}</h3>
 
-                    <form method="delete" action="/auth/user/invite/{{invite.invite_code}}">
-                        <button title="Revoke" class="pushbutton red" name="revoke">{{ icon_circle_cross() | safe }}</button>
-                    </form>
-                </div>
-                {% endfor %}
+                        {% if not invite.is_used %}
+                        <form method="post" action="/auth/invite/{{invite.invite_code}}/delete" class="button-horizontal-center">
+                            <button title="Revoke" class="pushbutton red" name="revoke">{{ icon_circle_cross() | safe }} Delete </button>
+                            <a class="pushbutton green" href="/auth/invite/{{invite.invite_code}}">{{ icon_invitation() | safe }} Get Code</a>
+                        </form>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <!-- null state: what if they don't have any invites? -->
+                    <div class="panel">
+                        <p> You accrue invites over time, and you haven't got any yet! </p>
+                        <p> Check back here, tomorrow! </p>
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>

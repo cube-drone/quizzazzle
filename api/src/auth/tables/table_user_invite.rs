@@ -90,6 +90,13 @@ pub async fn initialize(
             .await?,
     );
 
+    prepared_queries.insert(
+        "delete_user_invite",
+        scylla_session
+            .prepare("DELETE FROM ks.user_invite WHERE invite_code = ?;")
+            .await?,
+    );
+
     Ok(prepared_queries)
 }
 
@@ -218,5 +225,23 @@ impl Services {
             }
 
         Ok(invites)
+    }
+
+    pub async fn table_user_invite_delete(
+        &self,
+        invite_code: &InviteCode,
+    ) -> Result<()> {
+        self.scylla
+            .session
+            .execute(
+                &self
+                    .scylla
+                    .prepared_queries
+                    .get("delete_user_invite")
+                    .expect("Query missing!"),
+                (invite_code.to_uuid(), ),
+            ).await?;
+
+        Ok(())
     }
 }

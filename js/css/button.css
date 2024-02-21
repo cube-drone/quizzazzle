@@ -11,14 +11,26 @@ button.pushbutton, a.pushbutton {
     box-shadow: 0 8px 0 0 rgba(0, 0, 0, 0.9);
     mix-blend-mode: multiply;
     transition: all 100ms ease 10ms;
+    color: white;
+    font-size: medium;
+    text-align: center;
+    text-decoration: none;
+    text-transform: uppercase;
+    font-weight: bold;
+    font-family: "Radio Canada", sans-serif;
+}
 
-    svg{
-        width: 30px;
-        height: 30px;
-    }
-    svg path{
-        fill: white;
-    }
+button.pushbutton svg, a.pushbutton svg{
+    width: 30px;
+    height: 30px;
+}
+
+button.pushbutton svg path, a.pushbutton svg path{
+    fill: white;
+}
+
+button.pushbutton *, a.pushbutton *{
+    vertical-align: middle;
 }
 
 /*
