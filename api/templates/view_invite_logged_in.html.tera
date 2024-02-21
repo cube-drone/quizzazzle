@@ -16,9 +16,17 @@
         <div class="everything">
             <div class="gutter">
                 <div class="panel">
-                    Send people this link!
+                    <h2>
+                    Send people this link:
+                    </h2>
 
-                    {{invite_code}}
+                    <p><small>I mean, people who you want to join, obviously, not just any people.</small></p>
+
+                    <p>
+                        <a href="{{ public_address()}}/auth/invite/{{invite_code}}">
+                        {{ public_address() }}/auth/invite/{{invite_code}}
+                        </a>
+                    </p>
                 </div>
             </div>
         </div>

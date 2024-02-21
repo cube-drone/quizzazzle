@@ -19,6 +19,8 @@ use scylla::transport::session::Session;
 use scylla::SessionBuilder;
 use comrak::{markdown_to_html, Options};
 
+use tera::{Value, to_value, Error};
+
 
 mod fairings;
 mod error; // provides the no_shit! macro
@@ -186,12 +188,29 @@ async fn rocket() -> Rocket<Build> {
 	// Launch App
     let mut app = rocket::build();
 
+    let template_config = services.config.clone();
+    let template_config_again = services.config.clone();
     app = app.manage(services);
     app = app.attach(crate::fairings::timing::RequestTimer)
              .attach(crate::fairings::poweredby::PoweredBy)
-             .attach(Template::custom(|engines|{
+             .attach(Template::custom(move |engines|{
                 // register a few important variables like the site name
-                // TODO
+
+                let template_config = template_config.clone();
+                engines.tera.register_function("config_value", move |args: &HashMap<String, Value>| {
+                    let key = args.get("key").unwrap().as_str().unwrap();
+                    let config = template_config.read().unwrap();
+                    let value = config.public_config.get(key).unwrap_or(&"ERROR KEY NOT FOUND".to_string()).to_string();
+                    Ok(to_value(value)?)
+                });
+
+                let template_config_again = template_config_again.clone();
+                engines.tera.register_function("public_address", move |_args: &HashMap<String, Value>| {
+                    let config = template_config_again.read().unwrap();
+                    let value = config.public_config.get("ROCKET_PUBLIC_ADDRESS").unwrap_or(&"http://localhost:3333".to_string()).to_string();
+                    Ok(to_value(value)?)
+                });
+
                 // register the icons
                 engines.tera.register_function("sbubby", icons::sbubby);
                 engines.tera.register_function("icon_home", icons::icon_home);
