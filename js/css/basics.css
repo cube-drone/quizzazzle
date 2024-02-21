@@ -73,6 +73,7 @@ svg {
     box-sizing: border-box;
     margin: 65px auto 0 auto;
     padding-top: 0px;
+    overflow-y: auto;
 }
 
 .primary-card .content .everything-feed{
