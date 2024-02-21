@@ -17,13 +17,13 @@
             <div class="gutter">
                 {% if number_available_invites > 0 %}
                     <div class="panel">
+                        <p><em>Invites are the only way to create new user accounts!</em></p>
                         <p> {{number_remaining_invites}} / {{ number_available_invites }} available invites </p>
                     </div>
                     {% if can_create_invite %}
                         <form method="post" action="/auth/user/invite" class="panel">
-                            <h2>Create Invite</h2>
                             <div class="button-horizontal-center">
-                                <button title="Create Invite" class="pushbutton green" name="submit" value="Login">{{ icon_circle_check() | safe }}</button>
+                                <button title="Create Invite" class="pushbutton green" name="submit" value="Login">{{ icon_circle_plus() | safe }} Create Invite</button>
                             </div>
                         </form>
                     {% endif %}

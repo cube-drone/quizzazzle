@@ -86,6 +86,26 @@ pub fn icon_circle_check(_args: &HashMap<String, Value>) -> Result<Value, Error>
     </svg>"#.to_string())?)
 }
 
+pub fn icon_circle_plus(_args: &HashMap<String, Value>) -> Result<Value, Error> {
+    Ok(to_value(r#"
+    <svg viewBox="0 0 64 64" class="svg-icon icon-circle-check">
+        <path d="M42.2,29.7C42.2,29.7,42.2,29.7,42.2,29.7l-8,0l0-7.9c0-1.2-1-2.2-2.3-2.2c0,0,0,0,0,0c-1.2,0-2.2,1-2.2,2.3l0,7.9l-7.9,0
+            c-1.2,0-2.2,1-2.2,2.3c0,1.2,1,2.2,2.3,2.2c0,0,0,0,0,0l7.9,0l0,7.9c0,1.2,1,2.2,2.3,2.2c0,0,0,0,0,0c1.2,0,2.2-1,2.2-2.3l0-7.9
+            l7.9,0c1.2,0,2.2-1,2.2-2.3C44.4,30.7,43.4,29.7,42.2,29.7z"/>
+        <path class="opt" d="M32,1.8C15.3,1.8,1.8,15.3,1.8,32c0,16.7,13.6,30.3,30.3,30.3c16.7,0,30.3-13.6,30.3-30.3C62.3,15.3,48.7,1.8,32,1.8z
+            M32,57.8C17.8,57.8,6.3,46.2,6.3,32S17.8,6.3,32,6.3S57.8,17.8,57.8,32S46.2,57.8,32,57.8z"/>
+    </svg>"#.to_string())?)
+}
+
+pub fn icon_circle_minus(_args: &HashMap<String, Value>) -> Result<Value, Error> {
+    Ok(to_value(r#"
+        <path d="M42.2,29.7C42.2,29.7,42.2,29.7,42.2,29.7l-20.4,0c-1.2,0-2.2,1-2.2,2.3c0,1.2,1,2.2,2.3,2.2c0,0,0,0,0,0l20.4,0
+            c1.2,0,2.2-1,2.2-2.3C44.4,30.7,43.4,29.7,42.2,29.7z"/>
+        <path class="opt" d="M32,1.8C15.3,1.8,1.8,15.3,1.8,32c0,16.7,13.6,30.3,30.3,30.3c16.7,0,30.3-13.6,30.3-30.3C62.3,15.3,48.7,1.8,32,1.8z
+            M32,57.8C17.8,57.8,6.3,46.2,6.3,32C6.3,17.8,17.8,6.3,32,6.3c14.2,0,25.8,11.6,25.8,25.8C57.8,46.2,46.2,57.8,32,57.8z"/>
+    </svg>"#.to_string())?)
+}
+
 pub fn icon_circle_chevron_left(_args: &HashMap<String, Value>) -> Result<Value, Error> {
     Ok(to_value(r#"
     <svg viewBox="0 0 64 64" class="svg-icon icon-circle-chevron-left">

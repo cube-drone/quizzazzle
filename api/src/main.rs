@@ -221,6 +221,8 @@ async fn rocket() -> Rocket<Build> {
                 engines.tera.register_function("icon_search", icons::icon_search);
                 engines.tera.register_function("icon_circle_cross", icons::icon_circle_cross);
                 engines.tera.register_function("icon_circle_check", icons::icon_circle_check);
+                engines.tera.register_function("icon_circle_plus", icons::icon_circle_plus);
+                engines.tera.register_function("icon_circle_minus", icons::icon_circle_minus);
                 engines.tera.register_function("icon_circle_chevron_left", icons::icon_circle_chevron_left);
                 engines.tera.register_function("icon_circle_chevron_up", icons::icon_circle_chevron_up);
                 engines.tera.register_function("icon_circle_chevron_right", icons::icon_circle_chevron_right);
