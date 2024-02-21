@@ -152,6 +152,7 @@ dependencies = [
  "chrono",
  "comrak",
  "murmur3",
+ "qrcode",
  "rand",
  "redis",
  "rocket",
@@ -839,6 +840,12 @@ name = "clap_lex"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "702fc72eb24e5a1e48ce58027a675bc24edd52096d5397d4aea7c6dd9eca0bd1"
+
+[[package]]
+name = "color_quant"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
 
 [[package]]
 name = "colorchoice"
@@ -1647,6 +1654,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "image"
+version = "0.24.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "034bbe799d1909622a74d1193aa50147769440040ff36cb2baa947609b0a4e23"
+dependencies = [
+ "bytemuck",
+ "byteorder",
+ "color_quant",
+ "num-traits",
+]
+
+[[package]]
 name = "indexmap"
 version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2358,6 +2377,15 @@ dependencies = [
  "syn 2.0.38",
  "version_check",
  "yansi",
+]
+
+[[package]]
+name = "qrcode"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "166f136dfdb199f98186f3649cf7a0536534a61417a1a30221b492b4fb60ce3f"
+dependencies = [
+ "image",
 ]
 
 [[package]]

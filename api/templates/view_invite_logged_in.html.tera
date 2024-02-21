@@ -15,18 +15,16 @@
         <div class="bump"></div>
         <div class="everything">
             <div class="gutter">
-                <div class="panel">
-                    <h2>
-                    Send people this link:
-                    </h2>
-
-                    <p><small>I mean, people who you want to join, obviously, not just any people.</small></p>
-
+                <div class="qrcode-frame">
+                    <img class="qrcode qrcode-invite" src="/qr/invite/{{invite_code}}" />
+                </div>
+                <div class="panel invite-code">
                     <p>
                         <a href="{{ public_address()}}/auth/invite/{{invite_code}}">
                         {{ public_address() }}/auth/invite/{{invite_code}}
                         </a>
                     </p>
+
                 </div>
             </div>
         </div>

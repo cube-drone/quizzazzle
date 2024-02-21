@@ -1,0 +1,13 @@
+
+.qrcode-frame{
+    /* this fills most of the page with a big QR code */
+    width: 100%;
+    height: 350px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.qrcode{
+    mix-blend-mode: multiply;
+}

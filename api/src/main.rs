@@ -32,6 +32,7 @@ mod basic;
 mod home;
 mod auth;
 mod feed;
+mod qr;
 
 /*
     Services gets passed around willy nilly between threads so it needs to be cram-packed fulla arcs like a season of Naruto
@@ -251,6 +252,9 @@ async fn rocket() -> Rocket<Build> {
     app = auth::routes::mount_routes(app);
     // config: configuration
     app = config::routes::mount_routes(app);
+
+    // qr: that qr code thing
+    app = qr::mount_routes(app);
 
     // feed: configuration
     app = feed::routes::mount_routes(app);

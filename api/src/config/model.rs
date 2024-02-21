@@ -98,6 +98,10 @@ pub async fn update_config(services: & Services) -> Result<()> {
 }
 
 impl Services {
+    pub fn config_get_key(&self, key: &str, default: &String) -> String{
+        let config = self.config.read().unwrap();
+        config.public_config.get(key).unwrap_or(default).to_string()
+    }
     pub fn config_get_public_address(&self) -> String{
         let config = self.config.read().unwrap();
         config.public_config.get("ROCKET_PUBLIC_ADDRESS").unwrap_or(&"http://localhost:3333".to_string()).to_string()
