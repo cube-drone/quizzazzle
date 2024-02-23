@@ -24,8 +24,8 @@ services:
       ROCKET_PORT: 3333
       ROCKET_PUBLIC_ADDRESS: http://localhost:3333
       USE_INSECURE_HASHES: "true"
-      CACHE_REDIS_URLS: redis://:hamscramble@cache-redis-1:6888,redis://:hamscramble@cache-redis-2:6889,redis://:hamscramble@cache-redis-3:6890
-      APPLICATION_REDIS_URLS: redis://:hamscramble@application-redis-1:6999,redis://:hamscramble@application-redis-2:6998,redis://:hamscramble@application-redis-3:6997
+      CACHE_REDIS_URLS: redis://:hamscramble@cache-redis-1:6888
+      APPLICATION_REDIS_URLS: redis://:hamscramble@application-redis-1:6999
       ROCKET_SECRET_KEY: grPMXJszWoqdlGv1M7Y+9f0FsPhxsycGVjuQ6mfobIk=  # openssl rand -base64 32
       SCYLLA_URL: some-scylla:9042
       RUST_BACKTRACE: 1
@@ -52,51 +52,13 @@ services:
     command: --smp 2 --seeds=some-scylla
   cache-redis-1:
     image: redis/redis-stack-server
-    container_name: cache-redis-1
-    hostname: cache-redis-1
+    container_name: cache-redis
+    hostname: cache-redis
     environment:
-      - REDIS_ARGS= --requirepass hamscramble --appendonly no --save "" --maxmemory 2140000000 --maxmemory-policy allkeys-lfu --port 6888 --cluster-enabled yes --cluster-announce-hostname cache-redis-1
-  cache-redis-2:
-    image: redis/redis-stack-server
-    container_name: cache-redis-2
-    hostname: cache-redis-2
-    environment:
-      - REDIS_ARGS= --requirepass hamscramble --appendonly no --save "" --maxmemory 2140000000 --maxmemory-policy allkeys-lfu --port 6889 --cluster-enabled yes --cluster-announce-hostname cache-redis-2
-  cache-redis-3:
-    image: redis/redis-stack-server
-    container_name: cache-redis-3
-    hostname: cache-redis-3
-    environment:
-      - REDIS_ARGS= --requirepass hamscramble --appendonly no --save "" --maxmemory 2140000000 --maxmemory-policy allkeys-lfu --port 6890 --cluster-enabled yes --cluster-announce-hostname cache-redis-3
-  redis-cluster:
-    image: redis/redis-stack-server
-    command: redis-cli --cluster create cache-redis-1:6888 cache-redis-2:6889 cache-redis-3:6890 --cluster-replicas 0 -a hamscramble --cluster-yes
-    depends_on:
-      - cache-redis-1
-      - cache-redis-2
-      - cache-redis-3
+      - REDIS_ARGS= --requirepass hamscramble --appendonly no --save "" --maxmemory 2140000000 --maxmemory-policy allkeys-lfu --port 6888
   application-redis-1:
     image: redis/redis-stack-server
-    container_name: application-redis-1
-    hostname: application-redis-1
+    container_name: application-redis
+    hostname: application-redis
     environment:
-      - REDIS_ARGS= --requirepass hamscramble --appendonly no --save "" --maxmemory 2140000000 --maxmemory-policy noeviction --port 6999 --cluster-enabled yes --cluster-announce-hostname application-redis-1
-  application-redis-2:
-    image: redis/redis-stack-server
-    container_name: application-redis-2
-    hostname: application-redis-2
-    environment:
-      - REDIS_ARGS= --requirepass hamscramble --appendonly no --save "" --maxmemory 2140000000 --maxmemory-policy noeviction --port 6998 --cluster-enabled yes --cluster-announce-hostname application-redis-2
-  application-redis-3:
-    image: redis/redis-stack-server
-    container_name: application-redis-3
-    hostname: application-redis-3
-    environment:
-      - REDIS_ARGS= --requirepass hamscramble --appendonly no --save "" --maxmemory 2140000000 --maxmemory-policy noeviction --port 6997 --cluster-enabled yes --cluster-announce-hostname application-redis-3
-  app-redis-cluster:
-    image: redis/redis-stack-server
-    command: redis-cli --cluster create application-redis-1:6999 application-redis-2:6998 application-redis-3:6997 --cluster-replicas 0 -a hamscramble --cluster-yes
-    depends_on:
-      - application-redis-1
-      - application-redis-2
-      - application-redis-3
+      - REDIS_ARGS= --requirepass hamscramble --appendonly no --save "" --maxmemory 2140000000 --maxmemory-policy noeviction --port 6999
