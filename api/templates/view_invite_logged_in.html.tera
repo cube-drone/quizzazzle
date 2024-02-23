@@ -15,17 +15,22 @@
         <div class="bump"></div>
         <div class="everything">
             <div class="gutter">
-                <div class="qrcode-frame">
-                    <img class="qrcode qrcode-invite" src="/qr/invite/{{invite_code}}" />
-                </div>
-                <div class="panel invite-code">
-                    <p>
-                        <a href="{{ public_address()}}/auth/invite/{{invite_code}}">
-                        {{ public_address() }}/auth/invite/{{invite_code}}
-                        </a>
-                    </p>
-
-                </div>
+                    <div class="qrcode-frame">
+                        <img class="qrcode qrcode-invite {% if not invite_exists %}qrcode-invalid{% endif %}" src="/qr/invite/{{invite_code}}"/>
+                    </div>
+                    <div class="panel invite-code {% if not invite_exists %}invite-code-invalid{% endif %}">
+                        {% if invite_exists %}
+                            <p>
+                                <a href="{{ public_address()}}/auth/invite/{{invite_code}}">
+                                {{ public_address() }}/auth/invite/{{invite_code}}
+                                </a>
+                            </p>
+                        {% else %}
+                            <p>
+                                This code is either used (and thus: expired) or invalid!
+                            </p>
+                        {% endif %}
+                    </div>
             </div>
         </div>
     </div>

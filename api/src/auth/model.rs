@@ -236,18 +236,45 @@ impl Services {
         &self,
         invite_code: &InviteCode,
     ) -> Result<UserId> {
-        if invite_code.to_uuid() == ROOT_USER_ID.to_uuid(){
-            return Err(anyhow!("Invalid invite code"));
+        let invite_maybe = self.table_user_invite_get(&invite_code).await?;
+        match invite_maybe {
+            None => {
+                return Err(anyhow!("Invite code does not exist!"));
+            },
+            Some(invite) => {
+                if invite.is_used {
+                    return Err(anyhow!("Invite code has already been used!"));
+                }
+                Ok(UserId::from_uuid(invite.user_id))
+            }
         }
-        Ok(ROOT_USER_ID)
+    }
+
+    pub async fn is_user_invite_valid(
+        &self,
+        invite_code: &InviteCode,
+    ) -> Result<bool> {
+        let invite_maybe = self.table_user_invite_get(&invite_code).await?;
+        match invite_maybe {
+            None => {
+                return Ok(false);
+            },
+            Some(invite) => {
+                if invite.is_used {
+                    return Ok(false);
+                }
+                Ok(true)
+            }
+        }
     }
 
     pub async fn exhaust_invite_code(
         &self,
-        _invite_code: &InviteCode,
+        invite_code: &InviteCode,
+        user_id: &UserId
     ) -> Result<()> {
-        // the invite code can only be used once
-        // so we'll just delete it
+        self.table_user_invite_use(&invite_code, user_id).await?;
+
         Ok(())
     }
 

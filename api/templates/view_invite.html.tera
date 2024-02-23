@@ -15,16 +15,26 @@
         <div class="bump"></div>
         <div class="everything">
             <div class="gutter">
+                {% if invite_exists %}
                 <div class="panel">
                     You've been invited to groovelet!
                 </div>
-                <form method="post" class="panel">
+                <form method="post" action="/auth/invite" class="panel">
                     <label for="invite_code">Invite Code</label>
                     <input name="invite_code" type="text" value="{{invite_code}}" />
                     <div class="button-horizontal-center">
                         <button title="Use Invite Code!" class="pushbutton green" name="submit" value="Login">{{ icon_circle_check() | safe }}</button>
                     </div>
                 </form>
+                {% else %}
+                <div class="panel">
+                    <p>You've been invited to groovelet, but the invite code you've recieved has already been used <small>or is otherwise invalid</small>!</p>
+
+                    <p class="strikethrough"><small>{{invite_code}}</small></p>
+
+                </div>
+
+                {% endif %}
 
             </div>
         </div>

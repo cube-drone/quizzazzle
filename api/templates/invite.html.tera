@@ -15,7 +15,7 @@
         <div class="bump"></div>
         <div class="everything">
             <div class="gutters">
-                <form method="post" class="panel">
+                <form method="post" action="/auth/invite" class="panel">
                     {% if error %}
                         <div class="error message">{{error}}</div>
                     {% endif %}

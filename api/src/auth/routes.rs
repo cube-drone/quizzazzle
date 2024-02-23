@@ -338,8 +338,9 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: 
       };
 
     // okay, now, let's try to create the user
+    let user_id = model::UserId::new();
     if let Ok(parent_uuid) = services.get_invite_code_source(&model::InviteCode::from_uuid(register.invite_code)).await{
-        match services.exhaust_invite_code(&model::InviteCode::from_uuid(register.invite_code)).await{
+        match services.exhaust_invite_code(&model::InviteCode::from_uuid(register.invite_code), &user_id).await{
             Ok(_) => (),
             Err(e) => {
                 println!("Error exhausting invite code: {}", e);
@@ -355,7 +356,7 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: 
         }
 
         let user_create = model::UserCreate{
-            user_id: model::UserId::new(),
+            user_id: user_id,
             display_name: register.display_name,
             email: register.email,
             parent_id: parent_uuid,
@@ -965,15 +966,19 @@ async fn view_invite_logged_in(
         }
     }
 
-    match services.table_user_invite_exists(&model::InviteCode::from_uuid(id)).await{
+    match services.is_user_invite_valid(&model::InviteCode::from_uuid(id)).await{
         Ok(true) => (),
-        Ok(false) => return Err(Status::NotFound),
+        Ok(false) => return Ok(Template::render("view_invite_logged_in", context! {
+            invite_exists: false,
+            invite_code: id
+        })),
         Err(e) => {
             println!("Error checking if invite exists: {}", e);
             return Err(Status::InternalServerError);
         }
     }
     Ok(Template::render("view_invite_logged_in", context! {
+        invite_exists: true,
         invite_code: id
     }))
 }
@@ -998,15 +1003,19 @@ async fn view_invite(
         }
     }
 
-    match services.table_user_invite_exists(&model::InviteCode::from_uuid(id)).await{
+    match services.is_user_invite_valid(&model::InviteCode::from_uuid(id)).await{
         Ok(true) => (),
-        Ok(false) => return Err(Status::NotFound),
+        Ok(false) => return Ok(Template::render("view_invite", context! {
+            invite_exists: false,
+            invite_code: id
+        })),
         Err(e) => {
             println!("Error checking if invite exists: {}", e);
             return Err(Status::InternalServerError);
         }
     }
     Ok(Template::render("view_invite", context! {
+        invite_exists: true,
         invite_code: id
     }))
 }

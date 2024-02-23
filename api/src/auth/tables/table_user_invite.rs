@@ -149,7 +149,7 @@ impl Services {
                 &self
                     .scylla
                     .prepared_queries
-                    .get("use_user_invite")
+                    .get("use_invite")
                     .expect("Query missing!"),
                 (used_at, used_by.to_uuid(), invite_code.to_uuid(),),
             ).await?;
@@ -190,13 +190,6 @@ impl Services {
                 (invite_code.to_uuid(), ),
             ).await?
             .maybe_first_row_typed::<UserInviteDatabaseRaw>()?)
-    }
-
-    pub async fn table_user_invite_exists(
-        &self,
-        invite_code: &InviteCode,
-    ) -> Result<bool> {
-        Ok(self.table_user_invite_get(invite_code).await?.is_some())
     }
 
     pub async fn table_user_invite_get_user(
