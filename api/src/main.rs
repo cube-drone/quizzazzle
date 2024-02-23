@@ -12,7 +12,7 @@ use rocket::{Build, Rocket};
 use rocket::fs::FileServer;
 use rocket_dyn_templates::Template;
 use rocket::tokio;
-use redis::cluster::ClusterClient;
+use redis::Client;
 use redis::AsyncCommands;
 use scylla::prepared_statement::PreparedStatement;
 use scylla::transport::session::Session;
@@ -52,20 +52,17 @@ pub struct ConfigService {
 
 pub struct Services {
     pub is_production: bool,
-    pub cache_redis: Arc<ClusterClient>,
-    pub application_redis: Arc<ClusterClient>,
+    pub cache_redis: Arc<Client>,
+    pub application_redis: Arc<Client>,
     pub scylla: ScyllaService,
     pub config: Arc<RwLock<ConfigService>>,
     pub email: Arc<email::EmailProvider>,
     pub static_markdown: Arc<HashMap<&'static str, String>>
 }
 
-async fn setup_redis_cluster(redis_urls: &String) -> Arc<ClusterClient> {
-    // Environment Variables
-    let redis_nodes: Vec<&str> = redis_urls.split(",").collect();
-
+async fn setup_redis(redis_url: &String) -> Arc<Client> {
     // Redis Setup
-    let client = ClusterClient::new(redis_nodes).expect("Could not create Redis client");
+    let client = Client::open(redis_url.clone()).expect("Could not create Redis client");
     let mut connection = client
         .get_async_connection()
         .await
@@ -110,9 +107,9 @@ fn static_markdownify(file_name: &str) -> String {
 async fn rocket() -> Rocket<Build> {
     // Environment Variables
     let is_production: bool = env::var("GROOVELET_PRODUCTION").unwrap_or_else(|_| "false".to_string()) == "true";
-    let cache_redis_urls = env::var("CACHE_REDIS_URLS").unwrap_or_else(|_| "".to_string());
-    let application_redis_urls =
-        env::var("APPLICATION_REDIS_URLS").unwrap_or_else(|_| "".to_string());
+    let cache_redis_url = env::var("CACHE_REDIS_URL").unwrap_or_else(|_| "".to_string());
+    let application_redis_url =
+        env::var("APPLICATION_REDIS_URL").unwrap_or_else(|_| "".to_string());
 
     // Scylla Setup
     let scylla_url = env::var("SCYLLA_URL").unwrap_or_else(|_| "".to_string());
@@ -156,8 +153,8 @@ async fn rocket() -> Rocket<Build> {
     // Service Setup
     let services = Services {
         is_production: is_production,
-        cache_redis: setup_redis_cluster(&cache_redis_urls).await,
-        application_redis: setup_redis_cluster(&application_redis_urls).await,
+        cache_redis: setup_redis(&cache_redis_url).await,
+        application_redis: setup_redis(&application_redis_url).await,
         scylla: ScyllaService {
             session: scylla_connection,
             prepared_queries: Arc::new(prepared_queries),

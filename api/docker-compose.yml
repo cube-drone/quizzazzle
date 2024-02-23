@@ -24,8 +24,8 @@ services:
       ROCKET_PORT: 3333
       ROCKET_PUBLIC_ADDRESS: http://localhost:3333
       USE_INSECURE_HASHES: "true"
-      CACHE_REDIS_URLS: redis://:hamscramble@cache-redis-1:6888
-      APPLICATION_REDIS_URLS: redis://:hamscramble@application-redis-1:6999
+      CACHE_REDIS_URL: redis://:hamscramble@cache-redis-1:6888
+      APPLICATION_REDIS_URL: redis://:hamscramble@application-redis-1:6999
       ROCKET_SECRET_KEY: grPMXJszWoqdlGv1M7Y+9f0FsPhxsycGVjuQ6mfobIk=  # openssl rand -base64 32
       SCYLLA_URL: some-scylla:9042
       RUST_BACKTRACE: 1
