@@ -11,3 +11,7 @@
 .qrcode{
     mix-blend-mode: multiply;
 }
+
+.qrcode-invalid{
+    opacity: 0.1;
+}

@@ -19,6 +19,10 @@ svg {
     min-width: 20px;
 }
 
+.strikethrough {
+    text-decoration: line-through;
+}
+
 /* the primary card is the central frame, the card that sits around all of the content */
 .primary-card {
     width: 100px;
