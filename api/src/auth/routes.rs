@@ -184,7 +184,7 @@ async fn test_get_last_email(services: &State<Services>, email: &str) -> Result<
 
     let mut hashmap: HashMap<String, String> = HashMap::new();
     hashmap.insert("email".to_string(),
-        services.test_get_last_email(&email).await.expect("should be able to get last email").to_string()
+        services.test_get_last_email(&email).await.unwrap_or_default()
     );
 
     Ok(Json(hashmap))

@@ -24,6 +24,7 @@ murmur3 = "=0.5.2"
 qrcode = "=0.13.0"
 
 redis = { version = "0.23.3", features=["r2d2", "cluster-async", "tokio-comp", "connection-manager", "keep-alive", "ahash"]}
+moka = { version = "0.12.5", features = ["future"] }
 # r2d2 - enables r2d2 connection pool support
 # cluster-async / tokio-comp - async support
 # connection-manager - enables automatic reconnection

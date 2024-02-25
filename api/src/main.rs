@@ -19,6 +19,8 @@ use scylla::transport::session::Session;
 use scylla::SessionBuilder;
 use comrak::{markdown_to_html, Options};
 
+use moka::future::Cache;
+
 use tera::{Value, to_value};
 
 
@@ -57,7 +59,8 @@ pub struct Services {
     pub scylla: ScyllaService,
     pub config: Arc<RwLock<ConfigService>>,
     pub email: Arc<email::EmailProvider>,
-    pub static_markdown: Arc<HashMap<&'static str, String>>
+    pub static_markdown: Arc<HashMap<&'static str, String>>,
+    pub local_cache: Cache<String, String>,
 }
 
 async fn setup_redis(redis_url: &String) -> Arc<Client> {
@@ -116,6 +119,27 @@ async fn rocket() -> Rocket<Build> {
     let scylla_connection = setup_scylla_cluster(&scylla_url).await;
     let mut prepared_queries: HashMap<&'static str, PreparedStatement> = HashMap::new();
 
+    // TECHNICALLY this is MibiBytes, not MegaBytes, but in my defense: I don't care
+    let cache_megabytes_string = env::var("GROOVELET_CACHE_MEGABYTES").unwrap_or_else(|_| "32".to_string());
+    let cache_megabytes = cache_megabytes_string.parse::<u64>().expect("Could not parse cache size properly into u64");
+    let cache_bytes = cache_megabytes * 1024 * 1024;
+
+    // This cache will hold up to cache_megabytes MiB of values.
+    let cache: Cache<String, String> = Cache::builder()
+        // A weigher closure takes &K and &V and returns a u32 representing the
+        // relative size of the entry. Here, we use the byte length of the value
+        // String as the size.
+        .weigher(|_key, value: &String| -> u32 {
+            value.len().try_into().unwrap_or(u32::MAX)
+        })
+        .max_capacity(cache_bytes)
+        .build();
+
+    cache.insert("hello".to_string(), "world".to_string()).await;
+
+    let hi = cache.get("hello").await.expect("Moka cache is broken");
+    assert_eq!(hi, "world");
+
     // Initialize Models & Prepare all Scylla Queries
     let mut basic_prepared_queries = basic::model::initialize(&scylla_connection)
         .await
@@ -165,6 +189,7 @@ async fn rocket() -> Rocket<Build> {
         })),
         email: Arc::new(email_provider),
         static_markdown: Arc::new(static_hashmap),
+        local_cache: cache
     };
 
     let services_clone = Services{
@@ -177,7 +202,8 @@ async fn rocket() -> Rocket<Build> {
         },
         config: services.config.clone(),
         email: services.email.clone(),
-        static_markdown: services.static_markdown.clone()
+        static_markdown: services.static_markdown.clone(),
+        local_cache: services.local_cache.clone()
     };
 
     // Create a root user

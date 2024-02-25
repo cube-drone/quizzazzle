@@ -509,11 +509,9 @@ impl Services {
 
 */
 
-    pub async fn test_get_last_email(&self, email_address: &str) -> Result<String> {
-        let mut redis_connection = self.application_redis.get_async_connection().await?;
+    pub async fn test_get_last_email(&self, email_address: &str) -> Option<String> {
         let last_email_sent_key = format!("last_email_sent:${}", email_address);
-        let last_email_sent: String = redis_connection.get(&last_email_sent_key).await?;
-        Ok(last_email_sent)
+        self.local_cache.get(&last_email_sent_key).await
     }
 
     pub async fn send_verification_email(
