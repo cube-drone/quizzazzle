@@ -7,6 +7,9 @@ use std::env;
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::Duration;
+use argon2::password_hash::rand_core::le;
+use aws_sdk_sesv2::operation::get_email_identity;
+use disposable_token_service::DisposableTokenService;
 //use rocket::http::hyper::service;
 use rocket::{Build, Rocket};
 use rocket::fs::FileServer;
@@ -22,7 +25,9 @@ use comrak::{markdown_to_html, Options};
 use moka::future::Cache;
 
 use tera::{Value, to_value};
+use rusqlite::{Connection, Result};
 
+use crate::auth::model::UserId;
 
 mod fairings;
 mod error; // provides the no_shit! macro
@@ -35,6 +40,7 @@ mod home;
 mod auth;
 mod feed;
 mod qr;
+mod disposable_token_service;
 
 /*
     Services gets passed around willy nilly between threads so it needs to be cram-packed fulla arcs like a season of Naruto
@@ -54,6 +60,7 @@ pub struct ConfigService {
 
 pub struct Services {
     pub is_production: bool,
+    pub email_token_service: Arc<DisposableTokenService<UserId>>,
     pub cache_redis: Arc<Client>,
     pub application_redis: Arc<Client>,
     pub scylla: ScyllaService,
@@ -140,6 +147,23 @@ async fn rocket() -> Rocket<Build> {
     let hi = cache.get("hello").await.expect("Moka cache is broken");
     assert_eq!(hi, "world");
 
+    let data_directory = "/tmp".to_string();
+    let three_days_in_seconds = 60 * 60 * 24 * 3;
+    let email_verification_token_service_options = disposable_token_service::DisposableTokenServiceOptions{
+        data_directory: data_directory.clone(),
+        name: "email_verification".to_string(),
+        cache_capacity: 10000,
+        expiry_seconds: three_days_in_seconds,
+        drop_table_on_start: true,
+    };
+    let email_verification_token_service = disposable_token_service::DisposableTokenService::<UserId>::new(email_verification_token_service_options)
+        .expect("Could not create email verification token service");
+
+    let sample_user_id = UserId::new();
+    let sample_token = email_verification_token_service.create_token(sample_user_id).await.expect("Could not create token");
+    let sample_token_value = email_verification_token_service.get_token(&sample_token).await.expect("Could not get token").expect("Token not found");
+    assert_eq!(sample_token_value, sample_user_id);
+
     // Initialize Models & Prepare all Scylla Queries
     let mut basic_prepared_queries = basic::model::initialize(&scylla_connection)
         .await
@@ -177,6 +201,7 @@ async fn rocket() -> Rocket<Build> {
     // Service Setup
     let services = Services {
         is_production: is_production,
+        email_token_service: Arc::new(email_verification_token_service),
         cache_redis: setup_redis(&cache_redis_url).await,
         application_redis: setup_redis(&application_redis_url).await,
         scylla: ScyllaService {
@@ -194,6 +219,7 @@ async fn rocket() -> Rocket<Build> {
 
     let services_clone = Services{
         is_production: services.is_production,
+        email_token_service: services.email_token_service.clone(),
         cache_redis: services.cache_redis.clone(),
         application_redis: services.application_redis.clone(),
         scylla: ScyllaService {
@@ -287,11 +313,26 @@ async fn rocket() -> Rocket<Build> {
     tokio::spawn(async move {
         loop{
             // code goes here
-            println!("Every 60 seconds... ");
-            config::model::update_config(&services_clone).await.expect("Could not update config");
+            println!("Every 30 seconds... ");
+
+            let config_resp = config::model::update_config(&services_clone).await;
+            match config_resp{
+                Ok(_) => {},
+                Err(e) => {
+                    println!("Background Error: Could not update config: {:?}", e);
+                }
+            }
+
+            let resp = &services_clone.email_token_service.delete_expired_tokens();
+            match resp{
+                Ok(_) => {},
+                Err(e) => {
+                    println!("Background Error: Could not delete expired tokens: {:?}", e);
+                }
+            }
 
             // and now, I sleep
-            tokio::time::sleep(Duration::from_secs(60)).await;
+            tokio::time::sleep(Duration::from_secs(30)).await;
         }
     });
 

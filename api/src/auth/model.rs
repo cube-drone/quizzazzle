@@ -84,7 +84,7 @@ pub async fn initialize(
     Ok(prepared_queries)
 }
 
-#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
+#[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct InviteCode(Uuid);
 impl InviteCode {
     pub fn new() -> Self {
@@ -112,7 +112,7 @@ pub struct Invite{
 }
 */
 
-#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
+#[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct UserId(Uuid);
 impl UserId {
     pub fn new() -> Self {
