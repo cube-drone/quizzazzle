@@ -23,3 +23,7 @@ scyllastatus:
 	docker exec -it some-scylla nodetool status
 cqlsh:
 	docker exec -it some-scylla cqlsh
+
+
+unit:
+	cargo test -- --nocapture
