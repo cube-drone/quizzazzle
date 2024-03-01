@@ -7,8 +7,6 @@ use std::env;
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::Duration;
-use argon2::password_hash::rand_core::le;
-use aws_sdk_sesv2::operation::get_email_identity;
 use disposable_token_service::DisposableTokenService;
 //use rocket::http::hyper::service;
 use rocket::{Build, Rocket};
