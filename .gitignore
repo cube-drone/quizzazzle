@@ -5,3 +5,4 @@ api/target
 secrets.sh
 .vscode
 
+api/test_data/*

@@ -169,6 +169,7 @@ dependencies = [
  "aws-sdk-sesv2",
  "chrono",
  "comrak",
+ "futures",
  "moka",
  "murmur3",
  "qrcode",

@@ -23,7 +23,6 @@ use comrak::{markdown_to_html, Options};
 use moka::future::Cache;
 
 use tera::{Value, to_value};
-use rusqlite::{Connection, Result};
 
 use crate::auth::model::UserId;
 
@@ -147,12 +146,15 @@ async fn rocket() -> Rocket<Build> {
 
     let data_directory = "/tmp".to_string();
     let three_days_in_seconds = 60 * 60 * 24 * 3;
+
     let email_verification_token_service_options = disposable_token_service::DisposableTokenServiceOptions{
         data_directory: data_directory.clone(),
         name: "email_verification".to_string(),
         cache_capacity: 10000,
         expiry_seconds: three_days_in_seconds,
         drop_table_on_start: true,
+        get_refreshes_expiry: false,
+        probability_of_refresh: 0.0,
     };
     let email_verification_token_service = disposable_token_service::DisposableTokenService::<UserId>::new(email_verification_token_service_options)
         .expect("Could not create email verification token service");
