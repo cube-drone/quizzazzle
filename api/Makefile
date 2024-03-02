@@ -24,6 +24,7 @@ scyllastatus:
 cqlsh:
 	docker exec -it some-scylla cqlsh
 
-
+test:
+	cargo test -- --nocapture
 unit:
 	cargo test -- --nocapture
