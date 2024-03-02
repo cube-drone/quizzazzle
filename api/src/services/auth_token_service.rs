@@ -1,10 +1,12 @@
+#![allow(dead_code)]
+#![allow(unused_variables)]
+
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::collections::VecDeque;
 
 
 use anyhow::Result;
-use futures::join;
 use rocket::serde::uuid::Uuid;
 use rocket::tokio;
 
@@ -17,8 +19,8 @@ const DROP: &str = "DROP TABLE IF EXISTS list_tokens";
 const CREATE_TABLE: &str = "CREATE TABLE IF NOT EXISTS list_tokens (id UUID PRIMARY KEY, token TEXT NOT NULL, created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)";
 const INSERT: &str = "INSERT INTO list_tokens (id, token) VALUES (?1, ?2)";
 const SELECT: &str = "SELECT token, updated FROM list_tokens WHERE id = ?1";
-const PING: &str = "UPDATE list_tokens SET updated = CURRENT_TIMESTAMP WHERE id = ?1, token = ?2";
-const DELETE: &str = "DELETE FROM list_tokens WHERE id = ?1, token = ?2";
+const PING: &str = "UPDATE list_tokens SET updated = CURRENT_TIMESTAMP WHERE id = ?1 AND token = ?2";
+const DELETE: &str = "DELETE FROM list_tokens WHERE id = ?1 AND token = ?2";
 const DELETE_ALL: &str = "DELETE FROM list_tokens WHERE id = ?1";
 const DELETE_IDLE: &str = "DELETE FROM list_tokens WHERE updated < ?1";
 
@@ -122,19 +124,25 @@ impl<T> AuthTokenService<T> where T: Serialize + DeserializeOwned + Clone + Sync
 
         self.make_sure_user_exists(user_id).await?;
 
-        match self.timestamp_sorted_list_cache.count(user_id).await > self.options.max_tokens_per_user{
+        let count = self.timestamp_sorted_list_cache.count(user_id).await;
+
+        match count >= self.options.max_tokens_per_user{
             true => {
-                let oldest_token_id = self.timestamp_sorted_list_cache.pop_oldest(user_id).await;
-                match oldest_token_id {
-                    Some(oldest_token_id) => {
-                        self.disposable_token_service.delete_token(&oldest_token_id).await?;
-                        self.delete_token_from_sql_async(user_id, &oldest_token_id).await?;
+                for _ in 0..count - self.options.max_tokens_per_user + 1{
+                    let oldest_token_id = self.timestamp_sorted_list_cache.pop_oldest(user_id).await;
+                    match oldest_token_id {
+                        Some(oldest_token_id) => {
+                            self.disposable_token_service.delete_token(&oldest_token_id).await?;
+                            self.delete_token_from_sql_async(user_id, &oldest_token_id).await?;
+                        }
+                        None => {}
                     }
-                    None => {}
                 }
             }
             false => {}
         }
+
+        self.timestamp_sorted_list_cache.push_new(user_id, token_id.clone()).await?;
 
         Ok(token_id)
     }
@@ -189,7 +197,7 @@ impl<T> AuthTokenService<T> where T: Serialize + DeserializeOwned + Clone + Sync
     fn ping_sql(connection: Arc<Mutex<SqlConnection>>, user_id: &Uuid, token_id: &Uuid) -> Result<()>{
         let lock = connection.lock().map_err(|_e| anyhow::anyhow!("Could not get lock to ping sql"))?;
         let mut statement = lock.prepare_cached(PING)?;
-        statement.execute([token_id])?;
+        statement.execute([user_id, token_id])?;
         Ok(())
     }
 
@@ -287,4 +295,51 @@ impl<T> AuthTokenService<T> where T: Serialize + DeserializeOwned + Clone + Sync
         Ok(())
     }
 
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct ExampleAuthToken{
+    user_id: Uuid,
+    name: String,
+}
+
+impl HasUserId for ExampleAuthToken{
+    fn user_id(&self) -> Uuid{
+        self.user_id
+    }
+}
+
+#[tokio::test]
+async fn create_a_bunch_of_auth_tokens(){
+    let options = AuthTokenServiceOptions{
+        data_directory: "./test_data".to_string(),
+        name: "auth".to_string(),
+        cache_capacity: 100,
+        expiry_seconds: 60,
+        drop_table_on_start: true,
+        max_tokens_per_user: 5,
+    };
+    let auth_token_service: AuthTokenService<ExampleAuthToken> = AuthTokenService::new(options).unwrap();
+
+    let user_id = Uuid::new_v4();
+
+    let one = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "one".to_string()}).await.unwrap();
+    let two = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "two".to_string()}).await.unwrap();
+    let three = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "three".to_string()}).await.unwrap();
+    let four = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "four".to_string()}).await.unwrap();
+    let five = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "five".to_string()}).await.unwrap();
+    let six = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "six".to_string()}).await.unwrap();
+    let seven = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "seven".to_string()}).await.unwrap();
+
+    let tokens = auth_token_service.list_tokens(&user_id).await.unwrap();
+    assert_eq!(tokens.len(), 5);
+
+    assert_eq!(auth_token_service.get_token(&seven).await.unwrap().unwrap().name, "seven");
+    assert_eq!(auth_token_service.get_token(&six).await.unwrap().unwrap().name, "six");
+    assert_eq!(auth_token_service.get_token(&five).await.unwrap().unwrap().name, "five");
+    assert_eq!(auth_token_service.get_token(&four).await.unwrap().unwrap().name, "four");
+    assert_eq!(auth_token_service.get_token(&three).await.unwrap().unwrap().name, "three");
+    // these two are the oldest, and should have been automatically deleted
+    assert!(auth_token_service.get_token(&two).await.unwrap().is_none());
+    assert!(auth_token_service.get_token(&one).await.unwrap().is_none());
 }
