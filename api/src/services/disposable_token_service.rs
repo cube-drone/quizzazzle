@@ -103,7 +103,10 @@ impl<T> DisposableTokenService<T> where T: Serialize + DeserializeOwned + Clone 
 
         let connection = connection.lock().map_err(|_e| anyhow::anyhow!("Could not get lock to create token"))?;
         let mut statement = connection.prepare_cached(INSERT)?;
-        statement.execute([&uuid.to_string(), &serialized_value])?;
+        let i = statement.execute([&uuid.to_string(), &serialized_value])?;
+        if i != 1 {
+            return Err(anyhow::anyhow!("Could not insert token"));
+        }
 
         Ok(())
     }
@@ -144,7 +147,10 @@ impl<T> DisposableTokenService<T> where T: Serialize + DeserializeOwned + Clone 
 
         let connection = connection.lock().map_err(|_e| anyhow::anyhow!("Could not get lock to create token"))?;
         let mut statement = connection.prepare_cached(UPDATE)?;
-        statement.execute([&uuid.to_string(), &serialized_value])?;
+        let i = statement.execute([&uuid.to_string(), &serialized_value])?;
+        if i != 1 {
+            return Err(anyhow::anyhow!("Could not update token"));
+        }
 
         Ok(())
     }
@@ -219,6 +225,60 @@ impl<T> DisposableTokenService<T> where T: Serialize + DeserializeOwned + Clone 
         }
     }
 
+    fn get_sql_tokens(connection: Arc<Mutex<SqlConnection>>, keys: &Vec<Uuid>) -> Result<Vec<(Uuid, T)>>{
+        let connection = connection.lock().map_err(|_e| anyhow::anyhow!("Could not get lock to get token"))?;
+        let mut response: Vec<(Uuid, T)> = Vec::with_capacity(keys.len());
+        for key in keys.iter(){
+            let mut statement = connection.prepare_cached(SELECT)?;
+            let mut rows = statement.query([&key.to_string()])?;
+            let value = rows.next()?;
+            match value{
+                Some(v) => {
+                    // this is a row, and the query JUST asks for value, so we can just get the 0th index
+                    let serialized_value: String = v.get(0)?;
+                    let deserialized_value: T = serde_json::from_str(&serialized_value)?;
+
+                    response.push((key.clone(), deserialized_value));
+                },
+                None => {}
+            }
+        }
+        Ok(response)
+    }
+
+    async fn get_sql_tokens_async(&self, keys: &Vec<Uuid>) -> Result<Vec<(Uuid,T)>>{
+        let connection = self.connection.clone();
+        let keys = keys.clone();
+        tokio::task::spawn_blocking(move || {
+            Self::get_sql_tokens(connection, &keys)
+        }).await?
+    }
+
+    async fn get_tokens(&self, keys: Vec<Uuid>) -> Result<HashMap<Uuid, Option<T>>>{
+        let mut result = HashMap::new();
+
+        let mut remaining_keys: Vec<Uuid> = Vec::new();
+        for key in keys{
+            match self.cache.get(&key).await{
+                Some(value) => {
+                    result.insert(key, Some(value));
+                    continue;
+                },
+                None => {
+                    result.insert(key, None);
+                    remaining_keys.push(key.clone());
+                }
+            }
+        }
+
+        let sql_results = self.get_sql_tokens_async(&remaining_keys).await?;
+        for (key, value) in sql_results{
+            result.insert(key, Some(value));
+        }
+
+        Ok(result)
+    }
+
     fn ping_sql_token(connection: Arc<Mutex<SqlConnection>>, key: &Uuid) -> Result<()>{
         let connection = connection.lock().map_err(|_e| anyhow::anyhow!("Could not get lock to ping token"))?;
         let mut statement = connection.prepare_cached(PING)?;
@@ -279,22 +339,22 @@ impl<T> DisposableTokenService<T> where T: Serialize + DeserializeOwned + Clone 
         Ok(())
     }
 
-    pub fn turn_back_time(&self, key: Uuid, seconds: i64) -> Result<i64>{
+    pub fn turn_back_time(&self, key: Uuid, seconds: i64) -> Result<()>{
         let connection = self.connection.lock().map_err(|_e| anyhow::anyhow!("Could not get lock to turn back time"))?;
         let mut statement = connection.prepare_cached("UPDATE tokens SET created = created - ?1, updated = updated - ?1 WHERE id = ?2")?;
-        statement.execute(params![seconds, &key.to_string()])?;
-
-        let mut statement = connection.prepare_cached("SELECT updated FROM tokens WHERE id = ?1")?;
-        let mut rows = statement.query(params![&key.to_string()])?;
-        let value = rows.next()?;
-        match value{
-            Some(v) => {
-                let updated: i64 = v.get(0)?;
-                println!("Updated: {}", updated);
-                Ok(updated)
-            },
-            None => Err(anyhow::anyhow!("Could not find updated value for token"))
+        let i = statement.execute(params![seconds, &key.to_string()])?;
+        if i != 1 {
+            let mut statement = connection.prepare_cached(SELECT)?;
+            let mut rows = statement.query([&key.to_string()])?;
+            let value = rows.next()?;
+            if value.is_none(){
+                return Err(anyhow::anyhow!(format!("Token {} does not exist", key)));
+            }
+            else{
+                return Err(anyhow::anyhow!("Token exists, but something went wrong turning back time"));
+            }
         }
+        Ok(())
     }
 
     pub fn delete_expired_tokens(&self) -> Result<()>{
@@ -305,13 +365,11 @@ impl<T> DisposableTokenService<T> where T: Serialize + DeserializeOwned + Clone 
         if self.options.get_refreshes_expiry {
             let mut statement = connection.prepare_cached(DELETE_IDLE)?;
             let expiry_timestamp = chrono::Utc::now().timestamp() - self.options.expiry_seconds as i64;
-            println!("Idle expiry timestamp: {}", expiry_timestamp);
             statement.execute([expiry_timestamp])?;
         }
         else{
             let mut statement = connection.prepare_cached(DELETE_EXPIRED)?;
             let expiry_timestamp = chrono::Utc::now().timestamp() - self.options.expiry_seconds as i64;
-            println!("Created expiry timestamp: {}", expiry_timestamp);
             statement.execute([expiry_timestamp])?;
         }
         Ok(())
@@ -329,7 +387,7 @@ impl <T> RequiresBackgroundTick for DisposableTokenService<T> where T: Serialize
 async fn test_disposable_token_service(){
     let options = DisposableTokenServiceOptions{
         data_directory: "./test_data".to_string(),
-        name: "test".to_string(),
+        name: "test1".to_string(),
         cache_capacity: 100,
         expiry_seconds: 60,
         drop_table_on_start: true,
@@ -364,7 +422,7 @@ async fn test_disposable_token_service(){
 async fn test_disposable_token_service_no_cache(){
     let options = DisposableTokenServiceOptions{
         data_directory: "./test_data".to_string(),
-        name: "test".to_string(),
+        name: "test2".to_string(),
         cache_capacity: 100,
         expiry_seconds: 60,
         drop_table_on_start: true,
@@ -394,7 +452,7 @@ async fn test_disposable_token_service_no_cache(){
 async fn test_disposable_token_service_speed(){
     let options = DisposableTokenServiceOptions{
         data_directory: "./test_data".to_string(),
-        name: "test".to_string(),
+        name: "test3".to_string(),
         cache_capacity: 100000,
         expiry_seconds: 60,
         drop_table_on_start: true,
@@ -425,7 +483,7 @@ async fn test_disposable_token_service_speed(){
 async fn test_idle_token_service(){
     let options = DisposableTokenServiceOptions{
         data_directory: "./test_data".to_string(),
-        name: "test".to_string(),
+        name: "test4".to_string(),
         cache_capacity: 100,
         expiry_seconds: 60,
         drop_table_on_start: true,
@@ -464,7 +522,7 @@ struct SampleSerializableThing{
 async fn test_json_token_service(){
     let options = DisposableTokenServiceOptions{
         data_directory: "./test_data".to_string(),
-        name: "test_serialized".to_string(),
+        name: "test5".to_string(),
         cache_capacity: 100,
         expiry_seconds: 60,
         drop_table_on_start: true,
@@ -513,7 +571,7 @@ async fn test_json_token_service(){
 async fn test_sql_cleanup_service(){
     let options = DisposableTokenServiceOptions{
         data_directory: "./test_data".to_string(),
-        name: "test_serialized".to_string(),
+        name: "test6".to_string(),
         cache_capacity: 100,
         expiry_seconds: 60,
         drop_table_on_start: true,
@@ -534,8 +592,8 @@ async fn test_sql_cleanup_service(){
     let token2 = service.create_token_no_cache(thing.clone()).await.unwrap();
     let token3 = service.create_token_no_cache(thing.clone()).await.unwrap();
 
-    let i = service.turn_back_time(token, 120).unwrap();
-    let i2 = service.turn_back_time(token3, 120).unwrap();
+    service.turn_back_time(token, 120).unwrap();
+    service.turn_back_time(token3, 120).unwrap();
 
     service.background_tick().unwrap();
 
@@ -545,4 +603,38 @@ async fn test_sql_cleanup_service(){
     assert_eq!(value2, thing);
     let value3 = service.get_token(&token3).await.unwrap();
     assert_eq!(value3, None);
+}
+
+#[tokio::test]
+async fn test_get_multiple(){
+    let options = DisposableTokenServiceOptions{
+        data_directory: "./test_data".to_string(),
+        name: "test7".to_string(),
+        cache_capacity: 100,
+        expiry_seconds: 60,
+        drop_table_on_start: true,
+        get_refreshes_expiry: true,
+        probability_of_refresh: 1.0,
+    };
+
+    let service = DisposableTokenService::new(options).unwrap();
+
+    let token = service.create_token("one".to_string()).await.unwrap();
+    let token2 = service.create_token_no_cache("two".to_string()).await.unwrap();
+    let token3 = service.create_token("three".to_string()).await.unwrap();
+    let token4 = service.create_token_no_cache("four".to_string()).await.unwrap();
+    let token5 = service.create_token_no_cache("five".to_string()).await.unwrap();
+    let fake_token = Uuid::new_v4();
+
+    service.update_token(&token5, "five!".to_string()).await.unwrap();
+
+    let values = service.get_tokens(vec![token, token2, token3, token4, token5, fake_token]).await.unwrap();
+
+    assert_eq!(values.get(&token).unwrap().as_ref().unwrap(), "one");
+    assert_eq!(values.get(&token2).unwrap().as_ref().unwrap(), "two");
+    assert_eq!(values.get(&token3).unwrap().as_ref().unwrap(), "three");
+    assert_eq!(values.get(&token4).unwrap().as_ref().unwrap(), "four");
+    assert_eq!(values.get(&token5).unwrap().as_ref().unwrap(), "five!");
+    assert!(values.get(&fake_token).unwrap().is_none());
+
 }

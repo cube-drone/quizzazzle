@@ -361,7 +361,7 @@ impl HasUserId for ExampleAuthToken{
 async fn create_a_bunch_of_auth_tokens(){
     let options = AuthTokenServiceOptions{
         data_directory: "./test_data".to_string(),
-        name: "auth".to_string(),
+        name: "auth1".to_string(),
         cache_capacity: 100,
         expiry_seconds: 60,
         drop_table_on_start: true,
@@ -399,7 +399,7 @@ async fn create_a_bunch_of_auth_tokens(){
 async fn clear_cache_and_see_if_it_still_works(){
     let options = AuthTokenServiceOptions{
         data_directory: "./test_data".to_string(),
-        name: "auth".to_string(),
+        name: "auth2".to_string(),
         cache_capacity: 100,
         expiry_seconds: 60,
         drop_table_on_start: true,

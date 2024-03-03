@@ -28,3 +28,5 @@ test:
 	cargo test -- --nocapture
 unit:
 	cargo test -- --nocapture
+release-test:
+	cargo test --release -- --nocapture
