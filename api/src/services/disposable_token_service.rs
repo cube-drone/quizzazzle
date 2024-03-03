@@ -254,7 +254,7 @@ impl<T> DisposableTokenService<T> where T: Serialize + DeserializeOwned + Clone 
         }).await?
     }
 
-    async fn get_tokens(&self, keys: Vec<Uuid>) -> Result<HashMap<Uuid, Option<T>>>{
+    pub async fn get_tokens(&self, keys: Vec<Uuid>) -> Result<HashMap<Uuid, Option<T>>>{
         let mut result = HashMap::new();
 
         let mut remaining_keys: Vec<Uuid> = Vec::new();

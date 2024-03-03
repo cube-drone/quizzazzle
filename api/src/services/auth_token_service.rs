@@ -4,6 +4,7 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::collections::VecDeque;
+use std::collections::HashMap;
 use futures::try_join;
 
 use anyhow::Result;
@@ -275,7 +276,19 @@ impl<T> AuthTokenService<T> where T: Serialize + DeserializeOwned + Clone + Sync
         }
     }
 
-    async fn modify_token(&self, token_id: &Uuid, token: T) -> Result<()>{
+    async fn get_tokens(&self, user_id: &Uuid) -> Result<HashMap<Uuid, Option<T>>>{
+        self.make_sure_user_exists(&user_id).await?;
+        let maybe_token_ids = self.timestamp_sorted_list_cache.get(&user_id).await;
+        let token_ids = match maybe_token_ids {
+            Some(token_ids) => token_ids.into_iter().map(|(id, _)| id).collect(),
+            None => Vec::new(),
+        };
+        let result = self.disposable_token_service.get_tokens(token_ids).await?;
+
+        Ok(result)
+    }
+
+    async fn update_token(&self, token_id: &Uuid, token: T) -> Result<()>{
         self.disposable_token_service.update_token(token_id, token).await
     }
 
@@ -357,6 +370,8 @@ impl HasUserId for ExampleAuthToken{
     }
 }
 
+///
+/// This is just basic: create a token, create too many tokens
 #[tokio::test]
 async fn create_a_bunch_of_auth_tokens(){
     let options = AuthTokenServiceOptions{
@@ -395,11 +410,70 @@ async fn create_a_bunch_of_auth_tokens(){
     assert_eq!(auth_token_service.list_tokens(&user_id).await.unwrap().len(), 0);
 }
 
+///
+/// getting a token should update its order
+#[tokio::test]
+async fn reshuffle_a_bunch_of_auth_tokens(){
+    let options = AuthTokenServiceOptions{
+        data_directory: "./test_data".to_string(),
+        name: "auth2".to_string(),
+        cache_capacity: 100,
+        expiry_seconds: 60,
+        drop_table_on_start: true,
+        max_tokens_per_user: 5,
+    };
+    let auth_token_service: AuthTokenService<ExampleAuthToken> = AuthTokenService::new(options).unwrap();
+
+    let user_id = Uuid::new_v4();
+
+    let one = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "one".to_string()}).await.unwrap();
+    let two = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "two".to_string()}).await.unwrap();
+    let three = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "three".to_string()}).await.unwrap();
+    let four = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "four".to_string()}).await.unwrap();
+    let five = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "five".to_string()}).await.unwrap();
+    // now we are at max tokens
+    // and we want to bump one and three up to the top of the list
+    auth_token_service.get_token(&one).await.unwrap();
+    auth_token_service.get_token(&three).await.unwrap();
+
+    let six = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "six".to_string()}).await.unwrap();
+    let seven = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "seven".to_string()}).await.unwrap();
+
+    let tokens = auth_token_service.list_tokens(&user_id).await.unwrap();
+    assert_eq!(tokens.len(), 5);
+
+    // these are all in a totes different order
+    assert_eq!(auth_token_service.get_token(&seven).await.unwrap().unwrap().name, "seven");
+    assert_eq!(auth_token_service.get_token(&six).await.unwrap().unwrap().name, "six");
+    assert_eq!(auth_token_service.get_token(&three).await.unwrap().unwrap().name, "three");
+    assert_eq!(auth_token_service.get_token(&one).await.unwrap().unwrap().name, "one");
+    assert_eq!(auth_token_service.get_token(&five).await.unwrap().unwrap().name, "five");
+    // these two are the oldest, and should have been automatically deleted
+    assert!(auth_token_service.get_token(&two).await.unwrap().is_none());
+    assert!(auth_token_service.get_token(&four).await.unwrap().is_none());
+
+    //auth_token_service.test_clear_cache(&user_id).await.unwrap();
+    let eight = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "eight".to_string()}).await.unwrap();
+
+    // note: if we clear the cache here, it's possible for the tokens to get out of order
+    // because the cache will be reloaded from the database with the sort order determined by seconds since epoch
+    // and these tokens were all created in the same second
+
+    let tokens = auth_token_service.list_tokens(&user_id).await.unwrap();
+    assert_eq!(tokens.len(), 5);
+    assert_eq!(tokens, vec![eight, five, one, three, six]);
+
+    auth_token_service.clear_tokens(&user_id).await.unwrap();
+    assert_eq!(auth_token_service.list_tokens(&user_id).await.unwrap().len(), 0);
+}
+
+///
+/// If we create a bunch of tokens, then clear the cache, we should still be able to get the tokens from the database
 #[tokio::test]
 async fn clear_cache_and_see_if_it_still_works(){
     let options = AuthTokenServiceOptions{
         data_directory: "./test_data".to_string(),
-        name: "auth2".to_string(),
+        name: "auth3".to_string(),
         cache_capacity: 100,
         expiry_seconds: 60,
         drop_table_on_start: true,
@@ -433,4 +507,54 @@ async fn clear_cache_and_see_if_it_still_works(){
 
     auth_token_service.clear_tokens(&user_id).await.unwrap();
     assert_eq!(auth_token_service.list_tokens(&user_id).await.unwrap().len(), 0);
+}
+
+///
+/// When you verify your email address, we want to update all extant tokens to reflect that
+#[tokio::test]
+async fn modify_every_extant_auth_token(){
+    let options = AuthTokenServiceOptions{
+        data_directory: "./test_data".to_string(),
+        name: "auth4".to_string(),
+        cache_capacity: 100,
+        expiry_seconds: 60,
+        drop_table_on_start: true,
+        max_tokens_per_user: 5,
+    };
+    let auth_token_service: AuthTokenService<ExampleAuthToken> = AuthTokenService::new(options).unwrap();
+
+    let user_id = Uuid::new_v4();
+
+    let one = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "one".to_string()}).await.unwrap();
+    let two = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "two".to_string()}).await.unwrap();
+    let three = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "three".to_string()}).await.unwrap();
+    let four = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "four".to_string()}).await.unwrap();
+    let five = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "five".to_string()}).await.unwrap();
+    let six = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "six".to_string()}).await.unwrap();
+    let seven = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "seven".to_string()}).await.unwrap();
+
+    let tokens = auth_token_service.get_tokens(&user_id).await.unwrap();
+
+    // change the "name" of every token to "{name} modified"
+    for (id, token) in tokens{
+        match token{
+            Some(token) => {
+                let mut token = token;
+                token.name = format!("{} modified", token.name);
+                auth_token_service.update_token(&id, token).await.unwrap();
+            }
+            None => {}
+        }
+    }
+
+    let token = auth_token_service.get_token(&seven).await.unwrap().unwrap();
+    assert_eq!(token.name, "seven modified");
+    let token = auth_token_service.get_token(&six).await.unwrap().unwrap();
+    assert_eq!(token.name, "six modified");
+    let token = auth_token_service.get_token(&five).await.unwrap().unwrap();
+    assert_eq!(token.name, "five modified");
+    let token = auth_token_service.get_token(&four).await.unwrap().unwrap();
+    assert_eq!(token.name, "four modified");
+    let token = auth_token_service.get_token(&three).await.unwrap().unwrap();
+    assert_eq!(token.name, "three modified");
 }
