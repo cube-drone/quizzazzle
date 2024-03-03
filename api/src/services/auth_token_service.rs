@@ -4,7 +4,7 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::collections::VecDeque;
-
+use futures::try_join;
 
 use anyhow::Result;
 use rocket::serde::uuid::Uuid;
@@ -16,14 +16,18 @@ use serde::{Serialize, Deserialize};
 use serde::de::DeserializeOwned;
 
 const DROP: &str = "DROP TABLE IF EXISTS list_tokens";
-const CREATE_TABLE: &str = "CREATE TABLE IF NOT EXISTS list_tokens (id UUID PRIMARY KEY, token TEXT NOT NULL, created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)";
-const INSERT: &str = "INSERT INTO list_tokens (id, token) VALUES (?1, ?2)";
-const SELECT: &str = "SELECT token, updated FROM list_tokens WHERE id = ?1";
-const PING: &str = "UPDATE list_tokens SET updated = CURRENT_TIMESTAMP WHERE id = ?1 AND token = ?2";
-const DELETE: &str = "DELETE FROM list_tokens WHERE id = ?1 AND token = ?2";
-const DELETE_ALL: &str = "DELETE FROM list_tokens WHERE id = ?1";
+const CREATE_TABLE: &str = "CREATE TABLE IF NOT EXISTS list_tokens (user_id TEXT NOT NULL, token TEXT NOT NULL, created INTEGER NOT NULL, updated INTEGER NOT NULL)";
+const CREATE_INDEX: &str = "CREATE INDEX IF NOT EXISTS user_id_index ON list_tokens (user_id)";
+const CREATE_INDEX_CREATED: &str = "CREATE INDEX IF NOT EXISTS created_index ON list_tokens (created)";
+const CREATE_INDEX_UPDATED: &str = "CREATE INDEX IF NOT EXISTS updated_index ON list_tokens (updated)";
+const INSERT: &str = "INSERT INTO list_tokens (user_id, token, created, updated) VALUES (?1, ?2, unixepoch(), unixepoch())";
+const SELECT: &str = "SELECT token, updated FROM list_tokens WHERE user_id = ?1";
+const PING: &str = "UPDATE list_tokens SET updated = unixepoch() WHERE user_id = ?1 AND token = ?2";
+const DELETE: &str = "DELETE FROM list_tokens WHERE user_id = ?1 AND token = ?2";
+const DELETE_ALL: &str = "DELETE FROM list_tokens WHERE user_id = ?1";
 const DELETE_IDLE: &str = "DELETE FROM list_tokens WHERE updated < ?1";
 
+use crate::services::background_tick::RequiresBackgroundTick;
 use crate::services::disposable_token_service::{DisposableTokenService, DisposableTokenServiceOptions};
 use crate::services::timestamp_sorted_list_cache::TimestampSortedListCache;
 
@@ -31,9 +35,10 @@ pub trait HasUserId{
     fn user_id(&self) -> Uuid;
 }
 
+#[derive(Clone)]
 pub struct AuthTokenService<T: 'static> where T: Serialize + DeserializeOwned + Clone + Sync + Send + HasUserId{
     disposable_token_service: DisposableTokenService<T>,
-    timestamp_sorted_list_cache: TimestampSortedListCache<Uuid>,
+    timestamp_sorted_list_cache: Arc<TimestampSortedListCache<Uuid>>,
     connection: Arc<Mutex<SqlConnection>>,
     options: AuthTokenServiceOptions,
 }
@@ -44,6 +49,7 @@ pub struct AuthTokenService<T: 'static> where T: Serialize + DeserializeOwned + 
 //  the number of tokens that can be issued to a single user is limited
 //  if a user has too many tokens, the oldest tokens are automatically revoked
 
+#[derive(Clone)]
 pub struct AuthTokenServiceOptions{
     pub data_directory: String,
     pub name: String,
@@ -82,7 +88,7 @@ impl<T> AuthTokenService<T> where T: Serialize + DeserializeOwned + Clone + Sync
 
         Ok(Self{
             disposable_token_service: DisposableTokenService::new(options.to_disposable_token_service_options())?,
-            timestamp_sorted_list_cache: TimestampSortedListCache::new(options.cache_capacity / 5, options.expiry_seconds, options.max_tokens_per_user as usize),
+            timestamp_sorted_list_cache: Arc::new(TimestampSortedListCache::new(options.cache_capacity / 5, options.expiry_seconds, options.max_tokens_per_user as usize)),
             connection: sql_connection,
             options,
         })
@@ -92,7 +98,10 @@ impl<T> AuthTokenService<T> where T: Serialize + DeserializeOwned + Clone + Sync
         let prep_connection = sql_connection.clone();
         let prep_connection = prep_connection.lock().map_err(|_e| anyhow::anyhow!("Could not get lock to prepare connection"))?;
         // Create the table if it doesn't exist
-        prep_connection.execute(CREATE_TABLE, [])?;
+        let _i = prep_connection.execute(CREATE_TABLE, [])?;
+        prep_connection.execute(CREATE_INDEX, [])?;
+        prep_connection.execute(CREATE_INDEX_UPDATED, [])?;
+        prep_connection.execute(CREATE_INDEX_CREATED, [])?;
 
         prep_connection.pragma_update(Some(DatabaseName::Main), "journal_mode", "WAL")?;
         prep_connection.pragma_update(Some(DatabaseName::Main), "synchronous", "normal")?;
@@ -118,6 +127,24 @@ impl<T> AuthTokenService<T> where T: Serialize + DeserializeOwned + Clone + Sync
         Ok(())
     }
 
+    fn add_token_to_sql(connection: Arc<Mutex<SqlConnection>>, user_id: &Uuid, token_id: &Uuid) -> Result<()>{
+        let lock = connection.lock().map_err(|_e| anyhow::anyhow!("Could not get lock to add token to sql"))?;
+        let mut statement = lock.prepare_cached(INSERT)?;
+        statement.execute([user_id, token_id])?;
+        Ok(())
+    }
+
+    async fn add_token_to_sql_async(&self, user_id: &Uuid, token_id: &Uuid) -> Result<()>{
+        let connection = self.connection.clone();
+        let user_id = user_id.clone();
+        let token_id = token_id.clone();
+        tokio::task::spawn_blocking(move || {
+            Self::add_token_to_sql(connection, &user_id, &token_id)
+        }).await??;
+
+        Ok(())
+    }
+
     pub async fn create_token(&self, user_id: &Uuid, token: &T) -> Result<Uuid>{
         // start by creating the token
         let token_id = self.disposable_token_service.create_token(token.clone()).await?;
@@ -132,8 +159,10 @@ impl<T> AuthTokenService<T> where T: Serialize + DeserializeOwned + Clone + Sync
                     let oldest_token_id = self.timestamp_sorted_list_cache.pop_oldest(user_id).await;
                     match oldest_token_id {
                         Some(oldest_token_id) => {
-                            self.disposable_token_service.delete_token(&oldest_token_id).await?;
-                            self.delete_token_from_sql_async(user_id, &oldest_token_id).await?;
+                            try_join!(
+                                self.disposable_token_service.delete_token(&oldest_token_id),
+                                self.delete_token_from_sql_async(user_id, &oldest_token_id)
+                            )?;
                         }
                         None => {}
                     }
@@ -142,7 +171,10 @@ impl<T> AuthTokenService<T> where T: Serialize + DeserializeOwned + Clone + Sync
             false => {}
         }
 
-        self.timestamp_sorted_list_cache.push_new(user_id, token_id.clone()).await?;
+        try_join!(
+            self.add_token_to_sql_async(user_id, &token_id),
+            self.timestamp_sorted_list_cache.push_new(user_id, token_id.clone())
+        )?;
 
         Ok(token_id)
     }
@@ -154,9 +186,12 @@ impl<T> AuthTokenService<T> where T: Serialize + DeserializeOwned + Clone + Sync
         let mut rows = statement.query([user_id])?;
         let mut tokens = Vec::new();
         while let Some(row) = rows.next()? {
-            let token: String = row.get(0)?;
+            let token: Uuid = row.get(0)?;
             let updated: i64 = row.get(1)?;
-            tokens.push(serde_json::from_str(&token)?);
+            tokens.push((token, updated));
+        }
+        if tokens.len() == 0 {
+            return Ok(None);
         }
         Ok(Some(tokens))
     }
@@ -281,6 +316,17 @@ impl<T> AuthTokenService<T> where T: Serialize + DeserializeOwned + Clone + Sync
         Ok(())
     }
 
+    /// Clears out the cache for a user without deleting them from the database
+    ///
+    /// I don't know why we would want to do this outside of a test context:
+    ///  forcing the cache to be reloaded from the database the next time it is needed
+    /// (to test that the cache reload works)
+    pub async fn test_clear_cache(&self, user_id: &Uuid) -> Result<()> {
+        self.timestamp_sorted_list_cache.clear(&user_id).await;
+        Ok(())
+    }
+
+    /// This function should be called periodically to clean up expired tokens
     pub fn clear_expired_tokens(&self) -> Result<()>{
         let lock = self.connection.lock().map_err(|_e| anyhow::anyhow!("Could not get lock to delete token from sql"))?;
         let mut statement = lock.prepare_cached(DELETE_IDLE)?;
@@ -288,13 +334,15 @@ impl<T> AuthTokenService<T> where T: Serialize + DeserializeOwned + Clone + Sync
         Ok(())
     }
 
-    pub fn background_tick(&self) -> Result<()>{
+}
+
+impl <T> RequiresBackgroundTick for AuthTokenService<T> where T: Serialize + DeserializeOwned + Clone + Sync + Send + HasUserId{
+    fn background_tick(&self) -> Result<()>{
         self.clear_expired_tokens()?;
         self.disposable_token_service.background_tick()?;
 
         Ok(())
     }
-
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -342,4 +390,47 @@ async fn create_a_bunch_of_auth_tokens(){
     // these two are the oldest, and should have been automatically deleted
     assert!(auth_token_service.get_token(&two).await.unwrap().is_none());
     assert!(auth_token_service.get_token(&one).await.unwrap().is_none());
+
+    auth_token_service.clear_tokens(&user_id).await.unwrap();
+    assert_eq!(auth_token_service.list_tokens(&user_id).await.unwrap().len(), 0);
+}
+
+#[tokio::test]
+async fn clear_cache_and_see_if_it_still_works(){
+    let options = AuthTokenServiceOptions{
+        data_directory: "./test_data".to_string(),
+        name: "auth".to_string(),
+        cache_capacity: 100,
+        expiry_seconds: 60,
+        drop_table_on_start: true,
+        max_tokens_per_user: 5,
+    };
+    let auth_token_service: AuthTokenService<ExampleAuthToken> = AuthTokenService::new(options).unwrap();
+
+    let user_id = Uuid::new_v4();
+
+    let one = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "one".to_string()}).await.unwrap();
+    let two = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "two".to_string()}).await.unwrap();
+    let three = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "three".to_string()}).await.unwrap();
+    let four = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "four".to_string()}).await.unwrap();
+    let five = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "five".to_string()}).await.unwrap();
+    let six = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "six".to_string()}).await.unwrap();
+    let seven = auth_token_service.create_token(&user_id, &ExampleAuthToken{user_id: user_id, name: "seven".to_string()}).await.unwrap();
+
+    auth_token_service.test_clear_cache(&user_id).await.unwrap();
+
+    let tokens = auth_token_service.list_tokens(&user_id).await.unwrap();
+    assert_eq!(tokens.len(), 5);
+
+    assert_eq!(auth_token_service.get_token(&seven).await.unwrap().unwrap().name, "seven");
+    assert_eq!(auth_token_service.get_token(&six).await.unwrap().unwrap().name, "six");
+    assert_eq!(auth_token_service.get_token(&five).await.unwrap().unwrap().name, "five");
+    assert_eq!(auth_token_service.get_token(&four).await.unwrap().unwrap().name, "four");
+    assert_eq!(auth_token_service.get_token(&three).await.unwrap().unwrap().name, "three");
+    // these two are the oldest, and should have been automatically deleted
+    assert!(auth_token_service.get_token(&two).await.unwrap().is_none());
+    assert!(auth_token_service.get_token(&one).await.unwrap().is_none());
+
+    auth_token_service.clear_tokens(&user_id).await.unwrap();
+    assert_eq!(auth_token_service.list_tokens(&user_id).await.unwrap().len(), 0);
 }

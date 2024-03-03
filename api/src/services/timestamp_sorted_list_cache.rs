@@ -237,3 +237,29 @@ async fn test_load_sorting(){
     assert_eq!(count, 0);
 
 }
+
+#[tokio::test]
+async fn test_clear(){
+    let cache_capacity = 10;
+    let expiry_seconds = 10;
+    let vec_capacity = 10;
+    let cache: TimestampSortedListCache<Uuid> = TimestampSortedListCache::new(cache_capacity, expiry_seconds, vec_capacity);
+
+    let user_id = Uuid::new_v4();
+    cache.create_empty(&user_id).await.unwrap();
+
+    let oldest = Uuid::new_v4();
+    cache.push_new(&user_id, oldest).await.unwrap();
+    let middlest = Uuid::new_v4();
+    cache.push_new(&user_id, middlest).await.unwrap();
+    let newest = Uuid::new_v4();
+    cache.push_new(&user_id, newest).await.unwrap();
+
+    let count = cache.count(&user_id).await;
+    assert_eq!(count, 3);
+
+    cache.clear(&user_id).await;
+
+    let count = cache.count(&user_id).await;
+    assert_eq!(count, 0);
+}
