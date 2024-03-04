@@ -107,6 +107,27 @@ impl<T> TimestampSortedListCache<T> where T: Clone + Send + Sync + PartialEq{
 
         Ok(())
     }
+
+    pub async fn remove(&self, key: &Uuid, thing_to_remove: &T) -> Result<()> {
+        let arc = match self.cache.get(&key).await {
+            Some(arc) => arc,
+            None => return Err(anyhow!("that key doesn't exist")),
+        };
+        let mut writable = arc.write().await;
+
+        let mut index_to_remove = -1;
+        for (i, (token, _)) in writable.iter().enumerate() {
+            if *token == *thing_to_remove {
+                index_to_remove = i as isize;
+                break;
+            }
+        }
+        if index_to_remove >= 0 {
+            writable.remove(index_to_remove as usize);
+        }
+
+        Ok(())
+    }
 }
 
 

@@ -38,6 +38,8 @@ mod feed;
 mod qr;
 mod services;
 
+use crate::services::background_tick::RequiresBackgroundTick;
+
 /*
     Services gets passed around willy nilly between threads so it needs to be cram-packed fulla arcs like a season of Naruto
 */
@@ -57,13 +59,16 @@ pub struct ConfigService {
 pub struct Services {
     pub is_production: bool,
     pub email_token_service: Arc<services::disposable_token_service::DisposableTokenService<UserId>>,
+    pub ip_token_service: Arc<services::disposable_token_service::DisposableTokenService<UserId>>,
+    pub password_token_service: Arc<services::disposable_token_service::DisposableTokenService<UserId>>,
+    pub auth_token_service: Arc<services::auth_token_service::AuthTokenService<crate::auth::model::UserSession>>,
     pub cache_redis: Arc<Client>,
     pub application_redis: Arc<Client>,
     pub scylla: ScyllaService,
     pub config: Arc<RwLock<ConfigService>>,
     pub email: Arc<email::EmailProvider>,
     pub static_markdown: Arc<HashMap<&'static str, String>>,
-    pub local_cache: Cache<String, String>,
+    pub local_cache: Arc<Cache<String, String>>,
 }
 
 async fn setup_redis(redis_url: &String) -> Arc<Client> {
@@ -123,7 +128,7 @@ async fn rocket() -> Rocket<Build> {
     let mut prepared_queries: HashMap<&'static str, PreparedStatement> = HashMap::new();
 
     // TECHNICALLY this is MibiBytes, not MegaBytes, but in my defense: I don't care
-    let cache_megabytes_string = env::var("GROOVELET_CACHE_MEGABYTES").unwrap_or_else(|_| "32".to_string());
+    let cache_megabytes_string = env::var("GROOVELET_CACHE_MEGABYTES").unwrap_or_else(|_| "512".to_string());
     let cache_megabytes = cache_megabytes_string.parse::<u64>().expect("Could not parse cache size properly into u64");
     let cache_bytes = cache_megabytes * 1024 * 1024;
 
@@ -143,20 +148,59 @@ async fn rocket() -> Rocket<Build> {
     let hi = cache.get("hello").await.expect("Moka cache is broken");
     assert_eq!(hi, "world");
 
-    let data_directory = "/tmp".to_string();
+    let data_directory = "./data".to_string();
     let three_days_in_seconds = 60 * 60 * 24 * 3;
+    let drop_table_on_start = !is_production;
 
     let email_verification_token_service_options = services::disposable_token_service::DisposableTokenServiceOptions{
         data_directory: data_directory.clone(),
         name: "email_verification".to_string(),
         cache_capacity: 10000,
         expiry_seconds: three_days_in_seconds,
-        drop_table_on_start: true,
+        drop_table_on_start: drop_table_on_start,
         get_refreshes_expiry: false,
         probability_of_refresh: 0.0,
     };
     let email_verification_token_service = services::disposable_token_service::DisposableTokenService::<UserId>::new(email_verification_token_service_options)
         .expect("Could not create email verification token service");
+
+    let ip_verification_token_service_options = services::disposable_token_service::DisposableTokenServiceOptions{
+        data_directory: data_directory.clone(),
+        name: "ip_verification".to_string(),
+        cache_capacity: 10000,
+        expiry_seconds: three_days_in_seconds,
+        drop_table_on_start: drop_table_on_start,
+        get_refreshes_expiry: false,
+        probability_of_refresh: 0.0,
+    };
+    let ip_verification_token_service = services::disposable_token_service::DisposableTokenService::<UserId>::new(ip_verification_token_service_options)
+        .expect("Could not create ip verification token service");
+
+    let password_change_token_service_options = services::disposable_token_service::DisposableTokenServiceOptions{
+        data_directory: data_directory.clone(),
+        name: "password_change".to_string(),
+        cache_capacity: 10000,
+        expiry_seconds: three_days_in_seconds,
+        drop_table_on_start: drop_table_on_start,
+        get_refreshes_expiry: false,
+        probability_of_refresh: 0.0,
+    };
+    let password_change_token_service = services::disposable_token_service::DisposableTokenService::<UserId>::new(password_change_token_service_options)
+        .expect("Could not create password change token service");
+
+
+    let seven_days_in_seconds = 60 * 60 * 24 * 7;
+    let auth_token_service_options = services::auth_token_service::AuthTokenServiceOptions{
+        data_directory: data_directory.clone(),
+        name: "auth".to_string(),
+        cache_capacity: 100000,
+        expiry_seconds: seven_days_in_seconds,
+        drop_table_on_start: drop_table_on_start,
+        max_tokens_per_user: 8,
+    };
+
+    let auth_token_service = services::auth_token_service::AuthTokenService::<crate::auth::model::UserSession>::new(auth_token_service_options)
+        .expect("Could not create auth token service");
 
     // Initialize Models & Prepare all Scylla Queries
     let mut basic_prepared_queries = basic::model::initialize(&scylla_connection)
@@ -196,6 +240,9 @@ async fn rocket() -> Rocket<Build> {
     let services = Services {
         is_production: is_production,
         email_token_service: Arc::new(email_verification_token_service),
+        ip_token_service: Arc::new(ip_verification_token_service),
+        password_token_service: Arc::new(password_change_token_service),
+        auth_token_service: Arc::new(auth_token_service),
         cache_redis: setup_redis(&cache_redis_url).await,
         application_redis: setup_redis(&application_redis_url).await,
         scylla: ScyllaService {
@@ -208,12 +255,15 @@ async fn rocket() -> Rocket<Build> {
         })),
         email: Arc::new(email_provider),
         static_markdown: Arc::new(static_hashmap),
-        local_cache: cache
+        local_cache: Arc::new(cache),
     };
 
     let services_clone = Services{
         is_production: services.is_production,
         email_token_service: services.email_token_service.clone(),
+        ip_token_service: services.ip_token_service.clone(),
+        auth_token_service: services.auth_token_service.clone(),
+        password_token_service: services.password_token_service.clone(),
         cache_redis: services.cache_redis.clone(),
         application_redis: services.application_redis.clone(),
         scylla: ScyllaService {
@@ -223,7 +273,7 @@ async fn rocket() -> Rocket<Build> {
         config: services.config.clone(),
         email: services.email.clone(),
         static_markdown: services.static_markdown.clone(),
-        local_cache: services.local_cache.clone()
+        local_cache: services.local_cache.clone(),
     };
 
     // Create a root user
@@ -317,11 +367,35 @@ async fn rocket() -> Rocket<Build> {
                 }
             }
 
-            let resp = &services_clone.email_token_service.delete_expired_tokens();
+            let resp = &services_clone.email_token_service.background_tick();
             match resp{
                 Ok(_) => {},
                 Err(e) => {
-                    println!("Background Error: Could not delete expired tokens: {:?}", e);
+                    println!("Background Error: Could not delete expired email tokens: {:?}", e);
+                }
+            }
+
+            let resp = &services_clone.ip_token_service.background_tick();
+            match resp{
+                Ok(_) => {},
+                Err(e) => {
+                    println!("Background Error: Could not delete expired ip tokens: {:?}", e);
+                }
+            }
+
+            let resp = &services_clone.password_token_service.background_tick();
+            match resp{
+                Ok(_) => {},
+                Err(e) => {
+                    println!("Background Error: Could not delete expired password tokens: {:?}", e);
+                }
+            }
+
+            let resp = &services_clone.auth_token_service.background_tick();
+            match resp{
+                Ok(_) => {},
+                Err(e) => {
+                    println!("Background Error: Could not delete expired auth tokens: {:?}", e);
                 }
             }
 

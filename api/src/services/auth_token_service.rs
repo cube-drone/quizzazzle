@@ -237,7 +237,7 @@ impl<T> AuthTokenService<T> where T: Serialize + DeserializeOwned + Clone + Sync
         Ok(())
     }
 
-    async fn maybe_ping_sql(&self, user_id: &Uuid, token_id: &Uuid) -> Result<()>{
+    async fn ping_sql_async(&self, user_id: &Uuid, token_id: &Uuid) -> Result<()>{
         let connection = self.connection.clone();
         let user_id = user_id.clone();
         let token_id = token_id.clone();
@@ -248,13 +248,13 @@ impl<T> AuthTokenService<T> where T: Serialize + DeserializeOwned + Clone + Sync
         Ok(())
     }
 
-    async fn get_token(&self, token_id: &Uuid) -> Result<Option<T>>{
+    pub async fn get_token(&self, token_id: &Uuid) -> Result<Option<T>>{
         match self.disposable_token_service.get_token(token_id).await{
             Ok(Some(token)) => {
                 let user_id = token.user_id();
                 self.make_sure_user_exists(&user_id).await?;
                 self.timestamp_sorted_list_cache.push_new(&user_id, token_id.clone()).await?;
-                self.maybe_ping_sql(&user_id, &token_id).await?;
+                self.ping_sql_async(&user_id, &token_id).await?;
                 Ok(Some(token))
             }
             Ok(None) => {
@@ -264,7 +264,7 @@ impl<T> AuthTokenService<T> where T: Serialize + DeserializeOwned + Clone + Sync
         }
     }
 
-    async fn get_token_without_updating(&self, token_id: &Uuid) -> Result<Option<T>>{
+    pub async fn get_token_without_updating(&self, token_id: &Uuid) -> Result<Option<T>>{
         match self.disposable_token_service.get_token(token_id).await{
             Ok(Some(token)) => {
                 Ok(Some(token))
@@ -276,7 +276,7 @@ impl<T> AuthTokenService<T> where T: Serialize + DeserializeOwned + Clone + Sync
         }
     }
 
-    async fn get_tokens(&self, user_id: &Uuid) -> Result<HashMap<Uuid, Option<T>>>{
+    pub async fn get_tokens(&self, user_id: &Uuid) -> Result<HashMap<Uuid, Option<T>>>{
         self.make_sure_user_exists(&user_id).await?;
         let maybe_token_ids = self.timestamp_sorted_list_cache.get(&user_id).await;
         let token_ids = match maybe_token_ids {
@@ -288,17 +288,32 @@ impl<T> AuthTokenService<T> where T: Serialize + DeserializeOwned + Clone + Sync
         Ok(result)
     }
 
-    async fn update_token(&self, token_id: &Uuid, token: T) -> Result<()>{
+    pub async fn update_token(&self, token_id: &Uuid, token: T) -> Result<()>{
         self.disposable_token_service.update_token(token_id, token).await
     }
 
-    async fn list_tokens(&self, user_id: &Uuid) -> Result<Vec<Uuid>>{
+    pub async fn list_tokens(&self, user_id: &Uuid) -> Result<Vec<Uuid>>{
         self.make_sure_user_exists(&user_id).await?;
         let maybe_token_ids = self.timestamp_sorted_list_cache.get(&user_id).await;
         match maybe_token_ids {
             Some(token_ids) => Ok(token_ids.into_iter().map(|(id, _)| id).collect()),
             None => Ok(Vec::new()),
         }
+    }
+
+    pub async fn delete_token(&self, token_id: &Uuid) -> Result<()>{
+        let token = self.get_token_without_updating(token_id).await?;
+        match token {
+            Some(token) => {
+                let user_id = token.user_id();
+                self.timestamp_sorted_list_cache.remove(&user_id, token_id).await?;
+                self.disposable_token_service.delete_token(token_id).await?;
+                self.delete_token_from_sql_async(&user_id, token_id).await?;
+            }
+            None => {}
+        }
+
+        Ok(())
     }
 
     fn delete_all_tokens_from_sql(connection: Arc<Mutex<SqlConnection>>, user_id: &Uuid) -> Result<()>{
@@ -343,7 +358,11 @@ impl<T> AuthTokenService<T> where T: Serialize + DeserializeOwned + Clone + Sync
     pub fn clear_expired_tokens(&self) -> Result<()>{
         let lock = self.connection.lock().map_err(|_e| anyhow::anyhow!("Could not get lock to delete token from sql"))?;
         let mut statement = lock.prepare_cached(DELETE_IDLE)?;
-        statement.execute([])?;
+
+        let now_timestamp = chrono::Utc::now().timestamp();
+        let expiry_timestamp = now_timestamp - self.options.expiry_seconds as i64;
+
+        statement.execute([expiry_timestamp])?;
         Ok(())
     }
 

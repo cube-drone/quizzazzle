@@ -29,11 +29,6 @@ use crate::auth::tables::table_user_invite;
 const ROOT_USER_ID: UserId = UserId(Uuid::from_u128(0));
 const DEFAULT_THUMBNAIL_URL: &str = "/static/chismas.png";
 
-const USER_SESSION_TIMEOUT_SECONDS: usize = 86400 * 14; // two weeks
-const EMAIL_VERIFICATION_TIMEOUT_SECONDS: usize = 86400 * 3; // three days
-const PASSWORD_RESET_TIMEOUT_SECONDS: usize = 86400 * 1; // one day
-const USER_MAX_SESSION_COUNT: usize = 8; // how many sessions can a single user have active?
-
 
 pub async fn initialize(
     scylla_session: &Arc<Session>,
@@ -173,6 +168,12 @@ pub struct UserSession {
     pub is_known_ip: bool,
     pub ip: IpAddr,
     pub tags: Vec<String>,
+}
+
+impl crate::services::auth_token_service::HasUserId for UserSession{
+    fn user_id(&self) -> Uuid{
+        self.user_id.to_uuid()
+    }
 }
 
 impl UserSession {
@@ -418,7 +419,7 @@ impl Services {
             &user_create.user_id
         ).await?;
 
-        self.send_verification_email( &user_create.user_id.0, &user_create.email ).await?;
+        self.send_verification_email( &user_create.user_id, &user_create.email ).await?;
 
         let user_session = UserSession{
             user_id: user_create.user_id,
@@ -474,7 +475,7 @@ impl Services {
             let known_ip = self.is_this_a_known_ip_for_this_user(&UserId::from_uuid(email_user.id), &ip).await?;
 
             if !known_ip {
-                self.send_ip_verification_email(&email_user.id, &email).await?;
+                self.send_ip_verification_email(&UserId::from_uuid(email_user.id), &email).await?;
             }
 
             if password_success {
@@ -516,14 +517,10 @@ impl Services {
 
     pub async fn send_verification_email(
         &self,
-        user_id: &Uuid,
+        user_id: &UserId,
         email_address: &str,
     ) -> Result<()> {
-        let mut redis_connection = self.application_redis.get_async_connection().await?;
-        let email_verification_token = Uuid::new_v4().to_string();
-        let key = format!("email_verification_token:${}", email_verification_token);
-
-        redis_connection.set_ex(&key, user_id.to_string(), EMAIL_VERIFICATION_TIMEOUT_SECONDS).await?;
+        let email_verification_token = self.email_token_service.create_token(user_id.clone()).await?;
 
         let public_address = self.config_get_public_address();
 
@@ -531,9 +528,10 @@ impl Services {
 
         self.email.send_verification_email(&EmailAddress::new(email_address.to_string())?, &email_verification_link).await?;
 
+        // we keep track of the last email sent, so that we can test this functionality
         if ! self.is_production {
             let last_email_sent_key = format!("last_email_sent:${}", email_address);
-            redis_connection.set(&last_email_sent_key, email_verification_link).await?;
+            self.local_cache.insert(last_email_sent_key, email_verification_link).await;
         }
 
         Ok(())
@@ -553,7 +551,7 @@ impl Services {
                     Err(anyhow!("User is already verified!"))
                 }
                 else{
-                    self.send_verification_email(&user_id.to_uuid(), &user.email).await?;
+                    self.send_verification_email(&user_id, &user.email).await?;
                     Ok(())
                 }
             }
@@ -562,14 +560,10 @@ impl Services {
 
     pub async fn send_ip_verification_email(
         &self,
-        user_id: &Uuid,
+        user_id: &UserId,
         email_address: &str,
     ) -> Result<()> {
-        let mut redis_connection = self.application_redis.get_async_connection().await?;
-        let email_verification_token = Uuid::new_v4().to_string();
-        let key = format!("ip_verification_token:${}", email_verification_token);
-
-        redis_connection.set_ex(&key, user_id.to_string(), EMAIL_VERIFICATION_TIMEOUT_SECONDS).await?;
+        let email_verification_token = self.ip_token_service.create_token(user_id.clone()).await?;
 
         let public_address = self.config_get_public_address();
 
@@ -579,7 +573,7 @@ impl Services {
 
         if ! self.is_production {
             let last_email_sent_key = format!("last_email_sent:${}", email_address);
-            redis_connection.set(&last_email_sent_key, ip_verification_link).await?;
+            self.local_cache.insert(last_email_sent_key, ip_verification_link).await;
         }
 
         Ok(())
@@ -595,7 +589,7 @@ impl Services {
                 Err(anyhow!("User does not exist!"))
             },
             Some(user) => {
-                self.send_ip_verification_email(&user_id.to_uuid(), &user.email).await?;
+                self.send_ip_verification_email(&user_id, &user.email).await?;
                 Ok(())
             }
         }
@@ -605,23 +599,25 @@ impl Services {
         &self,
         email_verification_token: &Uuid,
     ) -> Result<UserId> {
-        let mut redis_connection = self.application_redis.get_async_connection().await?;
-        let verification_token_key = format!("email_verification_token:${}", email_verification_token.to_string());
-        let user_id: String = redis_connection.get(&verification_token_key).await?;
-        let user_id = Uuid::parse_str(&user_id)?;
-        let user_id = UserId(user_id);
+        let user_id = self.email_token_service.get_token(&email_verification_token).await?;
+        match user_id {
+            None => {
+                Err(anyhow!("Invalid token!"))
+            },
+            Some(user_id) => {
+                if ! self.table_user_exists(&user_id).await? {
+                    return Err(anyhow!("User does not exist!"));
+                }
 
-        if ! self.table_user_exists(&user_id).await? {
-            return Err(anyhow!("User does not exist!"));
+                self.table_user_verify(&user_id).await?;
+
+                self.verify_all_sessions(&user_id).await?;
+
+                self.email_token_service.delete_token(&email_verification_token).await?;
+
+                Ok(user_id)
+            }
         }
-
-        self.table_user_verify(&user_id).await?;
-
-        self.verify_all_sessions(&user_id).await?;
-
-        redis_connection.unlink(&verification_token_key).await?;
-
-        Ok(user_id)
     }
 
     pub async fn remember_ip(
@@ -649,23 +645,25 @@ impl Services {
         email_verification_token: &Uuid,
         ip: &IpAddr,
     ) -> Result<()> {
-        let mut redis_connection = self.application_redis.get_async_connection().await?;
-        let verification_token_key = format!("ip_verification_token:${}", email_verification_token.to_string());
-        let user_id: String = redis_connection.get(&verification_token_key).await?;
-        let user_id = Uuid::parse_str(&user_id)?;
-        let user_id = UserId(user_id);
+        let user_id = self.ip_token_service.get_token(&email_verification_token).await?;
+        match user_id {
+            None => {
+                Err(anyhow!("Invalid token!"))
+            },
+            Some(user_id) => {
+                if ! self.table_user_exists(&user_id).await? {
+                    return Err(anyhow!("User does not exist!"));
+                }
 
-        if ! self.table_user_exists(&user_id).await? {
-            return Err(anyhow!("User does not exist!"));
+                self.table_user_ip_create(&user_id, &ip).await?;
+
+                self.verify_ip_all_sessions(&user_id, &ip).await?;
+
+                self.ip_token_service.delete_token(&email_verification_token).await?;
+
+                Ok(())
+            }
         }
-
-        self.table_user_ip_create(&user_id, &ip).await?;
-
-        self.verify_ip_all_sessions(&user_id, &ip).await?;
-
-        redis_connection.unlink(&verification_token_key).await?;
-
-        Ok(())
     }
 
     pub async fn forget_ip(
@@ -699,11 +697,7 @@ impl Services {
             Some(user) => {
                 let user_id = user.id;
 
-                let mut redis_connection = self.application_redis.get_async_connection().await?;
-                let password_reset_token = Uuid::new_v4().to_string();
-                let key = format!("password_reset_token:${}", password_reset_token);
-
-                redis_connection.set_ex(&key, user_id.to_string(), PASSWORD_RESET_TIMEOUT_SECONDS).await?;
+                let password_reset_token = self.password_token_service.create_token(UserId::from_uuid(user_id)).await?;
 
                 let public_address = self.config_get_public_address();
 
@@ -713,7 +707,7 @@ impl Services {
 
                 if ! self.is_production {
                     let last_email_sent_key = format!("last_email_sent:${}", email_address);
-                    redis_connection.set(&last_email_sent_key, password_reset_link).await?;
+                    self.local_cache.insert(last_email_sent_key, password_reset_link).await;
                 }
 
                 Ok(())
@@ -723,36 +717,43 @@ impl Services {
 
     pub async fn password_reset(&self, password_token: &Uuid, password: &str, ip: &IpAddr) -> Result<SessionToken> {
         // 1. verify the token and find the associated user id
-        let mut redis_connection = self.application_redis.get_async_connection().await?;
-        let verification_token_key = format!("password_reset_token:${}", password_token.to_string());
-        let user_id: String = redis_connection.get(&verification_token_key).await?;
-        let user_id = Uuid::parse_str(&user_id)?;
-        let user_id = UserId(user_id);
+        let user_id_maybe = self.password_token_service.get_token(&password_token).await?;
 
-        // 2. hash the password and save it against the associated user id
-        let hashed_password: String = hashes::password_hash_async(&password).await?;
+        match user_id_maybe{
+            None => {
+                Err(anyhow!("Invalid token!"))
+            },
+            Some(user_id) => {
+                if ! self.table_user_exists(&user_id).await? {
+                    return Err(anyhow!("User does not exist!"));
+                }
 
-        self.table_user_password_change(&user_id, &hashed_password).await?;
+                // 2. hash the password and save it against the associated user id
+                let hashed_password: String = hashes::password_hash_async(&password).await?;
 
-        // 3. while we're here, save that IP as a known IP for this user
-        self.remember_ip(&user_id, &ip).await?;
+                self.table_user_password_change(&user_id, &hashed_password).await?;
 
-        // 4. get that user, create a session token, and return it
-        let user = self.table_user_get(&user_id).await?.unwrap();
-        let user_session = UserSession{
-            user_id: UserId::from_uuid(user.id),
-            display_name: user.display_name,
-            thumbnail_url: user.thumbnail_url,
-            is_verified: user.is_verified,
-            is_admin: user.is_admin,
-            is_known_ip: true,
-            ip: *ip,
-            tags: user.tags,
-        };
+                // 3. while we're here, save that IP as a known IP for this user
+                self.remember_ip(&user_id, &ip).await?;
 
-        let session_token = self.create_session_token(&user_session).await?;
+                // 4. get that user, create a session token, and return it
+                let user = self.table_user_get(&user_id).await?.unwrap();
+                let user_session = UserSession{
+                    user_id: UserId::from_uuid(user.id),
+                    display_name: user.display_name,
+                    thumbnail_url: user.thumbnail_url,
+                    is_verified: user.is_verified,
+                    is_admin: user.is_admin,
+                    is_known_ip: true,
+                    ip: *ip,
+                    tags: user.tags,
+                };
 
-        Ok(session_token)
+                let session_token = self.create_session_token(&user_session).await?;
+
+                Ok(session_token)
+            }
+        }
     }
 
 
@@ -768,7 +769,7 @@ impl Services {
 
     pub async fn rate_limit(&self, key: &String, requests_per_hour: usize) -> Result<()> {
         /*
-            Whatever the key is, it's not allowed to call this funciton more than requests_per_hour times per hour,
+            Whatever the key is, it's not allowed to call this function more than requests_per_hour times per hour,
             if it does, it'll throw a rate limit error.
             It also can't call this function more than once every 5 seconds.
         */
@@ -835,40 +836,10 @@ s::::::::::::::s  e::::::::eeeeeeee  s::::::::::::::s s::::::::::::::s i::::::io
         /*
             given a user session, create a session token and save it in redis
          */
-        let mut redis_connection = self.application_redis.get_async_connection().await?;
-        let session_token = Uuid::new_v4();
-        let session_json = serde_json::to_string(user_session)?;
-        let key = format!("session_token:{}", session_token.to_string());
-        redis_connection.set_ex(&key, session_json, USER_SESSION_TIMEOUT_SECONDS).await?;
 
-        let user_sessions_key = format!("user_sessions:{}", user_session.user_id.to_string());
-        redis_connection.zadd(&user_sessions_key, session_token.to_string(), Utc::now().timestamp_millis()).await?;
-        redis_connection.expire(&user_sessions_key, USER_SESSION_TIMEOUT_SECONDS*2).await?;
-
-        let user_sessions_count: usize = redis_connection.zcard(&user_sessions_key).await?;
-        //println!("user_sessions_count: {}", user_sessions_count);
-        // if the user has more than MAX_SESSIONS sessions, delete the oldest one
-        if user_sessions_count > USER_MAX_SESSION_COUNT {
-            self.cull_old_sessions(&user_session.user_id).await?;
-        }
+        let session_token = self.auth_token_service.create_token(&user_session.user_id.to_uuid(), user_session).await?;
 
         Ok(SessionToken(session_token))
-    }
-
-    pub async fn cull_old_sessions(&self, user_id: &UserId) -> Result<()>{
-        // the user has more than USER_MAX_SESSION_COUNT sessions, delete all but the USER_MAX_SESSION_COUNT most recent
-        // it's also fine to cull any that have obviously expired (> USER_SESSION_TIMEOUT_SECONDS old)
-        let timestamp_cutoff: i64 = Utc::now().timestamp_millis() - (USER_SESSION_TIMEOUT_SECONDS as i64 * 1000);
-
-        let mut counter: usize = 0;
-        for (session_token, timestamp) in self.get_all_sessions(&user_id).await? {
-            if timestamp < timestamp_cutoff || counter > USER_MAX_SESSION_COUNT {
-                self.delete_session(&session_token, &user_id).await?;
-            }
-            counter += 1;
-        }
-
-        Ok(())
     }
 
     /*
@@ -880,73 +851,35 @@ s::::::::::::::s  e::::::::eeeeeeee  s::::::::::::::s s::::::::::::::s i::::::io
     }
     */
 
-    pub async fn delete_session(&self, session_token: &SessionToken, user_id: &UserId) -> Result<()>{
-        let mut redis_connection = self.application_redis.get_async_connection().await?;
-        redis_connection.unlink(&format!("session_token:{}", session_token.to_string())).await?;
-        redis_connection.zrem(&format!("user_sessions:{}", user_id.to_string()), session_token.to_string()).await?;
+    pub async fn delete_session(&self, session_token: &SessionToken, _user_id: &UserId) -> Result<()>{
+        self.auth_token_service.delete_token(&session_token.to_uuid()).await?;
 
         Ok(())
     }
 
     pub async fn delete_all_sessions(&self, user_id: &UserId) -> Result<()>{
-        for (session_token, _timestamp) in self.get_all_sessions(&user_id).await? {
-            self.delete_session(&session_token, &user_id).await?;
-        }
-        Ok(())
-    }
-
-    pub async fn verify_session(&self, session_token: &SessionToken) -> Result<()>{
-        let mut redis_connection = self.application_redis.get_async_connection().await?;
-        let key = format!("session_token:{}", session_token.to_string());
-        let session_json: String = redis_connection.get(&key).await?;
-
-        //println!("verifying session_json: {}", session_json);
-
-        let mut user_session: UserSession = serde_json::from_str(&session_json)?;
-
-        user_session.is_verified = true;
-
-        let session_json = serde_json::to_string(&user_session)?;
-
-        redis_connection.set_ex(&key, session_json, USER_SESSION_TIMEOUT_SECONDS).await?;
+        self.auth_token_service.clear_tokens(&user_id.to_uuid()).await?;
 
         Ok(())
-    }
-
-    pub async fn verify_session_ip(&self, session_token: &SessionToken, ip: &IpAddr) -> Result<()>{
-        let mut redis_connection = self.application_redis.get_async_connection().await?;
-        let key = format!("session_token:{}", session_token.to_string());
-        let session_json: String = redis_connection.get(&key).await?;
-
-        let mut user_session: UserSession = serde_json::from_str(&session_json)?;
-
-        if user_session.ip.to_string() == ip.to_string(){
-            user_session.is_known_ip = true;
-
-            let session_json = serde_json::to_string(&user_session)?;
-
-            redis_connection.set_ex(&key, session_json, USER_SESSION_TIMEOUT_SECONDS).await?;
-        }
-
-        Ok(())
-    }
-
-    pub async fn get_all_sessions(&self, user_id: &UserId) -> Result<Vec<(SessionToken, i64)>> {
-        let mut redis_connection = self.application_redis.get_async_connection().await?;
-        let user_sessions: Vec<(String, i64)> = redis_connection.zrangebyscore_withscores(&format!("user_sessions:{}", user_id.to_string()), "-inf", "+inf").await?;
-
-        let new_user_sessions: Vec<(SessionToken, i64)> = user_sessions.iter().map(|(session_token, timestamp)| (SessionToken::from_string(&session_token).unwrap(), *timestamp)).collect();
-
-        Ok(new_user_sessions)
     }
 
     pub async fn verify_all_sessions(&self, user_id: &UserId) -> Result<()>{
         /*
             after the user has verified that their email address is valid, we should verify all of their sessions
          */
-        for (session_token, _timestamp) in self.get_all_sessions(&user_id).await? {
-            self.verify_session(&session_token).await?;
+
+        let sessions = self.auth_token_service.get_tokens(&user_id.to_uuid()).await?;
+
+        for(session_token, maybe_session) in sessions{
+            match maybe_session{
+                None => {},
+                Some(mut user_session) => {
+                    user_session.is_verified = true;
+                    self.auth_token_service.update_token(&session_token, user_session).await?;
+                }
+            }
         }
+
         Ok(())
     }
 
@@ -954,36 +887,26 @@ s::::::::::::::s  e::::::::eeeeeeee  s::::::::::::::s s::::::::::::::s i::::::io
         /*
             after the user has verified that their email address is valid, we should verify all of their sessions
          */
-        for (session_token, _timestamp) in self.get_all_sessions(&user_id).await? {
-            self.verify_session_ip(&session_token, &ip).await?;
+        let sessions = self.auth_token_service.get_tokens(&user_id.to_uuid()).await?;
+
+        for(session_token, maybe_session) in sessions{
+            match maybe_session{
+                None => {},
+                Some(mut user_session) => {
+                    if user_session.ip.to_string() == ip.to_string() {
+                        user_session.is_known_ip = true;
+                        self.auth_token_service.update_token(&session_token, user_session).await?;
+                    }
+                }
+            }
         }
         Ok(())
     }
 
-    pub async fn refresh_session_token(&self, session_token: &SessionToken, user_id: &UserId) -> Result<()>{
-        let mut redis_connection = self.application_redis.get_async_connection().await?;
+    pub async fn get_user_from_session_token(&self, session_token: &SessionToken) -> Result<Option<UserSession>>{
+        let user_session = self.auth_token_service.get_token(&session_token.to_uuid()).await?;
 
-        redis_connection.expire(&format!("session_token:{}", session_token.to_string()), USER_SESSION_TIMEOUT_SECONDS).await?;
-
-        let user_sessions_key = format!("user_sessions:{}", user_id.to_string());
-        redis_connection.zadd(&user_sessions_key, session_token.to_string(), Utc::now().timestamp_millis()).await?;
-
-        Ok(())
-    }
-
-    pub async fn get_user_from_session_token(&self, session_token: &SessionToken) -> Result<UserSession>{
-        let mut redis_connection = self.application_redis.get_async_connection().await?;
-
-        let session_json: String = redis_connection.get(&format!("session_token:{}", session_token.to_string())).await?;
-
-        //println!("getting session_json: {}", session_json);
-
-        let user_session: UserSession = serde_json::from_str(&session_json)?;
-
-        // note: it may be needlessly expensive to do this every single time, presumably, users are doing this on the reg
-        self.refresh_session_token(session_token, &user_session.user_id).await?;
-
-        return Ok(user_session);
+        Ok(user_session)
     }
 
 }

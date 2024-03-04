@@ -565,13 +565,16 @@ impl<'r> FromRequest<'r> for model::AdminUserSession {
             match session_token_maybe{
                 Ok(session_token) => {
                     match services.get_user_from_session_token(&session_token).await{
-                        Ok(user) => {
+                        Ok(Some(user)) => {
                             if user.is_admin{
                                 return Outcome::Success(user.to_admin_user_session());
                             }
                             else{
                                 return Outcome::Forward(Status::Forbidden);
                             }
+                        },
+                        Ok(None) => {
+                            return Outcome::Forward(Status::Forbidden);
                         },
                         Err(e) => {
                             println!("Error getting user from session token: {}", e);
@@ -606,13 +609,16 @@ impl<'r> FromRequest<'r> for model::VerifiedUserSession {
             match session_token_maybe{
                 Ok(session_token) => {
                     match services.get_user_from_session_token(&session_token).await{
-                        Ok(user) => {
+                        Ok(Some(user)) => {
                             if user.is_verified && user.is_known_ip{
                                 return Outcome::Success(user.to_verified_user_session());
                             }
                             else{
                                 return Outcome::Forward(Status::Forbidden);
                             }
+                        },
+                        Ok(None) => {
+                            return Outcome::Forward(Status::Forbidden);
                         },
                         Err(e) => {
                             println!("Error getting user from session token: {}", e);
@@ -647,8 +653,11 @@ impl<'r> FromRequest<'r> for model::UserSession {
             match session_token_maybe{
                 Ok(session_token) => {
                     match services.get_user_from_session_token(&session_token).await{
-                        Ok(user) => {
+                        Ok(Some(user)) => {
                             return Outcome::Success(user);
+                        },
+                        Ok(None) => {
+                            return Outcome::Forward(Status::Forbidden);
                         },
                         Err(e) => {
                             println!("Error getting user from session token: {}", e);
