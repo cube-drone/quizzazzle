@@ -14,6 +14,22 @@ async fn home() -> Template {
     })
 }
 
+#[get("/rate")]
+async fn rate() -> Template {
+    Template::render("message", context! {
+        title: "Rate Limited",
+        message: "You're doing that too much. Please wait a bit before trying again."
+    })
+}
+
+#[post("/rate")]
+async fn rate_post() -> Template {
+    Template::render("message", context! {
+        title: "Rate Limited",
+        message: "You're doing that too much. Please wait a bit before trying again."
+    })
+}
+
 #[get("/tos")]
 async fn tos(services: &State<Services>) -> Template {
     Template::render("markdown", context!{
@@ -57,6 +73,8 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
         "/",
         routes![
             home,
+            rate,
+            rate_post,
             tos,
             faq,
             pricing,

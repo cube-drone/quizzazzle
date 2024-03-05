@@ -520,7 +520,7 @@ impl Services {
     ) -> Result<()> {
         let email_verification_token = self.email_token_service.create_token(user_id.clone()).await?;
 
-        let public_address = self.config_get_public_address();
+        let public_address = crate::config::public_address();
 
         let email_verification_link = format!("{}/auth/verify_email?token={}", public_address, email_verification_token);
 
@@ -563,7 +563,7 @@ impl Services {
     ) -> Result<()> {
         let email_verification_token = self.ip_token_service.create_token(user_id.clone()).await?;
 
-        let public_address = self.config_get_public_address();
+        let public_address = crate::config::public_address();
 
         let ip_verification_link = format!("{}/auth/verify_ip?token={}", public_address, email_verification_token);
 
@@ -697,7 +697,7 @@ impl Services {
 
                 let password_reset_token = self.password_token_service.create_token(UserId::from_uuid(user_id)).await?;
 
-                let public_address = self.config_get_public_address();
+                let public_address = crate::config::public_address();
 
                 let password_reset_link = format!("{}/auth/password_reset/stage_2?token={}", public_address, password_reset_token);
 

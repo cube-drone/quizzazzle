@@ -4,6 +4,7 @@ use std::net::IpAddr;
 use moka::future::Cache;
 use std::sync::Arc;
 use rocket::http::uri::Origin;
+use rocket::http::Method::{Get, Post, Put, Delete};
 
 
 /// Nobody should be able to hit _any_ endpoint on the server too aggressively.
@@ -23,26 +24,37 @@ impl Fairing for RateLimit {
     /// Adds a header to the response indicating how long the server took to
     /// process the request.
     async fn on_request(&self, req: &mut Request<'_>, _: &mut Data<'_>) {
-        match req.client_ip(){
-            Some(ip) => {
-                let bounce = self.ip_limit.get(&ip).await;
+        println!("{}", req.uri().to_string());
+        match req.method(){
+            Get => {
+                // i don't think we should rate limit GET requests, yet
+            }
+            Post | Put | Delete => {
+                match req.client_ip(){
+                    Some(ip) => {
+                        let bounce = self.ip_limit.get(&ip).await;
 
-                match bounce {
-                    Some(seen_before) => {
-                        if seen_before{
-                            req.set_uri(Origin::parse("/rate_limit_exceeded").expect("Invalid URI"));
-                        }
-                        else{
-                            self.ip_limit.insert(ip.clone(), true).await;
+                        match bounce {
+                            Some(seen_before) => {
+                                if seen_before{
+                                    req.set_uri(Origin::parse("/rate").expect("Invalid URI"));
+                                }
+                                else{
+                                    self.ip_limit.insert(ip.clone(), true).await;
+                                }
+                            }
+                            None => {
+                                self.ip_limit.insert(ip.clone(), true).await;
+                            }
                         }
                     }
                     None => {
-                        self.ip_limit.insert(ip.clone(), true).await;
+                        req.set_uri(Origin::parse("/rate").expect("Invalid URI"));
                     }
                 }
             }
-            None => {
-                req.set_uri(Origin::parse("/rate_limit_exceeded").expect("Invalid URI"));
+            _ => {
+                return;
             }
         }
     }

@@ -5,7 +5,6 @@ use std::fs;
 use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
-use std::sync::RwLock;
 use std::time::Duration;
 //use rocket::http::hyper::service;
 use rocket::{Build, Rocket};
@@ -25,13 +24,12 @@ use tera::{Value, to_value};
 
 use crate::auth::model::UserId;
 
+mod config;
 mod fairings;
 mod error; // provides the no_shit! macro
 mod icons;
 
-mod config;
 mod email;
-mod basic;
 mod home;
 mod auth;
 mod feed;
@@ -52,11 +50,6 @@ pub struct ScyllaService {
 /*
     Note that this is private and public in the "visible to the end-user" sense, not in the "OO" sense
 */
-pub struct ConfigService {
-    pub public_config: HashMap<String, String>,
-    pub private_config: HashMap<String, String>
-}
-
 #[derive(Clone)]
 pub struct Services {
     pub is_production: bool,
@@ -68,7 +61,6 @@ pub struct Services {
     pub cache_redis: Arc<Client>,
     pub application_redis: Arc<Client>,
     pub scylla: ScyllaService,
-    pub config: Arc<RwLock<ConfigService>>,
     pub email: Arc<email::EmailProvider>,
     pub static_markdown: Arc<HashMap<&'static str, String>>,
     pub local_cache: Arc<Cache<String, String>>,
@@ -208,20 +200,12 @@ async fn rocket() -> Rocket<Build> {
     let rate_limit_service = services::rate_limit::RateLimitService::new();
 
     // Initialize Models & Prepare all Scylla Queries
-    let mut basic_prepared_queries = basic::model::initialize(&scylla_connection)
-        .await
-        .expect("Could not initialize basic model");
-    let mut config_prepared_queries = config::model::initialize(&scylla_connection)
-        .await
-        .expect("Could not initialize config model");
     let mut auth_prepared_queries = auth::model::initialize(&scylla_connection)
         .await
         .expect("Could not initialize auth model");
     let mut other_prepared_queries: HashMap<&'static str, PreparedStatement> = HashMap::new();
 
     let queries_to_merge = vec![
-        &mut basic_prepared_queries,
-        &mut config_prepared_queries,
         &mut auth_prepared_queries,
         &mut other_prepared_queries
     ];
@@ -255,10 +239,6 @@ async fn rocket() -> Rocket<Build> {
             session: scylla_connection,
             prepared_queries: Arc::new(prepared_queries),
         },
-        config: Arc::new(RwLock::new(ConfigService{
-            private_config: HashMap::new(),
-            public_config: HashMap::new(),
-        })),
         email: Arc::new(email_provider),
         static_markdown: Arc::new(static_hashmap),
         local_cache: Arc::new(cache),
@@ -272,29 +252,17 @@ async fn rocket() -> Rocket<Build> {
 	// Launch App
     let mut app = rocket::build();
 
-    let template_config = services.config.clone();
-    let template_config_again = services.config.clone();
     app = app.manage(services);
     app = app.attach(crate::fairings::timing::RequestTimer)
              .attach(crate::fairings::rate_limit::RateLimit{
-                 ip_limit: Arc::new(Cache::builder().max_capacity(100000).time_to_idle(Duration::from_millis(500)).build())
+                 ip_limit: Arc::new(Cache::builder().max_capacity(100000).time_to_idle(Duration::from_millis(5000)).build())
              })
              .attach(crate::fairings::poweredby::PoweredBy)
              .attach(Template::custom(move |engines|{
                 // register a few important variables like the site name
 
-                let template_config = template_config.clone();
-                engines.tera.register_function("config_value", move |args: &HashMap<String, Value>| {
-                    let key = args.get("key").unwrap().as_str().unwrap();
-                    let config = template_config.read().unwrap();
-                    let value = config.public_config.get(key).unwrap_or(&"ERROR KEY NOT FOUND".to_string()).to_string();
-                    Ok(to_value(value)?)
-                });
-
-                let template_config_again = template_config_again.clone();
                 engines.tera.register_function("public_address", move |_args: &HashMap<String, Value>| {
-                    let config = template_config_again.read().unwrap();
-                    let value = config.public_config.get("ROCKET_PUBLIC_ADDRESS").unwrap_or(&"http://localhost:3333".to_string()).to_string();
+                    let value = crate::config::public_address();
                     Ok(to_value(value)?)
                 });
 
@@ -334,31 +302,19 @@ async fn rocket() -> Rocket<Build> {
 
     // home is where "/" lives.
     app = home::routes::mount_routes(app);
-    // basic is a whole module intended to demonstrate basic functionality, it's not intended to be used in production
-    app = basic::routes::mount_routes(app);
     // auth: login, registration, that sort of stuff
     app = auth::routes::mount_routes(app);
-    // config: configuration
-    app = config::routes::mount_routes(app);
 
     // qr: that qr code thing
     app = qr::mount_routes(app);
 
-    // feed: configuration
+    // feed: we haven't worked out how feed works quite yet
     app = feed::routes::mount_routes(app);
 
     tokio::spawn(async move {
         loop{
             // code goes here
             println!("Every 30 seconds... ");
-
-            let config_resp = config::model::update_config(&services_clone).await;
-            match config_resp{
-                Ok(_) => {},
-                Err(e) => {
-                    println!("Background Error: Could not update config: {:?}", e);
-                }
-            }
 
             let resp = &services_clone.email_token_service.background_tick();
             match resp{
