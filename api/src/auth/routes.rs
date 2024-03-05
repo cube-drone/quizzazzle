@@ -44,13 +44,15 @@ struct Login<'r> {
     password: &'r str,
 }
 
-const MAXIMUM_INVITE_CODE_ATTEMPTS_PER_HOUR: usize = 15;
-const MAXIMUM_LOGIN_ATTEMPTS_PER_HOUR: usize = 15;
-const MAXIMUM_PASSWORD_EMAILS_PER_HOUR: usize = 2;
-const MAXIMUM_EMAIL_ATTEMPTS_PER_HOUR: usize = 2;
+use crate::services::rate_limit::RateLimitType;
+
+const RATE_LIMIT_INVITE_CODE_ATTEMPTS: RateLimitType = RateLimitType::ShortAndPerHour(15);
+const RATE_LIMIT_LOGIN_ATTEMPTS: RateLimitType = RateLimitType::ShortAndPerHour(15);
+const RATE_LIMIT_PASSWORD_EMAILS: RateLimitType = RateLimitType::ShortAndPerHour(2);
+const RATE_LIMIT_EMAIL_ATTEMPTS: RateLimitType = RateLimitType::ShortAndPerHour(2);
 
 #[post("/login", data = "<login>")]
-async fn login_post(services: &State<Services>, cookies: &CookieJar<'_>, login: Form<Login<'_>>, ip: BestGuessIpAddress) -> Result<Redirect, Template> {
+async fn login_post(services: &State<Services>, cookies: &CookieJar<'_>, login: Form<Login<'_>>, ip: IpAddr) -> Result<Redirect, Template> {
 
     let csrf_token_new = Uuid::new_v4().to_string();
 
@@ -89,22 +91,18 @@ async fn login_post(services: &State<Services>, cookies: &CookieJar<'_>, login: 
 
     if services.is_production {
         let rate_limit_factors: Vec<String> = vec![ip.to_string(), login.email.to_string()];
-        match services.rate_limits(&rate_limit_factors, MAXIMUM_LOGIN_ATTEMPTS_PER_HOUR).await{
-            Ok(()) => {
-            },
-            Err(_e) => {
-                return Err(Template::render("login", context! {
-                    csrf_token: csrf_token_new,
-                    error: "Attempting logins too fast, please wait a bit and try again!",
-                    email: "",
-                    password: "",
-                }));
-            }
+        if services.rate_limit_service.is_any_rate_limited(&"login".to_string(), &rate_limit_factors, RATE_LIMIT_LOGIN_ATTEMPTS).await {
+            return Err(Template::render("login", context! {
+                csrf_token: csrf_token_new,
+                error: "Attempting logins too fast, please wait a bit and try again!",
+                email: "",
+                password: "",
+            }));
         }
     }
 
     // okay, now, let's try to login
-    match services.login(login.email, login.password, ip.to_ip()).await{
+    match services.login(login.email, login.password, ip).await{
         Ok(session_token) => {
             // u did it, create a session token
             cookies.add_private(Cookie::new("session_token", session_token.to_string()));
@@ -144,7 +142,7 @@ async fn test_generate_invite_code(services: &State<Services>) -> Result<Json<Ha
 }
 
 #[post("/test/create_user", format = "json", data = "<user_serialized>")]
-async fn test_create_user(services: &State<Services>, cookies: &CookieJar<'_>, ip: BestGuessIpAddress, user_serialized: Json<model::UserCreate<'_>>) -> Result<Json<HashMap<String, String>>, Status> {
+async fn test_create_user(services: &State<Services>, cookies: &CookieJar<'_>, ip: IpAddr, user_serialized: Json<model::UserCreate<'_>>) -> Result<Json<HashMap<String, String>>, Status> {
     if services.is_production {
         return Err(Status::Forbidden);
     }
@@ -152,7 +150,7 @@ async fn test_create_user(services: &State<Services>, cookies: &CookieJar<'_>, i
     let user_to_create = user_serialized.into_inner();
     let user_id = user_to_create.user_id.clone();
 
-    let session_token = services.create_user(user_to_create, ip.to_ip()).await.expect("should be able to create a user");
+    let session_token = services.create_user(user_to_create, ip).await.expect("should be able to create a user");
     cookies.add_private(Cookie::new("session_token", session_token.to_string()));
 
     let mut hashmap: HashMap<String, String> = HashMap::new();
@@ -163,12 +161,12 @@ async fn test_create_user(services: &State<Services>, cookies: &CookieJar<'_>, i
 }
 
 #[get("/test/forget_ip")]
-async fn test_forget_ip(service: &State<Services>, cookies: &CookieJar<'_>, ip: BestGuessIpAddress, user: model::VerifiedUserSession) -> Result<Redirect, Status> {
+async fn test_forget_ip(service: &State<Services>, cookies: &CookieJar<'_>, ip: IpAddr, user: model::VerifiedUserSession) -> Result<Redirect, Status> {
     if service.is_production {
         return Err(Status::Forbidden);
     }
 
-    service.forget_ip(&user.user_id, &ip.to_ip()).await.expect("should be able to forget ip");
+    service.forget_ip(&user.user_id, &ip).await.expect("should be able to forget ip");
 
     cookies.remove_private(Cookie::from("session_token"));
 
@@ -201,7 +199,7 @@ struct Invite<'r> {
 }
 
 #[post("/invite", data = "<invite>")]
-async fn invite_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: BestGuessIpAddress, invite: Form<Invite<'_>>) -> Template {
+async fn invite_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: IpAddr, invite: Form<Invite<'_>>) -> Template {
 
     if invite.invite_code == "" {
         // just do nothing
@@ -210,15 +208,10 @@ async fn invite_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: Be
     }
 
     if services.is_production {
-        let ip_key = format!("{}-{}", "invite-attempt", ip.to_string());
-        match services.rate_limit(&ip_key, MAXIMUM_INVITE_CODE_ATTEMPTS_PER_HOUR).await{
-            Ok(()) => {
-            },
-            Err(_e) => {
-                return Template::render("invite", context! {
-                    error: "Attempting too fast, please wait a bit and try again!",
-                });
-            }
+        if services.rate_limit_service.is_rate_limited(&"invite".to_string(), &ip.to_string(), RATE_LIMIT_INVITE_CODE_ATTEMPTS).await {
+            return Template::render("invite", context! {
+                error: "Attempting too fast, please wait a bit and try again!",
+            });
         }
     }
 
@@ -273,7 +266,7 @@ struct Register<'r> {
 }
 
 #[post("/register", data = "<register>")]
-async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: BestGuessIpAddress, register: Form<Register<'_>>) -> Result<Redirect, Template> {
+async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: IpAddr, register: Form<Register<'_>>) -> Result<Redirect, Template> {
 
     let csrf_token_new = Uuid::new_v4().to_string();
 
@@ -364,7 +357,7 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: 
             is_admin: false,
         };
 
-        match services.create_user(user_create, ip.to_ip()).await{
+        match services.create_user(user_create, ip).await{
             Ok(session_token) => {
                 // u did it, create a session token
                 cookies.add_private(Cookie::new("session_token", session_token.to_string()));
@@ -411,7 +404,7 @@ struct PasswordReset<'r> {
 }
 
 #[post("/password_reset", data = "<password_reset>")]
-async fn password_reset_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: BestGuessIpAddress, password_reset: Form<PasswordReset<'_>>) -> Result<Redirect, Template> {
+async fn password_reset_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: IpAddr, password_reset: Form<PasswordReset<'_>>) -> Result<Redirect, Template> {
 
         let csrf_token_new = Uuid::new_v4().to_string();
 
@@ -447,20 +440,13 @@ async fn password_reset_post(services: &State<Services>, cookies: &CookieJar<'_>
         };
 
         if services.is_production {
-            let rate_limit_factors: Vec<String> = vec![
-                format!("{}-{}", "password-reset", ip.to_string()),
-                format!("{}-{}", "email", password_reset.email.to_string()),
-            ];
-            match services.rate_limits(&rate_limit_factors, MAXIMUM_PASSWORD_EMAILS_PER_HOUR).await{
-                Ok(()) => {
-                },
-                Err(_e) => {
-                    return Err(Template::render("password_reset", context! {
-                        csrf_token: csrf_token_new,
-                        error: "Attempting password resets too fast, please wait a bit and try again!",
-                        email: "",
-                    }));
-                }
+            let rate_limit_factors: Vec<String> = vec![ip.to_string(), password_reset.email.to_string()];
+            if services.rate_limit_service.is_any_rate_limited(&"password".to_string(), &rate_limit_factors, RATE_LIMIT_PASSWORD_EMAILS).await {
+                return Err(Template::render("password_reset", context! {
+                    csrf_token: csrf_token_new,
+                    error: "Attempting password resets too fast, please wait a bit and try again!",
+                    email: "",
+                }));
             }
         }
 
@@ -500,7 +486,7 @@ struct PasswordResetStage2<'r> {
 }
 
 #[post("/password_reset/stage_2", data = "<password_reset>")]
-async fn password_reset_stage_2_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: BestGuessIpAddress, password_reset: Form<PasswordResetStage2<'_>>) -> Result<Redirect, Template> {
+async fn password_reset_stage_2_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: IpAddr, password_reset: Form<PasswordResetStage2<'_>>) -> Result<Redirect, Template> {
 
     let csrf_token_new = Uuid::new_v4().to_string();
 
@@ -533,7 +519,7 @@ async fn password_reset_stage_2_post(services: &State<Services>, cookies: &Cooki
     };
 
     // okay, now, let's try to reset the password
-    match services.password_reset(&password_reset.password_token, &password_reset.password, &ip.to_ip()).await{
+    match services.password_reset(&password_reset.password_token, &password_reset.password, &ip).await{
         Ok(session_token) => {
             // u did it, create a session token
             cookies.add_private(Cookie::new("session_token", session_token.to_string()));
@@ -676,53 +662,6 @@ impl<'r> FromRequest<'r> for model::UserSession {
     }
 }
 
-struct BestGuessIpAddress(IpAddr);
-impl BestGuessIpAddress{
-    fn from_string(ip: &str) -> Result<Self, anyhow::Error>{
-        let ip = ip.parse::<IpAddr>()?;
-        Ok(Self(ip))
-    }
-    fn from_ip(ip: IpAddr) -> Self{
-        Self(ip)
-    }
-    fn to_string(&self) -> String{
-        self.0.to_string()
-    }
-    fn to_ip(&self) -> IpAddr{
-        self.0
-    }
-}
-
-#[rocket::async_trait]
-impl<'r> FromRequest<'r> for BestGuessIpAddress {
-    type Error = anyhow::Error;
-
-    async fn from_request(req: &'r Request<'_>) -> Outcome<Self, anyhow::Error> {
-        // X-Forwarded-For is a comma-separated list of IPs, the first one is the client IP
-        // return that, or, failing that
-        let maybe_ip = req.headers().get_one("X-Forwarded-For");
-        match maybe_ip{
-            Some(ip) => {
-                let ip = ip.split(",").next().unwrap().to_string();
-                match BestGuessIpAddress::from_string(&ip){
-                    Ok(ip) => return Outcome::Success(ip),
-                    Err(e) => {
-                        println!("Error parsing ip address: {}", e);
-                        return Outcome::Error((Status::BadRequest, anyhow::anyhow!("error parsing ip address")));
-                    }
-                }
-            },
-            None => {
-                let maybe_ip = req.remote().map(|ip| ip.ip());
-                match maybe_ip{
-                    Some(ip) => return Outcome::Success(BestGuessIpAddress::from_ip(ip)),
-                    None => return Outcome::Error((Status::BadRequest, anyhow::anyhow!("error parsing ip address"))),
-                }
-            }
-        }
-    }
-}
-
 #[get("/verify_email", rank=1)]
 async fn verify_email_ok(_user: model::VerifiedUserSession) -> Redirect{
     /* if the user is already verified, no need to show them anything, move them along */
@@ -730,22 +669,17 @@ async fn verify_email_ok(_user: model::VerifiedUserSession) -> Redirect{
 }
 
 #[post("/verify_email")]
-async fn verify_email_retry(user: model::UserSession, services: &State<Services>, ip: BestGuessIpAddress) -> Result<Redirect, Template> {
+async fn verify_email_retry(user: model::UserSession, services: &State<Services>, ip: IpAddr) -> Result<Redirect, Template> {
 
     if user.is_verified {
         return Ok(Redirect::to("/auth/ok"));
     }
 
     if services.is_production {
-        let rate_limit_key = format!("{}-{}", "verify-email", ip.to_string());
-        match services.rate_limit(&rate_limit_key, MAXIMUM_EMAIL_ATTEMPTS_PER_HOUR).await{
-            Ok(()) => {
-            },
-            Err(_e) => {
-                return Err(Template::render("verify_email", context! {
-                    error: "Attempting too fast, please wait a bit and try again!",
-                }));
-            }
+        if services.rate_limit_service.is_rate_limited(&"verify-email".to_string(), &ip.to_string(), RATE_LIMIT_PASSWORD_EMAILS).await {
+            return Err(Template::render("verify_email", context! {
+                error: "Attempting too fast, please wait a bit and try again!",
+            }));
         }
     }
 
@@ -801,8 +735,8 @@ async fn verify_ip_template(_user: model::UserSession) -> Template{
 }
 
 #[get("/verify_ip?<token>", rank=2)]
-async fn verify_ip(services: &State<Services>, token: Uuid, ip: BestGuessIpAddress) -> Redirect {
-    let maybe_error = services.verify_ip(&token, &ip.to_ip()).await;
+async fn verify_ip(services: &State<Services>, token: Uuid, ip: IpAddr) -> Redirect {
+    let maybe_error = services.verify_ip(&token, &ip).await;
 
     match maybe_error{
         Ok(_) => Redirect::to("/auth/ok"),
@@ -820,17 +754,13 @@ async fn verify_ip_nobody() -> Redirect{
 }
 
 #[post("/verify_ip")]
-async fn verify_ip_retry(user: model::UserSession, services: &State<Services>, ip: BestGuessIpAddress) -> Result<Redirect, Template> {
+async fn verify_ip_retry(user: model::UserSession, services: &State<Services>, ip: IpAddr) -> Result<Redirect, Template> {
 
     if services.is_production {
-        match services.rate_limit(&ip.to_string(), MAXIMUM_EMAIL_ATTEMPTS_PER_HOUR).await{
-            Ok(()) => {
-            },
-            Err(_e) => {
-                return Err(Template::render("verify_ip", context! {
-                    error: "Attempting too fast, please wait a bit and try again!",
-                }));
-            }
+        if services.rate_limit_service.is_rate_limited(&"resend-ip".to_string(), &ip.to_string(), RATE_LIMIT_EMAIL_ATTEMPTS).await {
+            return Err(Template::render("verify_ip", context! {
+                error: "Attempting too fast, please wait a bit and try again!",
+            }));
         }
     }
 
@@ -959,18 +889,13 @@ async fn create_invite(services: &State<Services>, user: model::VerifiedUserSess
 async fn view_invite_logged_in(
     services: &State<Services>,
     id: Uuid,
-    ip: BestGuessIpAddress,
+    ip: IpAddr,
     _user: model::VerifiedUserSession
 ) -> Result<Template, Status> {
 
     if services.is_production {
-        let rate_limit_key = format!("{}-{}", "invite-test", ip.to_string());
-        match services.rate_limit(&rate_limit_key, MAXIMUM_EMAIL_ATTEMPTS_PER_HOUR).await{
-            Ok(()) => {
-            },
-            Err(_e) => {
-                return Err(Status::TooManyRequests);
-            }
+        if services.rate_limit_service.is_rate_limited(&"invite-test".to_string(), &ip.to_string(), RATE_LIMIT_INVITE_CODE_ATTEMPTS).await {
+            return Err(Status::TooManyRequests);
         }
     }
 
@@ -991,19 +916,14 @@ async fn view_invite_logged_in(
 async fn view_invite(
     services: &State<Services>,
     id: Uuid,
-    ip: BestGuessIpAddress,
+    ip: IpAddr,
 ) -> Result<Template, Status> {
 
     // CREATE A FORM THAT POSTS THE ID TO /auth/invite
 
     if services.is_production {
-        let rate_limit_key = format!("{}-{}", "invite-test", ip.to_string());
-        match services.rate_limit(&rate_limit_key, MAXIMUM_EMAIL_ATTEMPTS_PER_HOUR).await{
-            Ok(()) => {
-            },
-            Err(_e) => {
-                return Err(Status::TooManyRequests);
-            }
+        if services.rate_limit_service.is_rate_limited(&"invite-test".to_string(), &ip.to_string(), RATE_LIMIT_INVITE_CODE_ATTEMPTS).await {
+            return Err(Status::TooManyRequests);
         }
     }
 

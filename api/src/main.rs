@@ -43,6 +43,7 @@ use crate::services::background_tick::RequiresBackgroundTick;
 /*
     Services gets passed around willy nilly between threads so it needs to be cram-packed fulla arcs like a season of Naruto
 */
+#[derive(Clone)]
 pub struct ScyllaService {
     pub session: Arc<Session>,
     pub prepared_queries: Arc<HashMap<&'static str, PreparedStatement>>,
@@ -56,12 +57,14 @@ pub struct ConfigService {
     pub private_config: HashMap<String, String>
 }
 
+#[derive(Clone)]
 pub struct Services {
     pub is_production: bool,
     pub email_token_service: Arc<services::disposable_token_service::DisposableTokenService<UserId>>,
     pub ip_token_service: Arc<services::disposable_token_service::DisposableTokenService<UserId>>,
     pub password_token_service: Arc<services::disposable_token_service::DisposableTokenService<UserId>>,
     pub auth_token_service: Arc<services::auth_token_service::AuthTokenService<crate::auth::model::UserSession>>,
+    pub rate_limit_service: Arc<services::rate_limit::RateLimitService>,
     pub cache_redis: Arc<Client>,
     pub application_redis: Arc<Client>,
     pub scylla: ScyllaService,
@@ -202,6 +205,8 @@ async fn rocket() -> Rocket<Build> {
     let auth_token_service = services::auth_token_service::AuthTokenService::<crate::auth::model::UserSession>::new(auth_token_service_options)
         .expect("Could not create auth token service");
 
+    let rate_limit_service = services::rate_limit::RateLimitService::new();
+
     // Initialize Models & Prepare all Scylla Queries
     let mut basic_prepared_queries = basic::model::initialize(&scylla_connection)
         .await
@@ -243,6 +248,7 @@ async fn rocket() -> Rocket<Build> {
         ip_token_service: Arc::new(ip_verification_token_service),
         password_token_service: Arc::new(password_change_token_service),
         auth_token_service: Arc::new(auth_token_service),
+        rate_limit_service: Arc::new(rate_limit_service),
         cache_redis: setup_redis(&cache_redis_url).await,
         application_redis: setup_redis(&application_redis_url).await,
         scylla: ScyllaService {
@@ -258,23 +264,7 @@ async fn rocket() -> Rocket<Build> {
         local_cache: Arc::new(cache),
     };
 
-    let services_clone = Services{
-        is_production: services.is_production,
-        email_token_service: services.email_token_service.clone(),
-        ip_token_service: services.ip_token_service.clone(),
-        auth_token_service: services.auth_token_service.clone(),
-        password_token_service: services.password_token_service.clone(),
-        cache_redis: services.cache_redis.clone(),
-        application_redis: services.application_redis.clone(),
-        scylla: ScyllaService {
-            session: services.scylla.session.clone(),
-            prepared_queries: services.scylla.prepared_queries.clone()
-        },
-        config: services.config.clone(),
-        email: services.email.clone(),
-        static_markdown: services.static_markdown.clone(),
-        local_cache: services.local_cache.clone(),
-    };
+    let services_clone = services.clone();
 
     // Create a root user
     services.create_root_user().await.expect("Could not create root user");
@@ -286,6 +276,9 @@ async fn rocket() -> Rocket<Build> {
     let template_config_again = services.config.clone();
     app = app.manage(services);
     app = app.attach(crate::fairings::timing::RequestTimer)
+             .attach(crate::fairings::rate_limit::RateLimit{
+                 ip_limit: Arc::new(Cache::builder().max_capacity(100000).time_to_idle(Duration::from_millis(500)).build())
+             })
              .attach(crate::fairings::poweredby::PoweredBy)
              .attach(Template::custom(move |engines|{
                 // register a few important variables like the site name

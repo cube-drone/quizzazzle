@@ -5,8 +5,6 @@ use std::net::IpAddr;
 
 use serde::{Deserialize, Serialize};
 
-use redis::AsyncCommands;
-
 use anyhow::Result;
 use anyhow::anyhow;
 
@@ -754,59 +752,6 @@ impl Services {
                 Ok(session_token)
             }
         }
-    }
-
-
-/*
- ______     ______     ______   ______        __         __     __    __     __     ______   ______
-/\  == \   /\  __ \   /\__  _\ /\  ___\      /\ \       /\ \   /\ "-./  \   /\ \   /\__  _\ /\  ___\
-\ \  __<   \ \  __ \  \/_/\ \/ \ \  __\      \ \ \____  \ \ \  \ \ \-./\ \  \ \ \  \/_/\ \/ \ \___  \
- \ \_\ \_\  \ \_\ \_\    \ \_\  \ \_____\     \ \_____\  \ \_\  \ \_\ \ \_\  \ \_\    \ \_\  \/\_____\
-  \/_/ /_/   \/_/\/_/     \/_/   \/_____/      \/_____/   \/_/   \/_/  \/_/   \/_/     \/_/   \/_____/
-
-*/
-
-
-    pub async fn rate_limit(&self, key: &String, requests_per_hour: usize) -> Result<()> {
-        /*
-            Whatever the key is, it's not allowed to call this function more than requests_per_hour times per hour,
-            if it does, it'll throw a rate limit error.
-            It also can't call this function more than once every 5 seconds.
-        */
-        let mut redis_connection = self.application_redis.get_async_connection().await?;
-
-        // everything has a 5-second rate limit by default
-        let rate_limit_key = format!("rate_limit:${}", key);
-        let rate_limit_exists: bool = redis_connection.exists(&rate_limit_key).await?;
-        if rate_limit_exists {
-            return Err(anyhow!("Rate limit exceeded!"));
-        }
-        redis_connection.set_ex(&rate_limit_key, "NO", 5).await?;
-
-        // everything also gets no more than requests_per_hour requests per hour
-        let rate_limit_key = format!("rate_limit_hour:${}", key);
-        let rate_limit_exists: bool = redis_connection.exists(&rate_limit_key).await?;
-        if !rate_limit_exists {
-            redis_connection.set_ex(&rate_limit_key, 0, 3600).await?;
-        }
-        else{
-            let rate_limit_count: usize = redis_connection.incr(&rate_limit_key, 1).await?;
-            if rate_limit_count > requests_per_hour {
-                return Err(anyhow!("Rate limit exceeded!"));
-            }
-        }
-
-        Ok(())
-    }
-
-    pub async fn rate_limits(&self, keys: &Vec<String>, requests_per_hour: usize) -> Result<()> {
-        /*
-            Apply multiple rate limits at once.
-        */
-        for key in keys {
-            self.rate_limit(key, requests_per_hour).await?;
-        }
-        Ok(())
     }
 
 /*
