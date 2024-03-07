@@ -1,11 +1,9 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Duration;
-use std::vec::Vec;
-use std::collections::HashMap;
+use std::collections::HashSet;
 
 use anyhow::Result;
-use futures::join;
 use rocket::serde::uuid::Uuid;
 use rocket::tokio;
 
@@ -13,9 +11,8 @@ use moka::future::Cache;
 use rusqlite::{Connection as SqlConnection, DatabaseName, params, Error as SqlError};
 
 use serde::{Serialize, Deserialize};
-use serde::de::DeserializeOwned;
 
-use crate::services::background_tick::RequiresBackgroundTick;
+//use crate::services::background_tick::RequiresBackgroundTick;
 use crate::auth::model::UserId;
 use crate::services::create_table::execute_and_eat_already_exists_errors;
 use chrono::{DateTime, Utc};
@@ -27,7 +24,7 @@ pub struct UserServiceOptions{
     pub cache_capacity: u64,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct UserDatabaseRaw {
     pub id: UserId,
     pub display_name: String,
@@ -37,7 +34,7 @@ pub struct UserDatabaseRaw {
     pub thumbnail_url: String,
     pub is_verified: bool,
     pub is_admin: bool,
-    pub tags: Vec<String>,
+    pub tags: HashSet<String>,
     pub opcount: i32,
     pub logincount: i32,
     pub created_at: DateTime<Utc>,
@@ -54,7 +51,7 @@ pub struct UserDatabaseCreate{
     pub thumbnail_url: String,
     pub is_verified: bool,
     pub is_admin: bool,
-    pub tags: Vec<String>,
+    pub tags: HashSet<String>,
 }
 
 impl UserDatabaseCreate{
@@ -81,7 +78,7 @@ impl UserDatabaseCreate{
 pub struct UserService{
     cache: Arc<Cache<Uuid, UserDatabaseRaw>>,
     connection: Arc<Mutex<SqlConnection>>,
-    options: UserServiceOptions,
+    _options: UserServiceOptions,
 }
 
 const CREATE_TABLE: &str = r#"CREATE TABLE IF NOT EXISTS user (
@@ -89,7 +86,7 @@ const CREATE_TABLE: &str = r#"CREATE TABLE IF NOT EXISTS user (
     display_name TEXT NOT NULL,
     parent_id UUID,
     hashed_password TEXT NOT NULL,
-    email TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
     thumbnail_url TEXT,
     is_verified BOOLEAN NOT NULL,
     is_admin BOOLEAN NOT NULL,
@@ -145,8 +142,13 @@ const SELECT: &str = r#"SELECT
     created,
     updated
     FROM user WHERE id = ?1"#;
+const SELECT_EXISTS: &str = "SELECT id FROM user WHERE id = ?1";
+const SELECT_EMAIL: &str = "SELECT id FROM user WHERE email = ?1";
 
-const PING: &str = "UPDATE user SET updated = CURRENT_TIMESTAMP WHERE id = ?1";
+//const PING: &str = "UPDATE user SET updated = unixepoch() WHERE id = ?1";
+const VERIFY: &str = "UPDATE user SET is_verified = true, updated = unixepoch() WHERE id = ?1";
+const PASSWORD_CHANGE: &str = "UPDATE user SET hashed_password = ?2, updated = unixepoch() WHERE id = ?1";
+
 const DELETE: &str = "DELETE FROM user WHERE id = ?1";
 
 const CREATE_TABLE_TAGS: &str = r#"CREATE TABLE IF NOT EXISTS user_tags (
@@ -158,6 +160,7 @@ const CREATE_TABLE_TAGS: &str = r#"CREATE TABLE IF NOT EXISTS user_tags (
 const CREATE_INDEX_TAGS: &str = "CREATE INDEX IF NOT EXISTS user_tags ON user_tags (tag)";
 const INSERT_TAG: &str = "INSERT INTO user_tags (user_id, tag, created) VALUES (?1, ?2, unixepoch())";
 const SELECT_TAGS: &str = "SELECT tag FROM user_tags WHERE user_id = ?1";
+/*
 const SELECT_ALL_USERS_MATCHING_TAG: &str = r#"SELECT
     id,
     display_name,
@@ -175,6 +178,7 @@ const SELECT_ALL_USERS_MATCHING_TAG: &str = r#"SELECT
     ORDER BY updated DESC
     LIMIT ?2
     OFFSET ?3"#;
+ */
 
 
 impl UserService {
@@ -189,7 +193,7 @@ impl UserService {
         let sql_connection = Arc::new(Mutex::new(SqlConnection::open(format!("{}/user_{}.db", options.data_directory, options.name)).expect("Could not open User SQLite database")));
         Self::initialize(sql_connection.clone())?;
 
-        Ok(UserService{cache, options, connection: sql_connection})
+        Ok(UserService{cache, _options: options, connection: sql_connection})
     }
 
     pub fn initialize(connection: Arc<Mutex<SqlConnection>>) -> Result<()> {
@@ -266,6 +270,14 @@ impl UserService {
                 let created = DateTime::from_timestamp(created_at, 0).expect("Could not convert created_at to DateTime");
                 let updated = DateTime::from_timestamp(updated_at, 0).expect("Could not convert updated_at to DateTime");
 
+                let mut statement = connection.prepare_cached(SELECT_TAGS)?;
+                let mut rows = statement.query(params![user_id])?;
+
+                let mut tags = HashSet::new();
+                while let Some(row) = rows.next()?{
+                    tags.insert(row.get(0)?);
+                }
+
                 Ok(Some(UserDatabaseRaw{
                     id: UserId::from_uuid(row.get(0)?),
                     display_name: row.get(1)?,
@@ -275,7 +287,7 @@ impl UserService {
                     thumbnail_url: row.get(5)?,
                     is_verified: row.get(6)?,
                     is_admin: row.get(7)?,
-                    tags: vec![],
+                    tags,
                     opcount: row.get(8)?,
                     logincount: row.get(9)?,
                     created_at: created,
@@ -284,7 +296,6 @@ impl UserService {
             },
             None => Ok(None)
         }
-
     }
 
     async fn get_sql_async(&self, user_id: &Uuid) -> Result<Option<UserDatabaseRaw>> {
@@ -311,6 +322,142 @@ impl UserService {
             }
         }
     }
+
+    pub fn user_exists(&self, user_id: &UserId) -> Result<bool> {
+        match self.cache.contains_key(&user_id.to_uuid()){
+            true => Ok(true),
+            false => {
+                let connection = self.connection.lock().map_err(|_e| anyhow::anyhow!("Could not get lock to get token"))?;
+                let mut statement = connection.prepare_cached(SELECT_EXISTS)?;
+                let mut rows = statement.query(params![user_id.to_uuid()])?;
+
+                match rows.next()?{
+                    Some(_) => Ok(true),
+                    None => Ok(false)
+                }
+            }
+        }
+    }
+
+    fn get_user_by_email_sql(&self, email: &String) -> Result<Option<Uuid>> {
+        let connection = self.connection.lock().map_err(|_e| anyhow::anyhow!("Could not get lock to get token"))?;
+        let mut statement = connection.prepare_cached(SELECT_EMAIL)?;
+        let mut rows = statement.query(params![email])?;
+
+        match rows.next()?{
+            Some(row) => {
+                let user_id: Uuid = row.get(0)?;
+                Ok(Some(user_id))
+            },
+            None => Ok(None)
+        }
+    }
+
+    pub async fn get_user_by_email(&self, email: &String) -> Result<Option<UserDatabaseRaw>> {
+        match self.get_user_by_email_sql(email)?{
+            Some(user_id) => {
+                self.get_user(&UserId::from_uuid(user_id)).await
+            }
+            None => Ok(None)
+        }
+    }
+
+    fn verify_sql(connection: Arc<Mutex<SqlConnection>>, user_id: &Uuid) -> Result<()> {
+        let connection = connection.lock().map_err(|_e| anyhow::anyhow!("Could not get lock to create token"))?;
+        let mut statement = connection.prepare_cached(VERIFY)?;
+        statement.execute(params![user_id])?;
+
+        Ok(())
+    }
+
+    async fn verify_sql_async(&self, user_id: &UserId) -> Result<()> {
+        let connection = self.connection.clone();
+        let user_id = user_id.to_uuid();
+        tokio::task::spawn_blocking(move || {
+            Self::verify_sql(connection, &user_id)
+        }).await??;
+
+        Ok(())
+    }
+
+    pub async fn verify(&self, user_id: &UserId) -> Result<()> {
+        self.verify_sql_async(user_id).await?;
+
+        // update dat cache
+        match self.cache.get(&user_id.to_uuid()).await{
+            Some(mut user) => {
+                user.is_verified = true;
+                self.cache.insert(user_id.to_uuid(), user).await;
+            },
+            None => {}
+        }
+
+        Ok(())
+    }
+
+    fn password_change_sql(connection: Arc<Mutex<SqlConnection>>, user_id: &Uuid, new_password: &String) -> Result<()> {
+        let connection = connection.lock().map_err(|_e| anyhow::anyhow!("Could not get lock to create token"))?;
+        let mut statement = connection.prepare_cached(PASSWORD_CHANGE)?;
+        statement.execute(params![user_id, new_password])?;
+
+        Ok(())
+    }
+
+    async fn password_change_sql_async(&self, user_id: &UserId, new_password: &String) -> Result<()> {
+        let connection = self.connection.clone();
+        let user_id = user_id.to_uuid();
+        let new_password = new_password.clone();
+        tokio::task::spawn_blocking(move || {
+            Self::password_change_sql(connection, &user_id, &new_password)
+        }).await??;
+
+        Ok(())
+    }
+
+    pub async fn change_password(&self, user_id: &UserId, new_password: &String) -> Result<()> {
+        self.password_change_sql_async(user_id, new_password).await?;
+
+        // update dat cache
+        match self.cache.get(&user_id.to_uuid()).await{
+            Some(mut user) => {
+                user.hashed_password = new_password.clone();
+                self.cache.insert(user_id.to_uuid(), user).await;
+            },
+            None => {}
+        }
+
+        Ok(())
+    }
+
+    pub async fn clear_cache(&self, user_id: &UserId) -> Result<()> {
+        self.cache.remove(&user_id.to_uuid()).await;
+        Ok(())
+    }
+
+
+    fn delete_sql(connection: Arc<Mutex<SqlConnection>>, user_id: &Uuid) -> Result<()> {
+        let connection = connection.lock().map_err(|_e| anyhow::anyhow!("Could not get lock to create token"))?;
+        let mut statement = connection.prepare_cached(DELETE)?;
+        statement.execute(params![user_id])?;
+
+        Ok(())
+    }
+
+    async fn delete_sql_async(&self, user_id: &UserId) -> Result<()> {
+        let connection = self.connection.clone();
+        let user_id = user_id.to_uuid();
+        tokio::task::spawn_blocking(move || {
+            Self::delete_sql(connection, &user_id)
+        }).await??;
+
+        Ok(())
+    }
+
+    pub async fn delete(&self, user_id: &UserId) -> Result<()> {
+        self.delete_sql_async(user_id).await?;
+        self.cache.remove(&user_id.to_uuid()).await;
+        Ok(())
+    }
 }
 
 #[tokio::test]
@@ -323,19 +470,25 @@ async fn test_create_and_get(){
 
     let service = UserService::new(options).unwrap();
 
+    let email = format!("{}@gmail.com", Uuid::new_v4());
+
     let creatable_user = UserDatabaseCreate{
         id: UserId::from_uuid(Uuid::new_v4()),
         display_name: "test".to_string(),
         parent_id: None,
         hashed_password: "test".to_string(),
-        email: "test".to_string(),
+        email: email.clone(),
         thumbnail_url: "test".to_string(),
         is_verified: false,
         is_admin: false,
-        tags: vec!["test".to_string()],
+        tags: HashSet::from(["test".to_string(), "hello".to_string(), "world".to_string()]),
     };
 
+    assert!(!service.user_exists(&creatable_user.id).unwrap());
+
     service.create_user(creatable_user.clone()).await.unwrap();
+
+    assert!(service.user_exists(&creatable_user.id).unwrap());
 
     let user = service.get_user(&creatable_user.id).await.unwrap().unwrap();
 
@@ -351,4 +504,44 @@ async fn test_create_and_get(){
     assert_eq!(user.opcount, 0);
     assert_eq!(user.logincount, 0);
     assert_eq!(user.created_at.timestamp(), user.updated_at.timestamp());
+
+    service.verify(&creatable_user.id).await.unwrap();
+    service.change_password(&creatable_user.id, &"anus".to_string()).await.unwrap();
+
+    let user = service.get_user_by_email(&email).await.unwrap().unwrap();
+    assert_eq!(user.id, creatable_user.id);
+    assert_eq!(user.display_name, creatable_user.display_name);
+    assert_eq!(user.parent_id, creatable_user.parent_id);
+    assert_eq!(user.hashed_password, "anus".to_string());
+    assert_eq!(user.email, creatable_user.email);
+    assert_eq!(user.thumbnail_url, creatable_user.thumbnail_url);
+    assert!(user.is_verified);
+    assert_eq!(user.is_admin, creatable_user.is_admin);
+    assert_eq!(user.tags, creatable_user.tags);
+    assert_eq!(user.opcount, 0);
+    assert_eq!(user.logincount, 0);
+    assert_eq!(user.created_at.timestamp(), user.updated_at.timestamp());
+
+    service.clear_cache(&creatable_user.id).await.unwrap();
+
+    // this all still works even post cache-clear
+    let user = service.get_user_by_email(&email).await.unwrap().unwrap();
+    assert_eq!(user.id, creatable_user.id);
+    assert_eq!(user.display_name, creatable_user.display_name);
+    assert_eq!(user.parent_id, creatable_user.parent_id);
+    assert_eq!(user.hashed_password, "anus".to_string());
+    assert_eq!(user.email, creatable_user.email);
+    assert_eq!(user.thumbnail_url, creatable_user.thumbnail_url);
+    assert!(user.is_verified);
+    assert_eq!(user.is_admin, creatable_user.is_admin);
+    assert_eq!(user.tags, creatable_user.tags);
+    assert_eq!(user.opcount, 0);
+    assert_eq!(user.logincount, 0);
+    assert_eq!(user.created_at.timestamp(), user.updated_at.timestamp());
+
+    service.delete(&creatable_user.id).await.unwrap();
+
+    assert!(!service.user_exists(&creatable_user.id).unwrap());
+    assert!(service.get_user(&creatable_user.id).await.unwrap().is_none());
+
 }
