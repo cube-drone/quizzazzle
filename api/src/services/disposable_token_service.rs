@@ -16,6 +16,7 @@ use serde::{Serialize, Deserialize};
 use serde::de::DeserializeOwned;
 
 use crate::services::background_tick::RequiresBackgroundTick;
+use crate::services::create_table::execute_and_eat_already_exists_errors;
 
 const CREATE_TABLE: &str = "CREATE TABLE IF NOT EXISTS tokens (id UUID PRIMARY KEY, value TEXT NOT NULL, created INT NOT NULL, updated INT NOT NULL)";
 const CREATE_INDEX_UPDATED: &str = "CREATE INDEX IF NOT EXISTS updated_index ON tokens (updated)";
@@ -81,16 +82,16 @@ impl<T> DisposableTokenService<T> where T: Serialize + DeserializeOwned + Clone 
     }
 
     fn prep_connection(sql_connection: Arc<Mutex<SqlConnection>>) -> Result<()>{
+        // Create the table if it doesn't exist
+        execute_and_eat_already_exists_errors(sql_connection.clone(), CREATE_TABLE)?;
+        execute_and_eat_already_exists_errors(sql_connection.clone(), CREATE_INDEX_CREATED)?;
+        execute_and_eat_already_exists_errors(sql_connection.clone(), CREATE_INDEX_UPDATED)?;
+
+        // Pragma Stuff
         let prep_connection = sql_connection.clone();
         let prep_connection = prep_connection.lock().map_err(|_e| anyhow::anyhow!("Could not get lock to prepare connection"))?;
-
-        // Create the table if it doesn't exist
-        let _i = prep_connection.execute(CREATE_TABLE, [])?;
-        prep_connection.execute(CREATE_INDEX_CREATED, [])?;
-        prep_connection.execute(CREATE_INDEX_UPDATED, [])?;
-
         // Set the journal mode and synchronous mode: WAL and normal
-        // (WAL is write-ahead logging, which is faster and more reliable than the default rollback journal)
+        // (WAL is write-ahead logging, which is faster than the default rollback journal)
         // (normal synchronous mode is the best choice for WAL, and is the best tradeoff between speed and reliability)
         prep_connection.pragma_update(Some(DatabaseName::Main), "journal_mode", "WAL")?;
         prep_connection.pragma_update(Some(DatabaseName::Main), "synchronous", "normal")?;
