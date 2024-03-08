@@ -11,8 +11,6 @@ use rocket::{Build, Rocket};
 use rocket::fs::FileServer;
 use rocket_dyn_templates::Template;
 use rocket::tokio;
-use redis::Client;
-use redis::AsyncCommands;
 use scylla::prepared_statement::PreparedStatement;
 use scylla::transport::session::Session;
 use scylla::SessionBuilder;
@@ -58,34 +56,11 @@ pub struct Services {
     pub password_token_service: Arc<services::disposable_token_service::DisposableTokenService<UserId>>,
     pub auth_token_service: Arc<services::auth_token_service::AuthTokenService<crate::auth::model::UserSession>>,
     pub rate_limit_service: Arc<services::rate_limit::RateLimitService>,
-    pub cache_redis: Arc<Client>,
-    pub application_redis: Arc<Client>,
+    pub user_service: Arc<services::user_service::UserService>,
     pub scylla: ScyllaService,
     pub email: Arc<email::EmailProvider>,
     pub static_markdown: Arc<HashMap<&'static str, String>>,
     pub local_cache: Arc<Cache<String, String>>,
-}
-
-async fn setup_redis(redis_url: &String) -> Arc<Client> {
-    // Redis Setup
-    let client = Client::open(redis_url.clone()).expect("Could not create Redis client");
-    let mut connection = client
-        .get_async_connection()
-        .await
-        .expect("Could not connect to Redis");
-
-    // Redis Test
-    let _: () = connection
-        .set("foo", "bar")
-        .await
-        .expect("Could not test Redis connection");
-    let result: String = connection
-        .get("foo")
-        .await
-        .expect("Could not test Redis connection");
-    assert_eq!(result, "bar");
-
-    Arc::new(client)
 }
 
 async fn setup_scylla_cluster(scylla_url: &String) -> Arc<Session> {
@@ -112,10 +87,7 @@ fn static_markdownify(file_name: &str) -> String {
 #[launch]
 async fn rocket() -> Rocket<Build> {
     // Environment Variables
-    let is_production: bool = env::var("GROOVELET_PRODUCTION").unwrap_or_else(|_| "false".to_string()) == "true";
-    let cache_redis_url = env::var("CACHE_REDIS_URL").unwrap_or_else(|_| "".to_string());
-    let application_redis_url =
-        env::var("APPLICATION_REDIS_URL").unwrap_or_else(|_| "".to_string());
+    let is_production: bool = env::var("ROCKET_ENV").unwrap_or_else(|_| "development".to_string()) == "production";
 
     // Scylla Setup
     let scylla_url = env::var("SCYLLA_URL").unwrap_or_else(|_| "".to_string());
@@ -152,7 +124,7 @@ async fn rocket() -> Rocket<Build> {
         name: "email_verification".to_string(),
         cache_capacity: 10000,
         expiry_seconds: three_days_in_seconds,
-        drop_table_on_start: drop_table_on_start,
+        drop_table_on_start,
         get_refreshes_expiry: false,
         probability_of_refresh: 0.0,
     };
@@ -164,7 +136,7 @@ async fn rocket() -> Rocket<Build> {
         name: "ip_verification".to_string(),
         cache_capacity: 10000,
         expiry_seconds: three_days_in_seconds,
-        drop_table_on_start: drop_table_on_start,
+        drop_table_on_start,
         get_refreshes_expiry: false,
         probability_of_refresh: 0.0,
     };
@@ -176,13 +148,12 @@ async fn rocket() -> Rocket<Build> {
         name: "password_change".to_string(),
         cache_capacity: 10000,
         expiry_seconds: three_days_in_seconds,
-        drop_table_on_start: drop_table_on_start,
+        drop_table_on_start,
         get_refreshes_expiry: false,
         probability_of_refresh: 0.0,
     };
     let password_change_token_service = services::disposable_token_service::DisposableTokenService::<UserId>::new(password_change_token_service_options)
         .expect("Could not create password change token service");
-
 
     let seven_days_in_seconds = 60 * 60 * 24 * 7;
     let auth_token_service_options = services::auth_token_service::AuthTokenServiceOptions{
@@ -190,7 +161,7 @@ async fn rocket() -> Rocket<Build> {
         name: "auth".to_string(),
         cache_capacity: 100000,
         expiry_seconds: seven_days_in_seconds,
-        drop_table_on_start: drop_table_on_start,
+        drop_table_on_start,
         max_tokens_per_user: 8,
     };
 
@@ -198,6 +169,16 @@ async fn rocket() -> Rocket<Build> {
         .expect("Could not create auth token service");
 
     let rate_limit_service = services::rate_limit::RateLimitService::new();
+
+    let user_service_options = services::user_service::UserServiceOptions{
+        data_directory: data_directory.clone(),
+        name: "user".to_string(),
+        cache_capacity: 100000,
+        expiry_seconds: seven_days_in_seconds,
+        drop_table_on_start,
+    };
+
+    let user_service = services::user_service::UserService::new(user_service_options).expect("Could not create user service");
 
     // Initialize Models & Prepare all Scylla Queries
     let mut auth_prepared_queries = auth::model::initialize(&scylla_connection)
@@ -233,8 +214,7 @@ async fn rocket() -> Rocket<Build> {
         password_token_service: Arc::new(password_change_token_service),
         auth_token_service: Arc::new(auth_token_service),
         rate_limit_service: Arc::new(rate_limit_service),
-        cache_redis: setup_redis(&cache_redis_url).await,
-        application_redis: setup_redis(&application_redis_url).await,
+        user_service: Arc::new(user_service),
         scylla: ScyllaService {
             session: scylla_connection,
             prepared_queries: Arc::new(prepared_queries),

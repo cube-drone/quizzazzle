@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::env;
 use std::net::IpAddr;
@@ -12,16 +12,13 @@ use rocket::serde::uuid::Uuid;
 use scylla::prepared_statement::PreparedStatement;
 //use scylla::frame::value::Timestamp;
 use scylla::Session;
-use chrono::Utc;
 
 
 use crate::email::EmailAddress;
 use crate::Services;
 use crate::auth::hashes;
 
-use crate::auth::tables::table_user;
-use crate::auth::tables::table_user_email;
-use crate::auth::tables::table_user_ip;
+
 use crate::auth::tables::table_user_invite;
 
 const ROOT_USER_ID: UserId = UserId(Uuid::from_u128(0));
@@ -32,41 +29,11 @@ pub async fn initialize(
     scylla_session: &Arc<Session>,
 ) -> Result<HashMap<&'static str, PreparedStatement>> {
 
-    let mut user_queries: HashMap<&'static str, PreparedStatement> = table_user::initialize(scylla_session).await?;
-    let mut user_email_queries: HashMap<&'static str, PreparedStatement> = table_user_email::initialize(scylla_session).await?;
-    let mut user_ip_queries: HashMap<&'static str, PreparedStatement> = table_user_ip::initialize(scylla_session).await?;
     let mut user_invite_queries: HashMap<&'static str, PreparedStatement> = table_user_invite::initialize(scylla_session).await?;
 
     let mut prepared_queries = HashMap::new();
 
-
-    scylla_session
-        .query(r#"
-            CREATE TABLE IF NOT EXISTS ks.user_parents (
-                user_id uuid PRIMARY KEY,
-                parents list<uuid> );
-            "#, &[], ).await?;
-
-    scylla_session
-        .query(r#"
-            CREATE TABLE IF NOT EXISTS ks.user_children (
-                user_id uuid,
-                child_id uuid,
-                PRIMARY KEY (user_id, child_id));
-            "#, &[], ).await?;
-
-    scylla_session
-        .query(r#"
-            CREATE TABLE IF NOT EXISTS ks.user_descendants (
-                user_id uuid,
-                descendant_id uuid,
-                PRIMARY KEY (user_id, descendant_id));
-            "#, &[], ).await?;
-
     let queries_to_merge = vec![
-        &mut user_queries,
-        &mut user_email_queries,
-        &mut user_ip_queries,
         &mut user_invite_queries,
     ];
 
@@ -165,7 +132,7 @@ pub struct UserSession {
     pub is_admin: bool,
     pub is_known_ip: bool,
     pub ip: IpAddr,
-    pub tags: Vec<String>,
+    pub tags: HashSet<String>,
 }
 
 impl crate::services::auth_token_service::HasUserId for UserSession{
@@ -200,7 +167,7 @@ pub struct VerifiedUserSession {
     pub display_name: String,
     pub thumbnail_url: String,
     pub is_admin: bool,
-    pub tags: Vec<String>,
+    pub tags: HashSet<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -208,26 +175,7 @@ pub struct AdminUserSession {
     pub user_id: UserId,
     pub display_name: String,
     pub thumbnail_url: String,
-    pub tags: Vec<String>,
-}
-
-
-const INVITE_CODE_REGENERATION_TIME_MS: i64 = 86400 * 1000 * 4; // 4 days
-
-impl table_user::UserDatabaseRaw {
-    pub fn available_user_invites(&self) -> i32 {
-        if self.is_admin {
-            return 1000000;
-        }
-        if self.tags.contains(&"unlimited_invites".to_string()) {
-            return 1000000;
-        }
-        let time_since_creation = Utc::now() - self.created_at;
-        let time_in_ms = time_since_creation.num_milliseconds() as f64;
-        let invite_codes = time_in_ms as f64 / INVITE_CODE_REGENERATION_TIME_MS as f64;
-        let n_invite_codes: i32 = invite_codes.ceil() as i32;
-        n_invite_codes
-    }
+    pub tags: HashSet<String>,
 }
 
 impl Services {
@@ -262,7 +210,7 @@ impl Services {
         user_id: &UserId,
     ) -> Result<()> {
         // first we need to check if the user has any available invites
-        let user_maybe = self.table_user_get(&user_id).await?;
+        let user_maybe = self.user_service.get_user(&user_id).await?;
         let invite_count = self.table_user_invite_count(&user_id).await?;
         match user_maybe {
             None => {
@@ -313,7 +261,7 @@ impl Services {
     pub async fn get_number_available_invites(
         &self,
         user_id: &UserId) -> Result<i32> {
-        let user_maybe = self.table_user_get(user_id).await?;
+        let user_maybe = self.user_service.get_user(&user_id).await?;
         match user_maybe {
             None => {
                 Err(anyhow!("User does not exist!"))
@@ -324,48 +272,31 @@ impl Services {
         }
     }
 
-    pub async fn get_user_via_email(
-        &self,
-        email: &str,
-    ) -> Result<Option<table_user::UserDatabaseRaw>> {
-
-        let user_id_maybe = self.table_user_email_get_uuid(email).await?;
-
-        if let Some(user_id) = user_id_maybe {
-            return self.table_user_get(&user_id).await;
-        }
-        else{
-            return Ok(None);
-        }
-    }
-
     pub async fn create_root_user(&self) -> Result<()>{
         // don't create a root user if one already exists
-        if self.table_user_exists(&ROOT_USER_ID).await? {
+        if self.user_service.user_exists(&ROOT_USER_ID)?{
             return Ok(());
         }
 
-        let display_name = "root";
+        let display_name = "root".to_string();
         let email = env::var("GROOVELET_ROOT_EMAIL").unwrap_or_else(|_| "root@gooble.email".to_string());
         let root_auth_password = env::var("GROOVELET_ROOT_AUTH_PASSWORD").unwrap_or_else(|_| "root".to_string());
 
         let hashed_password: String = hashes::password_hash_async(&root_auth_password).await?;
 
-        self.table_user_create(
-            &ROOT_USER_ID,
+        let user_to_create = crate::services::user_service::UserDatabaseCreate{
+            id: ROOT_USER_ID,
+            parent_id: None,
+            thumbnail_url: DEFAULT_THUMBNAIL_URL.to_string(),
+            tags: HashSet::new(),
             display_name,
-            None,
-            &hashed_password,
-            &email,
-            true,
-            true,
-            DEFAULT_THUMBNAIL_URL,
-        ).await?;
+            email,
+            hashed_password,
+            is_verified: true,
+            is_admin: true,
+        };
 
-        self.table_user_email_create(
-            &email,
-            &ROOT_USER_ID,
-        ).await?;
+        self.user_service.create_user(user_to_create).await?;
 
         Ok(())
     }
@@ -375,47 +306,40 @@ impl Services {
         user_create: UserCreate<'_>,
         ip: IpAddr,
     ) -> Result<SessionToken> {
-        if self.table_user_exists(&user_create.user_id).await? {
+        if self.user_service.user_exists(&user_create.user_id)? {
             return Err(anyhow!("User somehow already exists! Wow, UUIDs are not as unique as I thought!"));
         }
-        if !self.table_user_exists(&user_create.parent_id).await? {
+        if !self.user_service.user_exists(&user_create.parent_id)? {
             return Err(anyhow!("Parent user does not exist!"));
         }
-        let existing_user_with_same_email = self.get_user_via_email(&user_create.email).await?;
+        let existing_user_with_same_email = self.user_service.get_user_by_email(user_create.email).await?;
         if let Some(existing_user_with_same_email) = existing_user_with_same_email {
             if existing_user_with_same_email.is_verified{
                 return Err(anyhow!("Email already exists!"));
             }
             else{
-                // TODO: delete the unverified user
+                // delete the unverified user
                 // and just create a new one, now
                 // suck it, chump
-                self.table_user_delete(&UserId::from_uuid(existing_user_with_same_email.id)).await?;
+                self.user_service.delete_user(&existing_user_with_same_email.id).await?;
             }
         }
 
         let hashed_password: String = hashes::password_hash_async(&user_create.password).await?;
 
-        // core user table!
-        self.table_user_create(
-            &user_create.user_id,
-            user_create.display_name,
-            Some(&user_create.parent_id),
-            &hashed_password,
-            user_create.email,
-            user_create.is_verified,
-            user_create.is_admin,
-            DEFAULT_THUMBNAIL_URL).await?;
+        let user_to_create = crate::services::user_service::UserDatabaseCreate{
+            id: user_create.user_id,
+            parent_id: Some(user_create.parent_id),
+            thumbnail_url: DEFAULT_THUMBNAIL_URL.to_string(),
+            tags: HashSet::new(),
+            display_name: user_create.display_name.to_string(),
+            email: user_create.email.to_string(),
+            hashed_password: hashed_password.to_string(),
+            is_verified: user_create.is_verified,
+            is_admin: user_create.is_admin,
+        };
 
-        self.table_user_email_create(
-            user_create.email,
-            &user_create.user_id
-        ).await?;
-
-        self.table_user_email_domain_create(
-            user_create.email,
-            &user_create.user_id
-        ).await?;
+        self.user_service.create_user(user_to_create).await?;
 
         self.send_verification_email( &user_create.user_id, &user_create.email ).await?;
 
@@ -427,7 +351,7 @@ impl Services {
             is_admin: user_create.is_admin,
             is_known_ip: true,
             ip: ip,
-            tags: vec!["tag_default".to_string()],
+            tags: HashSet::new(),
         };
 
         let session_token = self.create_session_token(&user_session).await?;
@@ -435,51 +359,24 @@ impl Services {
         Ok(session_token)
     }
 
-    pub async fn is_this_a_known_ip_for_this_user(
-        &self,
-        user_id: &UserId,
-        ip: &IpAddr,
-    ) -> Result<bool> {
-        let result = self.scylla
-            .session
-            .execute(
-                &self
-                    .scylla
-                    .prepared_queries
-                    .get("get_user_ip")
-                    .expect("Query missing!"),
-                (user_id.to_uuid(), ip,),
-            )
-            .await?;
-
-        if let Some(rows) = result.rows {
-            if rows.len() > 0 {
-                return Ok(true);
-            }
-            else{
-                return Ok(false);
-            }
-        }
-        else{
-            return Ok(false);
-        }
-    }
-
     pub async fn login(&self, email: &str, password: &str, ip: IpAddr) -> Result<SessionToken> {
-        let email_user = self.get_user_via_email(&email).await?;
+        let email_user = self.user_service.get_user_by_email(email).await?;
         if let Some(email_user) = email_user {
             let password_success:bool = hashes::password_test_async(&password, &email_user.hashed_password).await?;
 
-            let known_ip = self.is_this_a_known_ip_for_this_user(&UserId::from_uuid(email_user.id), &ip).await?;
+            let known_ip = self.user_service.user_has_used_ip(&email_user.id, &ip)?;
 
             if !known_ip {
-                self.send_ip_verification_email(&UserId::from_uuid(email_user.id), &email).await?;
+                self.send_ip_verification_email(&email_user.id, &email).await?;
+            }
+            else{
+                println!("User has logged in with ip {} before", ip.to_string());
             }
 
+
             if password_success {
-                let user_id: UserId = UserId::from_uuid(email_user.id);
                 let user_session: UserSession = UserSession{
-                    user_id: user_id,
+                    user_id: email_user.id,
                     display_name: email_user.display_name,
                     thumbnail_url: email_user.thumbnail_url,
                     is_verified: email_user.is_verified,
@@ -539,8 +436,7 @@ impl Services {
         &self,
         user_id: &UserId,
     ) -> Result<()> {
-        let user_maybe = self.table_user_get(user_id).await?;
-        match user_maybe {
+        match self.user_service.get_user(&user_id).await? {
             None => {
                 Err(anyhow!("User does not exist!"))
             },
@@ -581,8 +477,7 @@ impl Services {
         &self,
         user_id: &UserId,
     ) -> Result<()> {
-        let user_maybe = self.table_user_get(user_id).await?;
-        match user_maybe {
+        match self.user_service.get_user(&user_id).await? {
             None => {
                 Err(anyhow!("User does not exist!"))
             },
@@ -603,11 +498,7 @@ impl Services {
                 Err(anyhow!("Invalid token!"))
             },
             Some(user_id) => {
-                if ! self.table_user_exists(&user_id).await? {
-                    return Err(anyhow!("User does not exist!"));
-                }
-
-                self.table_user_verify(&user_id).await?;
+                self.user_service.verify_user(&user_id).await?;
 
                 self.verify_all_sessions(&user_id).await?;
 
@@ -649,11 +540,8 @@ impl Services {
                 Err(anyhow!("Invalid token!"))
             },
             Some(user_id) => {
-                if ! self.table_user_exists(&user_id).await? {
-                    return Err(anyhow!("User does not exist!"));
-                }
 
-                self.table_user_ip_create(&user_id, &ip).await?;
+                self.user_service.set_user_ip(&user_id, ip.clone()).await?;
 
                 self.verify_ip_all_sessions(&user_id, &ip).await?;
 
@@ -669,7 +557,7 @@ impl Services {
         user_id: &UserId,
         ip: &IpAddr,
     ) -> Result<()> {
-        self.table_user_ip_delete(&user_id, &ip).await?;
+        self.user_service.delete_ip(&user_id, &ip).await?;
 
         Ok(())
     }
@@ -687,15 +575,12 @@ impl Services {
         email_address: &str,
     ) -> Result<()> {
 
-        let user_maybe = self.get_user_via_email(&email_address).await?;
-        match user_maybe {
+        match self.user_service.get_user_by_email(&email_address).await? {
             None => {
                 Err(anyhow!("User does not exist!"))
             },
             Some(user) => {
-                let user_id = user.id;
-
-                let password_reset_token = self.password_token_service.create_token(UserId::from_uuid(user_id)).await?;
+                let password_reset_token = self.password_token_service.create_token(user.id).await?;
 
                 let public_address = crate::config::public_address();
 
@@ -722,34 +607,40 @@ impl Services {
                 Err(anyhow!("Invalid token!"))
             },
             Some(user_id) => {
-                if ! self.table_user_exists(&user_id).await? {
+                if ! self.user_service.user_exists(&user_id)? {
                     return Err(anyhow!("User does not exist!"));
                 }
 
                 // 2. hash the password and save it against the associated user id
                 let hashed_password: String = hashes::password_hash_async(&password).await?;
 
-                self.table_user_password_change(&user_id, &hashed_password).await?;
+                self.user_service.change_password(&user_id, &hashed_password).await?;
 
                 // 3. while we're here, save that IP as a known IP for this user
-                self.remember_ip(&user_id, &ip).await?;
+                self.user_service.set_user_ip(&user_id, ip.clone()).await?;
 
                 // 4. get that user, create a session token, and return it
-                let user = self.table_user_get(&user_id).await?.unwrap();
-                let user_session = UserSession{
-                    user_id: UserId::from_uuid(user.id),
-                    display_name: user.display_name,
-                    thumbnail_url: user.thumbnail_url,
-                    is_verified: user.is_verified,
-                    is_admin: user.is_admin,
-                    is_known_ip: true,
-                    ip: *ip,
-                    tags: user.tags,
-                };
+                match self.user_service.get_user(&user_id).await?{
+                    None => {
+                        Err(anyhow!("User does not exist!"))
+                    },
+                    Some(user) => {
+                        let user_session = UserSession{
+                            user_id: user.id,
+                            display_name: user.display_name,
+                            thumbnail_url: user.thumbnail_url,
+                            is_verified: user.is_verified,
+                            is_admin: user.is_admin,
+                            is_known_ip: true,
+                            ip: ip.clone(),
+                            tags: user.tags,
+                        };
 
-                let session_token = self.create_session_token(&user_session).await?;
+                        let session_token = self.create_session_token(&user_session).await?;
 
-                Ok(session_token)
+                        Ok(session_token)
+                    }
+                }
             }
         }
     }

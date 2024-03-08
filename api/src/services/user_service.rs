@@ -2,6 +2,8 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Duration;
 use std::collections::HashSet;
+use std::net::IpAddr;
+use std::str::FromStr;
 
 use anyhow::Result;
 use rocket::serde::uuid::Uuid;
@@ -15,6 +17,7 @@ use serde::{Serialize, Deserialize};
 //use crate::services::background_tick::RequiresBackgroundTick;
 use crate::auth::model::UserId;
 use crate::services::create_table::execute_and_eat_already_exists_errors;
+use crate::services::user_ip_service::UserIpService;
 use chrono::{DateTime, Utc};
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -22,15 +25,18 @@ pub struct UserServiceOptions{
     pub data_directory: String,
     pub name: String,
     pub cache_capacity: u64,
+    pub expiry_seconds: u64,
+    pub drop_table_on_start: bool,
 }
 
 #[derive(Clone, PartialEq)]
 pub struct UserDatabaseRaw {
     pub id: UserId,
     pub display_name: String,
-    pub parent_id: Option<Uuid>,
+    pub parent_id: Option<UserId>,
     pub hashed_password: String,
     pub email: String,
+    pub email_domain: String,
     pub thumbnail_url: String,
     pub is_verified: bool,
     pub is_admin: bool,
@@ -41,11 +47,29 @@ pub struct UserDatabaseRaw {
     pub updated_at: DateTime<Utc>
 }
 
+const INVITE_CODE_REGENERATION_TIME_MS: i64 = 86400 * 1000 * 4; // 4 days
+
+impl UserDatabaseRaw {
+    pub fn available_user_invites(&self) -> i32 {
+        if self.is_admin {
+            return 1000000;
+        }
+        if self.tags.contains(&"unlimited_invites".to_string()) {
+            return 1000000;
+        }
+        let time_since_creation = Utc::now() - self.created_at;
+        let time_in_ms = time_since_creation.num_milliseconds() as f64;
+        let invite_codes = time_in_ms as f64 / INVITE_CODE_REGENERATION_TIME_MS as f64;
+        let n_invite_codes: i32 = invite_codes.ceil() as i32;
+        n_invite_codes
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct UserDatabaseCreate{
     pub id: UserId,
     pub display_name: String,
-    pub parent_id: Option<Uuid>,
+    pub parent_id: Option<UserId>,
     pub hashed_password: String,
     pub email: String,
     pub thumbnail_url: String,
@@ -56,12 +80,14 @@ pub struct UserDatabaseCreate{
 
 impl UserDatabaseCreate{
     pub fn to_raw(self) -> UserDatabaseRaw{
+        let domain = self.email.split('@').collect::<Vec<&str>>()[1].to_string();
         UserDatabaseRaw{
             id: self.id,
             display_name: self.display_name,
             parent_id: self.parent_id,
             hashed_password: self.hashed_password,
             email: self.email,
+            email_domain: domain,
             thumbnail_url: self.thumbnail_url,
             is_verified: self.is_verified,
             is_admin: self.is_admin,
@@ -78,6 +104,7 @@ impl UserDatabaseCreate{
 pub struct UserService{
     cache: Arc<Cache<Uuid, UserDatabaseRaw>>,
     connection: Arc<Mutex<SqlConnection>>,
+    user_ip_service: UserIpService,
     _options: UserServiceOptions,
 }
 
@@ -87,6 +114,7 @@ const CREATE_TABLE: &str = r#"CREATE TABLE IF NOT EXISTS user (
     parent_id UUID,
     hashed_password TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
+    email_domain TEXT NOT NULL,
     thumbnail_url TEXT,
     is_verified BOOLEAN NOT NULL,
     is_admin BOOLEAN NOT NULL,
@@ -99,6 +127,7 @@ const CREATE_INDEX_UPDATED: &str = "CREATE INDEX IF NOT EXISTS user_updated ON u
 const CREATE_INDEX_CREATED: &str = "CREATE INDEX IF NOT EXISTS user_created ON user (created)";
 const CREATE_INDEX_PARENT: &str = "CREATE INDEX IF NOT EXISTS user_parent ON user (parent_id)";
 const CREATE_INDEX_EMAIL: &str = "CREATE INDEX IF NOT EXISTS user_email ON user (email)";
+const CREATE_INDEX_EMAIL_DOMAIN: &str = "CREATE INDEX IF NOT EXISTS user_email_domain ON user (email_domain)";
 
 const INSERT: &str = r#"INSERT INTO user (
     id,
@@ -106,6 +135,7 @@ const INSERT: &str = r#"INSERT INTO user (
     parent_id,
     hashed_password,
     email,
+    email_domain,
     thumbnail_url,
     is_verified,
     is_admin,
@@ -122,6 +152,7 @@ const INSERT: &str = r#"INSERT INTO user (
     ?6,
     ?7,
     ?8,
+    ?9,
     0,
     0,
     unixepoch(),
@@ -134,6 +165,7 @@ const SELECT: &str = r#"SELECT
     parent_id,
     hashed_password,
     email,
+    email_domain,
     thumbnail_url,
     is_verified,
     is_admin,
@@ -184,16 +216,25 @@ const SELECT_ALL_USERS_MATCHING_TAG: &str = r#"SELECT
 impl UserService {
     pub fn new(options: UserServiceOptions) -> Result<Self>{
         let cache = Cache::builder()
-            .max_capacity(100000)
-            .time_to_idle(Duration::from_secs(86400))
+            .max_capacity(options.cache_capacity)
+            .time_to_idle(Duration::from_secs(options.expiry_seconds))
             .build();
 
         let cache = Arc::new(cache);
 
         let sql_connection = Arc::new(Mutex::new(SqlConnection::open(format!("{}/user_{}.db", options.data_directory, options.name)).expect("Could not open User SQLite database")));
+
+        let drop_table = options.drop_table_on_start;
+
+        if drop_table {
+            let connection = sql_connection.lock().map_err(|_e| anyhow::anyhow!("Could not get lock to drop table"))?;
+            connection.execute("DROP TABLE IF EXISTS user", [])?;
+            connection.execute("DROP TABLE IF EXISTS user_tags", [])?;
+        }
+
         Self::initialize(sql_connection.clone())?;
 
-        Ok(UserService{cache, _options: options, connection: sql_connection})
+        Ok(UserService{cache, _options: options, connection: sql_connection.clone(), user_ip_service: UserIpService::new(sql_connection.clone(), drop_table)?})
     }
 
     pub fn initialize(connection: Arc<Mutex<SqlConnection>>) -> Result<()> {
@@ -202,6 +243,7 @@ impl UserService {
         execute_and_eat_already_exists_errors(connection.clone(), CREATE_INDEX_CREATED)?;
         execute_and_eat_already_exists_errors(connection.clone(), CREATE_INDEX_PARENT)?;
         execute_and_eat_already_exists_errors(connection.clone(), CREATE_INDEX_EMAIL)?;
+        execute_and_eat_already_exists_errors(connection.clone(), CREATE_INDEX_EMAIL_DOMAIN)?;
 
         execute_and_eat_already_exists_errors(connection.clone(), CREATE_TABLE_TAGS)?;
         execute_and_eat_already_exists_errors(connection.clone(), CREATE_INDEX_TAGS)?;
@@ -223,9 +265,10 @@ impl UserService {
         statement.execute(params![
             user.id.to_uuid(),
             user.display_name,
-            user.parent_id,
+            user.parent_id.map(|id| id.to_uuid()),
             user.hashed_password,
             user.email,
+            user.email.split('@').collect::<Vec<&str>>()[1],
             user.thumbnail_url,
             user.is_verified,
             user.is_admin,
@@ -263,9 +306,9 @@ impl UserService {
 
         match rows.next()?{
             Some(row) => {
-                let created_at: Result<i64, SqlError> = row.get(10);
+                let created_at: Result<i64, SqlError> = row.get(11);
                 let created_at = created_at.expect("Could not get created_at, even though it's a not null field") as i64;
-                let updated_at: Result<i64, SqlError> = row.get(11);
+                let updated_at: Result<i64, SqlError> = row.get(12);
                 let updated_at = updated_at.expect("Could not get updated_at, even though it's a not null field") as i64;
                 let created = DateTime::from_timestamp(created_at, 0).expect("Could not convert created_at to DateTime");
                 let updated = DateTime::from_timestamp(updated_at, 0).expect("Could not convert updated_at to DateTime");
@@ -278,18 +321,24 @@ impl UserService {
                     tags.insert(row.get(0)?);
                 }
 
+                let parent_id = match row.get(2)?{
+                    Some(id) => Some(UserId::from_uuid(id)),
+                    None => None
+                };
+
                 Ok(Some(UserDatabaseRaw{
                     id: UserId::from_uuid(row.get(0)?),
                     display_name: row.get(1)?,
-                    parent_id: row.get(2)?,
+                    parent_id,
                     hashed_password: row.get(3)?,
                     email: row.get(4)?,
-                    thumbnail_url: row.get(5)?,
-                    is_verified: row.get(6)?,
-                    is_admin: row.get(7)?,
+                    email_domain: row.get(5)?,
+                    thumbnail_url: row.get(6)?,
+                    is_verified: row.get(7)?,
+                    is_admin: row.get(8)?,
                     tags,
-                    opcount: row.get(8)?,
-                    logincount: row.get(9)?,
+                    opcount: row.get(9)?,
+                    logincount: row.get(10)?,
                     created_at: created,
                     updated_at: updated,
                 }))
@@ -339,7 +388,7 @@ impl UserService {
         }
     }
 
-    fn get_user_by_email_sql(&self, email: &String) -> Result<Option<Uuid>> {
+    fn get_user_by_email_sql(&self, email: &str) -> Result<Option<Uuid>> {
         let connection = self.connection.lock().map_err(|_e| anyhow::anyhow!("Could not get lock to get token"))?;
         let mut statement = connection.prepare_cached(SELECT_EMAIL)?;
         let mut rows = statement.query(params![email])?;
@@ -353,7 +402,7 @@ impl UserService {
         }
     }
 
-    pub async fn get_user_by_email(&self, email: &String) -> Result<Option<UserDatabaseRaw>> {
+    pub async fn get_user_by_email(&self, email: &str) -> Result<Option<UserDatabaseRaw>> {
         match self.get_user_by_email_sql(email)?{
             Some(user_id) => {
                 self.get_user(&UserId::from_uuid(user_id)).await
@@ -380,7 +429,11 @@ impl UserService {
         Ok(())
     }
 
-    pub async fn verify(&self, user_id: &UserId) -> Result<()> {
+    pub async fn verify_user(&self, user_id: &UserId) -> Result<()> {
+        if !self.user_exists(user_id)? {
+            return Err(anyhow::anyhow!("User does not exist"));
+        }
+
         self.verify_sql_async(user_id).await?;
 
         // update dat cache
@@ -415,6 +468,9 @@ impl UserService {
     }
 
     pub async fn change_password(&self, user_id: &UserId, new_password: &String) -> Result<()> {
+        if !self.user_exists(user_id)? {
+            return Err(anyhow::anyhow!("User does not exist"));
+        }
         self.password_change_sql_async(user_id, new_password).await?;
 
         // update dat cache
@@ -453,11 +509,65 @@ impl UserService {
         Ok(())
     }
 
-    pub async fn delete(&self, user_id: &UserId) -> Result<()> {
+    pub async fn delete_user(&self, user_id: &UserId) -> Result<()> {
         self.delete_sql_async(user_id).await?;
+        self.user_ip_service.delete_user(&user_id.to_uuid()).await?;
         self.cache.remove(&user_id.to_uuid()).await;
         Ok(())
     }
+
+
+    pub async fn increment_opcount(&self, user_id: &UserId) -> Result<()> {
+        // TODO: OPCOUNT
+        match self.cache.get(&user_id.to_uuid()).await{
+            Some(mut user) => {
+                user.opcount += 1;
+                self.cache.insert(user_id.to_uuid(), user).await;
+            },
+            None => {}
+        }
+
+        Ok(())
+    }
+
+    pub async fn increment_logincount(&self, user_id: &UserId) -> Result<()> {
+        // TODO: LOGINCOUNT
+        if !self.user_exists(user_id)? {
+            return Err(anyhow::anyhow!("User does not exist"));
+        }
+
+        match self.cache.get(&user_id.to_uuid()).await{
+            Some(mut user) => {
+                user.logincount += 1;
+                self.cache.insert(user_id.to_uuid(), user).await;
+            },
+            None => {}
+        }
+
+        Ok(())
+    }
+
+    pub async fn set_user_ip(
+        &self,
+        user_id: &UserId,
+        ip: IpAddr
+    ) -> Result<()> {
+        if !self.user_exists(user_id)? {
+            return Err(anyhow::anyhow!("User does not exist"));
+        }
+        self.user_ip_service.set_user_ip(user_id.to_uuid(), ip).await?;
+
+        Ok(())
+    }
+
+    pub fn user_has_used_ip(&self, user_id: &UserId, ip: &IpAddr) -> Result<bool> {
+        self.user_ip_service.user_has_used_ip(&user_id.to_uuid(), ip)
+    }
+
+    pub async fn delete_ip(&self, user_id: &UserId, ip: &IpAddr) -> Result<()> {
+        self.user_ip_service.delete_ip(&user_id.to_uuid(), ip.clone()).await
+    }
+
 }
 
 #[tokio::test]
@@ -466,6 +576,8 @@ async fn test_create_and_get(){
         data_directory: "./test_data".to_string(),
         name: "test".to_string(),
         cache_capacity: 100,
+        expiry_seconds: 60,
+        drop_table_on_start: true
     };
 
     let service = UserService::new(options).unwrap();
@@ -505,7 +617,7 @@ async fn test_create_and_get(){
     assert_eq!(user.logincount, 0);
     assert_eq!(user.created_at.timestamp(), user.updated_at.timestamp());
 
-    service.verify(&creatable_user.id).await.unwrap();
+    service.verify_user(&creatable_user.id).await.unwrap();
     service.change_password(&creatable_user.id, &"anus".to_string()).await.unwrap();
 
     let user = service.get_user_by_email(&email).await.unwrap().unwrap();
@@ -539,9 +651,51 @@ async fn test_create_and_get(){
     assert_eq!(user.logincount, 0);
     assert_eq!(user.created_at.timestamp(), user.updated_at.timestamp());
 
-    service.delete(&creatable_user.id).await.unwrap();
+    service.delete_user(&creatable_user.id).await.unwrap();
 
     assert!(!service.user_exists(&creatable_user.id).unwrap());
     assert!(service.get_user(&creatable_user.id).await.unwrap().is_none());
+}
 
+#[tokio::test]
+async fn test_ip_stuff(){
+    let options = UserServiceOptions{
+        data_directory: "./test_data".to_string(),
+        name: "test".to_string(),
+        cache_capacity: 100,
+        expiry_seconds: 60,
+        drop_table_on_start: false
+    };
+
+    let service = UserService::new(options).unwrap();
+
+    let email = format!("{}@gmail.com", Uuid::new_v4());
+
+    let creatable_user = UserDatabaseCreate{
+        id: UserId::from_uuid(Uuid::new_v4()),
+        display_name: "toast".to_string(),
+        parent_id: None,
+        hashed_password: "test".to_string(),
+        email: email.clone(),
+        thumbnail_url: "test".to_string(),
+        is_verified: false,
+        is_admin: false,
+        tags: HashSet::from(["test".to_string(), "hello".to_string(), "world".to_string()]),
+    };
+
+    service.create_user(creatable_user.clone()).await.unwrap();
+
+    let ip = IpAddr::from_str("192.168.1.1").unwrap();
+
+    match service.user_has_used_ip(&creatable_user.id, &ip).unwrap(){
+        true => panic!("User has used ip"),
+        false => {}
+    }
+
+    service.set_user_ip(&creatable_user.id, ip).await.unwrap();
+
+    match service.user_has_used_ip(&creatable_user.id, &ip).unwrap(){
+        true => {}
+        false => panic!("User has not used ip"),
+    }
 }

@@ -1,6 +1,8 @@
 use rocket::{Request, Data};
 use rocket::fairing::{Fairing, Info, Kind};
 use std::net::IpAddr;
+use std::env;
+
 use moka::future::Cache;
 use std::sync::Arc;
 use rocket::http::uri::Origin;
@@ -25,6 +27,13 @@ impl Fairing for RateLimit {
     /// process the request.
     async fn on_request(&self, req: &mut Request<'_>, _: &mut Data<'_>) {
         println!("{}", req.uri().to_string());
+
+        //let disabled = req.headers().contains("X-Rate-Limit-Disabled") && env::var("ROCKET_ENV").unwrap() != "production";
+        let disabled = env::var("ROCKET_ENV").unwrap_or("development".to_string()) != "production";
+
+        if disabled{
+            return;
+        }
         match req.method(){
             Get => {
                 // i don't think we should rate limit GET requests, yet
