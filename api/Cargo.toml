@@ -7,29 +7,21 @@ edition = "2021"
 
 [dependencies]
 rand = "=0.8.5"
-anyhow = "=1.0.75"
-rocket = { version = "=0.5.0-rc.4", features=["json", "secrets", "uuid"] }
-rocket_dyn_templates = { version="=0.1.0-rc.4", features=["tera"] }
+anyhow = "=1.0.80"
+rocket = { version = "=0.5.0", features=["json", "secrets", "uuid"] }
+rocket_dyn_templates = { version="=0.1.0", features=["tera"] }
 tera = "=1.19.1"
-scylla = "=0.10.1"
 serde = { version = "1.0", features=["derive"]}
-serde_json = "=1.0.108"
-validator = { version = "0.16.1", features=["derive"] }
+serde_json = "=1.0.114"
+validator = { version = "0.17.0", features=["derive"] }
 chrono = { version = "0.4.31", features=["serde"]}
 argon2 = { version = "0.5.2"}
-comrak = "0.20" # markdown
+comrak = "0.21.0" # markdown
 aws-config = { version = "1.0.3", features = ["behavior-version-latest"] }
 aws-sdk-sesv2 = "1.4.0"
 murmur3 = "=0.5.2"
 qrcode = "=0.13.0"
 futures = "=0.3.30"
 
-redis = { version = "0.23.3", features=["r2d2", "cluster-async", "tokio-comp", "connection-manager", "keep-alive", "ahash"]}
 moka = { version = "0.12.5", features = ["future"] }
-# r2d2 - enables r2d2 connection pool support
-# cluster-async / tokio-comp - async support
-# connection-manager - enables automatic reconnection
-# keep-alive - uses socket2 to enable keep-alive
-# ahash - ahash map/set support internally (+7-10% performance)
-
 rusqlite = { version = "0.31.0", features = ["bundled", "blob", "chrono", "serde_json", "uuid"]}

@@ -1,5 +1,4 @@
-use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
+use std::collections::HashSet;
 use std::env;
 use std::net::IpAddr;
 
@@ -9,40 +8,17 @@ use anyhow::Result;
 use anyhow::anyhow;
 
 use rocket::serde::uuid::Uuid;
-use scylla::prepared_statement::PreparedStatement;
 //use scylla::frame::value::Timestamp;
-use scylla::Session;
 
 
 use crate::email::EmailAddress;
 use crate::Services;
 use crate::auth::hashes;
-
-
-use crate::auth::tables::table_user_invite;
+use crate::services::user_invite_service::UserInviteRaw;
 
 const ROOT_USER_ID: UserId = UserId(Uuid::from_u128(0));
 const DEFAULT_THUMBNAIL_URL: &str = "/static/chismas.png";
 
-
-pub async fn initialize(
-    scylla_session: &Arc<Session>,
-) -> Result<HashMap<&'static str, PreparedStatement>> {
-
-    let mut user_invite_queries: HashMap<&'static str, PreparedStatement> = table_user_invite::initialize(scylla_session).await?;
-
-    let mut prepared_queries = HashMap::new();
-
-    let queries_to_merge = vec![
-        &mut user_invite_queries,
-    ];
-
-    for query_map in queries_to_merge {
-        prepared_queries.extend(query_map.drain());
-    }
-
-    Ok(prepared_queries)
-}
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct InviteCode(Uuid);
@@ -211,7 +187,7 @@ impl Services {
     ) -> Result<()> {
         // first we need to check if the user has any available invites
         let user_maybe = self.user_service.get_user(&user_id).await?;
-        let invite_count = self.table_user_invite_count(&user_id).await?;
+        let invite_count = self.user_invite_service.count_invites(&user_id).await?;
         match user_maybe {
             None => {
                 Err(anyhow!("User does not exist!"))
@@ -222,7 +198,7 @@ impl Services {
                     return Err(anyhow!("No available invites!"));
                 }
                 else{
-                    self.table_user_invite_create(&user_id, &InviteCode::new()).await?;
+                    self.user_invite_service.create_invite(&user_id).await?;
                     Ok(())
                 }
             }
@@ -234,17 +210,17 @@ impl Services {
         user_id: &UserId,
         invite_code: &InviteCode,
     ) -> Result<()> {
-        let invite = self.table_user_invite_get(&invite_code).await?;
+        let invite = self.user_invite_service.get_invite(&invite_code).await?;
 
         match invite {
             None => {
                 return Err(anyhow!("Invite code does not exist!"));
             },
             Some(invite) => {
-                if invite.user_id != user_id.to_uuid() {
+                if invite.user_id != *user_id {
                     return Err(anyhow!("You can't delete that invite code! It's not yours!"));
                 }
-                self.table_user_invite_delete(&invite_code).await?;
+                self.user_invite_service.delete_invite(&invite_code).await?;
                 Ok(())
             }
         }
@@ -253,9 +229,9 @@ impl Services {
     pub async fn get_my_invites(
         &self,
         user_id: &UserId,
-    ) -> Result<Vec<table_user_invite::UserInviteDatabaseRaw>> {
+    ) -> Result<Vec<UserInviteRaw>> {
         // for testing, generate a new invite code from the root user
-        self.table_user_invite_get_user(&user_id).await
+        self.user_invite_service.get_invites(&user_id).await
     }
 
     pub async fn get_number_available_invites(
@@ -514,17 +490,7 @@ impl Services {
         user_id: &UserId,
         ip: &IpAddr,
     ) -> Result<()> {
-        self.scylla
-            .session
-            .execute(
-                &self
-                    .scylla
-                    .prepared_queries
-                    .get("set_user_ip")
-                    .expect("Query missing!"),
-                (user_id.to_uuid(), ip, ),
-            )
-            .await?;
+        self.user_service.set_user_ip(&user_id, ip.clone()).await?;
 
         Ok(())
     }

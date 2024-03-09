@@ -20,7 +20,7 @@ use crate::services::create_table::execute_and_eat_already_exists_errors;
 use crate::services::user_ip_service::UserIpService;
 use chrono::{DateTime, Utc};
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Clone)]
 pub struct UserServiceOptions{
     pub data_directory: String,
     pub name: String,
@@ -574,7 +574,7 @@ impl UserService {
 async fn test_create_and_get(){
     let options = UserServiceOptions{
         data_directory: "./test_data".to_string(),
-        name: "test".to_string(),
+        name: "test_create".to_string(),
         cache_capacity: 100,
         expiry_seconds: 60,
         drop_table_on_start: true
@@ -661,7 +661,7 @@ async fn test_create_and_get(){
 async fn test_ip_stuff(){
     let options = UserServiceOptions{
         data_directory: "./test_data".to_string(),
-        name: "test".to_string(),
+        name: "test_ip".to_string(),
         cache_capacity: 100,
         expiry_seconds: 60,
         drop_table_on_start: false

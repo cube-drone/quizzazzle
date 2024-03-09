@@ -11,9 +11,6 @@ use rocket::{Build, Rocket};
 use rocket::fs::FileServer;
 use rocket_dyn_templates::Template;
 use rocket::tokio;
-use scylla::prepared_statement::PreparedStatement;
-use scylla::transport::session::Session;
-use scylla::SessionBuilder;
 use comrak::{markdown_to_html, Options};
 
 use moka::future::Cache;
@@ -37,15 +34,6 @@ mod services;
 use crate::services::background_tick::RequiresBackgroundTick;
 
 /*
-    Services gets passed around willy nilly between threads so it needs to be cram-packed fulla arcs like a season of Naruto
-*/
-#[derive(Clone)]
-pub struct ScyllaService {
-    pub session: Arc<Session>,
-    pub prepared_queries: Arc<HashMap<&'static str, PreparedStatement>>,
-}
-
-/*
     Note that this is private and public in the "visible to the end-user" sense, not in the "OO" sense
 */
 #[derive(Clone)]
@@ -57,27 +45,15 @@ pub struct Services {
     pub auth_token_service: Arc<services::auth_token_service::AuthTokenService<crate::auth::model::UserSession>>,
     pub rate_limit_service: Arc<services::rate_limit::RateLimitService>,
     pub user_service: Arc<services::user_service::UserService>,
-    pub scylla: ScyllaService,
+    pub user_invite_service: Arc<services::user_invite_service::UserInviteService>,
     pub email: Arc<email::EmailProvider>,
     pub static_markdown: Arc<HashMap<&'static str, String>>,
     pub local_cache: Arc<Cache<String, String>>,
 }
 
-async fn setup_scylla_cluster(scylla_url: &String) -> Arc<Session> {
-    let session: Session = SessionBuilder::new()
-        .known_node(scylla_url)
-        .build()
-        .await
-        .expect("Could not connect to Scylla");
-
-    session.query("CREATE KEYSPACE IF NOT EXISTS ks WITH REPLICATION = {'class' : 'NetworkTopologyStrategy', 'replication_factor' : 2}", &[]).await.expect("Could not create keyspace");
-
-    Arc::new(session)
-}
-
 //  "tos.md" -> look for /tmp/api-static/tos.md -> read it -> markdownify it -> return it
 fn static_markdownify(file_name: &str) -> String {
-    let file_path = format!("/tmp/api-static/{}", file_name);
+    let file_path = format!("./static/{}", file_name);
     let file_contents = fs::read_to_string(file_path).expect("Should have been able to read the file");
     let html = markdown_to_html(&file_contents, &Options::default());
 
@@ -88,11 +64,6 @@ fn static_markdownify(file_name: &str) -> String {
 async fn rocket() -> Rocket<Build> {
     // Environment Variables
     let is_production: bool = env::var("ROCKET_ENV").unwrap_or_else(|_| "development".to_string()) == "production";
-
-    // Scylla Setup
-    let scylla_url = env::var("SCYLLA_URL").unwrap_or_else(|_| "".to_string());
-    let scylla_connection = setup_scylla_cluster(&scylla_url).await;
-    let mut prepared_queries: HashMap<&'static str, PreparedStatement> = HashMap::new();
 
     // TECHNICALLY this is MibiBytes, not MegaBytes, but in my defense: I don't care
     let cache_megabytes_string = env::var("GROOVELET_CACHE_MEGABYTES").unwrap_or_else(|_| "512".to_string());
@@ -180,20 +151,15 @@ async fn rocket() -> Rocket<Build> {
 
     let user_service = services::user_service::UserService::new(user_service_options).expect("Could not create user service");
 
-    // Initialize Models & Prepare all Scylla Queries
-    let mut auth_prepared_queries = auth::model::initialize(&scylla_connection)
-        .await
-        .expect("Could not initialize auth model");
-    let mut other_prepared_queries: HashMap<&'static str, PreparedStatement> = HashMap::new();
+    let user_invite_service_options = services::user_invite_service::UserInviteServiceOptions{
+        data_directory: data_directory.clone(),
+        name: "user_invite".to_string(),
+        cache_capacity: 100000,
+        expiry_seconds: seven_days_in_seconds,
+        drop_table_on_start,
+    };
 
-    let queries_to_merge = vec![
-        &mut auth_prepared_queries,
-        &mut other_prepared_queries
-    ];
-
-    for query_map in queries_to_merge {
-        prepared_queries.extend(query_map.drain());
-    }
+    let user_invite_service = services::user_invite_service::UserInviteService::new(user_invite_service_options).expect("Could not create user invite service");
 
     // Static Content Setup
     let mut static_hashmap = HashMap::new();
@@ -215,10 +181,7 @@ async fn rocket() -> Rocket<Build> {
         auth_token_service: Arc::new(auth_token_service),
         rate_limit_service: Arc::new(rate_limit_service),
         user_service: Arc::new(user_service),
-        scylla: ScyllaService {
-            session: scylla_connection,
-            prepared_queries: Arc::new(prepared_queries),
-        },
+        user_invite_service: Arc::new(user_invite_service),
         email: Arc::new(email_provider),
         static_markdown: Arc::new(static_hashmap),
         local_cache: Arc::new(cache),
@@ -277,8 +240,8 @@ async fn rocket() -> Rocket<Build> {
     ]);
 
 	// Mount Routes
-    app = app.mount("/static", FileServer::from("/tmp/static"));
-    app = app.mount("/build", FileServer::from("/tmp/build"));
+    app = app.mount("/static", FileServer::from("../js/static"));
+    app = app.mount("/build", FileServer::from("../js/build"));
 
     // home is where "/" lives.
     app = home::routes::mount_routes(app);

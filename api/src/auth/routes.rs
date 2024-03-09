@@ -899,7 +899,7 @@ async fn view_invite_logged_in(
         }
     }
 
-    match services.table_user_invite_exists(&model::InviteCode::from_uuid(id)).await{
+    match services.user_invite_service.invite_exists(&model::InviteCode::from_uuid(id)).await{
         Ok(true) => (),
         Ok(false) => return Err(Status::NotFound),
         Err(e) => {
@@ -927,7 +927,7 @@ async fn view_invite(
         }
     }
 
-    match services.table_user_invite_exists(&model::InviteCode::from_uuid(id)).await{
+    match services.user_invite_service.invite_exists(&model::InviteCode::from_uuid(id)).await{
         Ok(true) => (),
         Ok(false) => return Err(Status::NotFound),
         Err(e) => {
