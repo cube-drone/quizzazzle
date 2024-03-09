@@ -40,8 +40,8 @@ test('Log in as the root user', async () => {
 
     const loginFormData = new FormData();
     loginFormData.append('csrf_token', login_csrf_token);
-    loginFormData.append('email', "root@gooble.email");
-    loginFormData.append('password', "jimscrimble");
+    loginFormData.append('email', "test@test.test");
+    loginFormData.append('password', "test");
 
     let login_final_form_response = await fetchCookie(`${endpoint}/auth/login`, {
         method: 'POST',
