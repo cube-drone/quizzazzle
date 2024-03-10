@@ -18,7 +18,7 @@
                 <div class="panel">
                     You've been invited to groovelet!
                 </div>
-                <form method="post" class="panel">
+                <form method="post" class="panel" action="/auth/invite">
                     <label for="invite_code">Invite Code</label>
                     <input name="invite_code" type="text" value="{{invite_code}}" />
                     <div class="button-horizontal-center">

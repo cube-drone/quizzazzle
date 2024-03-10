@@ -16,11 +16,11 @@
         <div class="everything">
             <div class="gutter">
                 <div class="qrcode-frame">
-                    <img class="qrcode qrcode-invite" src="/qr/invite/{{invite_code}}" />
+                    <img class="qrcode qrcode-invite" src="/qr/invite/{{invite_code | safe }}" />
                 </div>
                 <div class="panel invite-code">
                     <p>
-                        <a href="{{ public_address()}}/auth/invite/{{invite_code}}">
+                        <a href="{{ public_address() | safe }}/auth/invite/{{invite_code}}">
                         {{ public_address() }}/auth/invite/{{invite_code}}
                         </a>
                     </p>

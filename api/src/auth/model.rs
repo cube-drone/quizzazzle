@@ -159,18 +159,24 @@ impl Services {
         &self,
         invite_code: &InviteCode,
     ) -> Result<UserId> {
-        if invite_code.to_uuid() == ROOT_USER_ID.to_uuid(){
-            return Err(anyhow!("Invalid invite code"));
+        let invite = self.user_invite_service.get_invite(&invite_code).await?;
+        match invite {
+            None => {
+                Err(anyhow!("Invite code does not exist!"))
+            },
+            Some(invite) => {
+                Ok(invite.user_id)
+            }
         }
-        Ok(ROOT_USER_ID)
     }
 
     pub async fn exhaust_invite_code(
         &self,
-        _invite_code: &InviteCode,
+        invite_code: &InviteCode,
     ) -> Result<()> {
         // the invite code can only be used once
-        // so we'll just delete it
+        self.user_invite_service.use_invite(invite_code).await?;
+
         Ok(())
     }
 
@@ -178,7 +184,8 @@ impl Services {
         &self,
     ) -> Result<InviteCode> {
         // for testing, generate a new invite code from the root user
-        Ok(InviteCode::new())
+        let code = self.user_invite_service.create_invite(&ROOT_USER_ID).await?;
+        Ok(code)
     }
 
     pub async fn create_invite_code(
@@ -194,7 +201,7 @@ impl Services {
             },
             Some(user) => {
                 let available_invites = user.available_user_invites();
-                if available_invites < invite_count {
+                if available_invites <= invite_count {
                     return Err(anyhow!("No available invites!"));
                 }
                 else{

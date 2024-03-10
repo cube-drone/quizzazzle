@@ -19,6 +19,32 @@ use validator::Validate;
 use crate::Services;
 use crate::auth::model;
 
+#[derive(Responder)]
+enum TemplateError{
+    #[response(status = 200)]
+    Harmless(Template),
+    #[response(status = 400)]
+    BadRequest(Template),
+    #[response(status = 404)]
+    NotFound(Template),
+    #[response(status = 429)]
+    TooMany(Template),
+    #[response(status = 500)]
+    InternalServerError(Template),
+}
+
+#[derive(Responder)]
+enum JsonError{
+    #[response(status = 400)]
+    BadRequest(Json<BasicError>),
+    #[response(status = 404)]
+    NotFound(Json<BasicError>),
+    #[response(status = 429)]
+    TooMany(Json<BasicError>),
+    #[response(status = 500)]
+    InternalServerError(Json<BasicError>),
+}
+
 #[get("/login")]
 async fn login_bounce(_user: model::UserSession) -> Redirect {
     /* you're already logged in */
@@ -34,6 +60,12 @@ async fn login(cookies: &CookieJar<'_>) -> Template {
     Template::render("login", context! {
         csrf_token: csrf_token,
     })
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct BasicError{
+    error: String,
+    error_code: i32,
 }
 
 #[derive(FromForm, Validate)]
@@ -52,52 +84,53 @@ const RATE_LIMIT_PASSWORD_EMAILS: RateLimitType = RateLimitType::ShortAndPerHour
 const RATE_LIMIT_EMAIL_ATTEMPTS: RateLimitType = RateLimitType::ShortAndPerHour(2);
 
 #[post("/login", data = "<login>")]
-async fn login_post(services: &State<Services>, cookies: &CookieJar<'_>, login: Form<Login<'_>>, ip: IpAddr) -> Result<Redirect, Template> {
+async fn login_post(services: &State<Services>, cookies: &CookieJar<'_>, login: Form<Login<'_>>, ip: IpAddr) -> Result<Redirect, TemplateError> {
 
     let csrf_token_new = Uuid::new_v4().to_string();
 
     if let Some(csrf_cookie) = cookies.get_private("csrf_token"){
-        let csrf_token_cookie = csrf_cookie.value();
 
+        let csrf_token_cookie = csrf_cookie.value();
         cookies.add_private(("csrf_token", csrf_token_new.clone()));
+
         if login.csrf_token != csrf_token_cookie {
-            return Err(Template::render("login", context! {
+            return Err(TemplateError::BadRequest(Template::render("login", context! {
                 csrf_token: csrf_token_new,
                 error: "CSRF token mismatch",
                 email: login.email,
                 password: login.password,
-            }));
+            })));
         }
     }
     else{
         cookies.add_private(("csrf_token", csrf_token_new.clone()));
-        return Err(Template::render("login", context! {
+        return Err(TemplateError::BadRequest(Template::render("login", context! {
             csrf_token: csrf_token_new,
             error: "CSRF token missing",
             email: login.email,
             password: login.password,
-        }));
+        })));
     }
 
     match login.validate() {
         Ok(_) => (),
-        Err(e) => return Err(Template::render("login", context! {
+        Err(e) => return Err(TemplateError::BadRequest(Template::render("login", context! {
             csrf_token: csrf_token_new,
             error: e.to_string(),
             email: login.email,
             password: login.password,
-        })),
+        }))),
       };
 
     if services.is_production {
         let rate_limit_factors: Vec<String> = vec![ip.to_string(), login.email.to_string()];
         if services.rate_limit_service.is_any_rate_limited(&"login".to_string(), &rate_limit_factors, RATE_LIMIT_LOGIN_ATTEMPTS).await {
-            return Err(Template::render("login", context! {
+            return Err(TemplateError::TooMany(Template::render("login", context! {
                 csrf_token: csrf_token_new,
                 error: "Attempting logins too fast, please wait a bit and try again!",
                 email: "",
                 password: "",
-            }));
+            })));
         }
     }
 
@@ -111,12 +144,12 @@ async fn login_post(services: &State<Services>, cookies: &CookieJar<'_>, login: 
         },
         Err(e) => {
             println!("Error logging in: {}", e);
-            Err(Template::render("login", context! {
+            Err(TemplateError::BadRequest(Template::render("login", context! {
                 csrf_token: csrf_token_new,
                 error: "Could not log in",
                 email: login.email,
                 password: login.password,
-            }))
+            })))
         }
     }
 }
@@ -199,55 +232,47 @@ struct Invite<'r> {
 }
 
 #[post("/invite", data = "<invite>")]
-async fn invite_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: IpAddr, invite: Form<Invite<'_>>) -> Template {
+async fn invite_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: IpAddr, invite: Form<Invite<'_>>) -> Result<Template, TemplateError> {
 
     if invite.invite_code == "" {
         // just do nothing
-        return Template::render("invite", context! {
-        });
+        return Ok(Template::render("invite", context! {}));
     }
 
     if services.is_production {
         if services.rate_limit_service.is_rate_limited(&"invite".to_string(), &ip.to_string(), RATE_LIMIT_INVITE_CODE_ATTEMPTS).await {
-            return Template::render("invite", context! {
+            return Err(TemplateError::TooMany(Template::render("invite", context! {
                 error: "Attempting too fast, please wait a bit and try again!",
-            });
+            })));
         }
     }
 
-    match invite.validate() {
-        Ok(_) => (),
-        Err(_e) => return Template::render("invite", context! {
-            error: "Invalid invite code",
-        }),
-      };
-
-    let invite_code = match model::InviteCode::from_string(invite.invite_code){
-        Ok(invite_code) => invite_code,
-        Err(_e) => {
-            return Template::render("invite", context! {
+    let invite_code = match (invite.validate(), model::InviteCode::from_string(invite.invite_code)){
+        (Ok(_), Ok(invite_code)) => invite_code,
+        _ => {
+            return Err(TemplateError::BadRequest(Template::render("invite", context! {
                 error: "Invalid invite code",
-            });
+            })));
         }
     };
 
     match services.get_invite_code_source(&invite_code).await{
+        Err(e) => {
+            return Err(TemplateError::BadRequest(Template::render("invite", context! {
+                error: e.to_string(),
+            })));
+        }
         Ok(invite_source) => {
             println!("invite source: {}", invite_source.to_string());
 
             let csrf_token = Uuid::new_v4().to_string();
             cookies.add_private(("csrf_token", csrf_token.clone()));
 
-            return Template::render("register", context! {
+            return Ok(Template::render("register", context! {
                 csrf_token: csrf_token,
                 invite_code: invite.invite_code,
-            });
+            }));
         },
-        Err(e) => {
-            return Template::render("invite", context! {
-                error: e.to_string(),
-            });
-        }
     }
 }
 
@@ -266,7 +291,7 @@ struct Register<'r> {
 }
 
 #[post("/register", data = "<register>")]
-async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: IpAddr, register: Form<Register<'_>>) -> Result<Redirect, Template> {
+async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: IpAddr, register: Form<Register<'_>>) -> Result<Redirect, TemplateError> {
 
     let csrf_token_new = Uuid::new_v4().to_string();
 
@@ -275,60 +300,42 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: 
 
         cookies.add_private(("csrf_token", csrf_token_new.clone()));
         if register.csrf_token != csrf_token_cookie {
-            return Err(Template::render("register", context! {
+            return Err(TemplateError::BadRequest(Template::render("register", context! {
                 csrf_token: csrf_token_new,
                 invite_code: register.invite_code,
                 error: "CSRF token mismatch",
                 display_name: register.display_name,
                 email: register.email,
                 password: register.password,
-            }))
+            })));
         }
     }
     else{
         cookies.add_private(("csrf_token", csrf_token_new.clone()));
 
-        return Err(Template::render("register", context! {
+        return Err(TemplateError::BadRequest(Template::render("register", context! {
             csrf_token: csrf_token_new,
             invite_code: register.invite_code,
             error: "CSRF cookie missing",
             display_name: register.display_name,
             email: register.email,
             password: register.password,
-        }))
+        })));
     }
 
-    if !register.tos {
-        return Err(Template::render("register", context! {
-            csrf_token: csrf_token_new,
-            invite_code: register.invite_code,
-            error: "You must agree to the terms of service",
-            display_name: register.display_name,
-            email: register.email,
-            password: register.password,
-        }))
+    match (register.tos, register.age, register.validate()){
+        (true, true, Ok(_)) => (),
+        _ => {
+            return Err(TemplateError::BadRequest(Template::render("register", context!{
+                csrf_token: csrf_token_new,
+                invite_code: register.invite_code,
+                error: "You must agree to the terms of service and be 13 years of age or older",
+                display_name: register.display_name,
+                email: register.email,
+                password: register.password,
+            })));
+        }
     }
-    if !register.age {
-        return Err(Template::render("register", context! {
-            csrf_token: csrf_token_new,
-            invite_code: register.invite_code,
-            error: "You must be 13 years of age or older",
-            display_name: register.display_name,
-            email: register.email,
-            password: register.password,
-        }))
-    }
-    match register.validate() {
-        Ok(_) => (),
-        Err(e) => return Err(Template::render("register", context! {
-            csrf_token: csrf_token_new,
-            invite_code: register.invite_code,
-            error: e.to_string(),
-            display_name: register.display_name,
-            email: register.email,
-            password: register.password,
-        })),
-      };
 
     // okay, now, let's try to create the user
     if let Ok(parent_uuid) = services.get_invite_code_source(&model::InviteCode::from_uuid(register.invite_code)).await{
@@ -336,14 +343,14 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: 
             Ok(_) => (),
             Err(e) => {
                 println!("Error exhausting invite code: {}", e);
-                return Err(Template::render("register", context! {
+                return Err(TemplateError::InternalServerError(Template::render("register", context! {
                     csrf_token: csrf_token_new,
                     invite_code: register.invite_code,
                     error: "Error exhausting invite code",
                     display_name: register.display_name,
                     email: register.email,
                     password: register.password,
-                }))
+                })));
             }
         }
 
@@ -366,26 +373,26 @@ async fn register_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: 
             },
             Err(e) => {
                 println!("Error creating user: {}", e);
-                return Err(Template::render("register", context! {
+                return Err(TemplateError::InternalServerError(Template::render("register", context! {
                     csrf_token: csrf_token_new,
                     invite_code: register.invite_code,
                     error: "Error creating user",
                     display_name: register.display_name,
                     email: register.email,
                     password: register.password,
-                }))
+                })));
             }
         }
     }
     else{
-        return Err(Template::render("register", context! {
+        return Err(TemplateError::BadRequest(Template::render("register", context! {
             csrf_token: csrf_token_new,
             invite_code: register.invite_code,
             error: "Invalid invite code",
             display_name: register.display_name,
             email: register.email,
             password: register.password,
-        }))
+        })));
     }
 }
 
@@ -404,7 +411,7 @@ struct PasswordReset<'r> {
 }
 
 #[post("/password_reset", data = "<password_reset>")]
-async fn password_reset_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: IpAddr, password_reset: Form<PasswordReset<'_>>) -> Result<Redirect, Template> {
+async fn password_reset_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: IpAddr, password_reset: Form<PasswordReset<'_>>) -> Result<Redirect, TemplateError> {
 
         let csrf_token_new = Uuid::new_v4().to_string();
 
@@ -413,40 +420,40 @@ async fn password_reset_post(services: &State<Services>, cookies: &CookieJar<'_>
 
             cookies.add_private(("csrf_token", csrf_token_new.clone()));
             if password_reset.csrf_token != csrf_token_cookie {
-                return Err(Template::render("password_reset", context! {
+                return Err(TemplateError::BadRequest(Template::render("password_reset", context! {
                     csrf_token: csrf_token_new,
                     error: "CSRF token mismatch",
                     email: password_reset.email,
-                }))
+                })));
             }
         }
         else{
             cookies.add_private(("csrf_token", csrf_token_new.clone()));
 
-            return Err(Template::render("password_reset", context! {
+            return Err(TemplateError::BadRequest(Template::render("password_reset", context! {
                 csrf_token: csrf_token_new,
                 error: "CSRF cookie missing",
                 email: password_reset.email,
-            }))
+            })));
         }
 
         match password_reset.validate() {
             Ok(_) => (),
-            Err(e) => return Err(Template::render("password_reset", context! {
+            Err(e) => return Err(TemplateError::BadRequest(Template::render("password_reset", context! {
                 csrf_token: csrf_token_new,
                 error: e.to_string(),
                 email: password_reset.email,
-            })),
+            })))
         };
 
         if services.is_production {
             let rate_limit_factors: Vec<String> = vec![ip.to_string(), password_reset.email.to_string()];
             if services.rate_limit_service.is_any_rate_limited(&"password".to_string(), &rate_limit_factors, RATE_LIMIT_PASSWORD_EMAILS).await {
-                return Err(Template::render("password_reset", context! {
+                return Err(TemplateError::TooMany(Template::render("password_reset", context! {
                     csrf_token: csrf_token_new,
                     error: "Attempting password resets too fast, please wait a bit and try again!",
                     email: "",
-                }));
+                })));
             }
         }
 
@@ -457,8 +464,13 @@ async fn password_reset_post(services: &State<Services>, cookies: &CookieJar<'_>
                 return Ok(Redirect::to("/auth/password_reset_wait"))
             },
             Err(e) => {
-                println!("Error resetting password: {}", e);
-                return Ok(Redirect::to("/auth/password_reset_wait"))
+                let logcode = Uuid::new_v4();
+                println!("Error resetting password: {}, code-{}", e, logcode);
+                return Err(TemplateError::InternalServerError(Template::render("password_reset", context! {
+                    csrf_token: csrf_token_new,
+                    error: format!("Error {} - Something went wrong, please try again!", logcode.to_string()),
+                    email: "",
+                })));
             }
         }
 }
@@ -486,7 +498,7 @@ struct PasswordResetStage2<'r> {
 }
 
 #[post("/password_reset/stage_2", data = "<password_reset>")]
-async fn password_reset_stage_2_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: IpAddr, password_reset: Form<PasswordResetStage2<'_>>) -> Result<Redirect, Template> {
+async fn password_reset_stage_2_post(services: &State<Services>, cookies: &CookieJar<'_>, ip: IpAddr, password_reset: Form<PasswordResetStage2<'_>>) -> Result<Redirect, TemplateError> {
 
     let csrf_token_new = Uuid::new_v4().to_string();
 
@@ -495,27 +507,27 @@ async fn password_reset_stage_2_post(services: &State<Services>, cookies: &Cooki
 
         cookies.add_private(("csrf_token", csrf_token_new.clone()));
         if password_reset.csrf_token != csrf_token_cookie {
-            return Err(Template::render("password_reset_stage_2", context! {
+            return Err(TemplateError::BadRequest(Template::render("password_reset_stage_2", context! {
                 csrf_token: csrf_token_new,
                 error: "CSRF token mismatch",
-            }))
+            })))
         }
     }
     else{
         cookies.add_private(("csrf_token", csrf_token_new.clone()));
 
-        return Err(Template::render("password_reset_stage_2", context! {
+        return Err(TemplateError::BadRequest(Template::render("password_reset_stage_2", context! {
             csrf_token: csrf_token_new,
             error: "CSRF cookie missing",
-        }))
+        })))
     }
 
     match password_reset.validate() {
         Ok(_) => (),
-        Err(e) => return Err(Template::render("password_reset_stage_2", context! {
+        Err(e) => return Err(TemplateError::BadRequest(Template::render("password_reset_stage_2", context! {
             csrf_token: csrf_token_new,
             error: e.to_string(),
-        })),
+        }))),
     };
 
     // okay, now, let's try to reset the password
@@ -527,10 +539,10 @@ async fn password_reset_stage_2_post(services: &State<Services>, cookies: &Cooki
             return Ok(Redirect::to("/auth/ok"))
         },
         Err(e) => {
-            return Err(Template::render("password_reset_stage_2", context! {
+            return Err(TemplateError::BadRequest(Template::render("password_reset_stage_2", context! {
                 csrf_token: csrf_token_new,
                 error: e.to_string(),
-            }))
+            })))
         }
     }
 }
@@ -669,7 +681,7 @@ async fn verify_email_ok(_user: model::VerifiedUserSession) -> Redirect{
 }
 
 #[post("/verify_email")]
-async fn verify_email_retry(user: model::UserSession, services: &State<Services>, ip: IpAddr) -> Result<Redirect, Template> {
+async fn verify_email_retry(user: model::UserSession, services: &State<Services>, ip: IpAddr) -> Result<Redirect, TemplateError> {
 
     if user.is_verified {
         return Ok(Redirect::to("/auth/ok"));
@@ -677,24 +689,25 @@ async fn verify_email_retry(user: model::UserSession, services: &State<Services>
 
     if services.is_production {
         if services.rate_limit_service.is_rate_limited(&"verify-email".to_string(), &ip.to_string(), RATE_LIMIT_PASSWORD_EMAILS).await {
-            return Err(Template::render("verify_email", context! {
+            return Err(TemplateError::TooMany(Template::render("verify_email", context! {
                 error: "Attempting too fast, please wait a bit and try again!",
-            }));
+            })));
         }
     }
 
     match services.resend_verification_email(&user.user_id).await{
         Ok(_) => {
             // we sent the email, now we wait
-            return Err(Template::render("verify_email", context! {
+            return Err(TemplateError::Harmless(Template::render("verify_email", context! {
                 again: true,
-            }));
+            })));
         },
         Err(e) => {
-            println!("Error sending verification email: {}", e);
-            return Err(Template::render("verify_email", context! {
-                error: "Error sending verification email",
-            }));
+            let error_code = Uuid::new_v4();
+            println!("Error sending verification email: {} - {}", e, error_code);
+            return Err(TemplateError::InternalServerError(Template::render("verify_email", context! {
+                error: format!("Error {} - sending verification email", error_code),
+            })));
         }
     }
 }
@@ -803,13 +816,13 @@ async fn status() -> &'static str {
 }
 
 #[get("/email_error")]
-async fn email_error() -> Template {
-    Template::render("error", context! {error: "We tried to verify your email, but something went wrong. Please try again!"})
+async fn email_error() -> TemplateError {
+    TemplateError::InternalServerError(Template::render("error", context! {error: "We tried to verify your email, but something went wrong. Please try again!"}))
 }
 
 #[get("/ip_error")]
-async fn ip_error() -> Template {
-    Template::render("error", context! {error: "We tried to verify your location, but something went wrong. Please try again!"})
+async fn ip_error() -> TemplateError {
+    TemplateError::InternalServerError(Template::render("error", context! {error: "We tried to verify your location, but something went wrong. Please try again!"}))
 }
 
 #[get("/ok")]
@@ -848,12 +861,23 @@ async fn auth_user(user: model::VerifiedUserSession) -> Json<model::VerifiedUser
 }
 
 #[get("/user/invite")]
-async fn list_invites(services: &State<Services>, user: model::VerifiedUserSession) -> Template {
-    let mut invites = services.get_my_invites(&user.user_id).await.expect("should be able to list invites");
+async fn list_invites(services: &State<Services>, user: model::VerifiedUserSession) -> Result<Template, TemplateError> {
 
-    invites.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    let invites = match services.get_my_invites(&user.user_id).await{
+        Ok(invites) => invites,
+        Err(e) => {
+            println!("Error listing invites: {}", e);
+            return Err(TemplateError::InternalServerError(Template::render("error", context! {error: "Error listing invites"})));
+        }
+    };
 
-    let number_available_invites: i32 = services.get_number_available_invites(&user.user_id).await.expect("should be able to get number of available invites");
+    let number_available_invites: i32 = match services.get_number_available_invites(&user.user_id).await{
+        Ok(n_invites) => n_invites,
+        Err(e) => {
+            println!("Error getting number of available invites: {}", e);
+            return Err(TemplateError::InternalServerError(Template::render("error", context! {error: "Error getting number of available invites"})));
+        }
+    };
     let number_remaining_invites: i32 = number_available_invites - invites.len() as i32;
     let can_create_invite = number_remaining_invites > 0;
 
@@ -861,17 +885,28 @@ async fn list_invites(services: &State<Services>, user: model::VerifiedUserSessi
     let most_recent_invite_created_at = most_recent_invite_created_at.unwrap_or_else(|| Utc::now());
     let created_recently = most_recent_invite_created_at > Utc::now() - Duration::milliseconds(200);
 
-    Template::render("list_invites", context! {
+    Ok(Template::render("list_invites", context! {
         invites: invites,
         number_available_invites: number_available_invites,
         number_remaining_invites: number_remaining_invites,
         can_create_invite: can_create_invite,
         created_recently: created_recently,
-    })
+    }))
+}
+
+#[get("/user/invite/json")]
+async fn list_invites_json(services: &State<Services>, user: model::VerifiedUserSession) -> Result<Json<Vec<crate::services::user_invite_service::UserInviteRaw>>, JsonError> {
+    match services.get_my_invites(&user.user_id).await{
+        Ok(invites) => Ok(Json(invites)),
+        Err(e) => {
+            println!("Error listing invites: {}", e);
+            Err(JsonError::InternalServerError(Json(BasicError{error: "Error listing invites".to_string(), error_code: 500})))
+        }
+    }
 }
 
 #[post("/user/invite")]
-async fn create_invite(services: &State<Services>, user: model::VerifiedUserSession) -> Result<Redirect, Template> {
+async fn create_invite(services: &State<Services>, user: model::VerifiedUserSession) -> Result<Redirect, TemplateError> {
     let creation_result = services.create_invite_code(&user.user_id).await;
 
     match creation_result{
@@ -880,7 +915,7 @@ async fn create_invite(services: &State<Services>, user: model::VerifiedUserSess
         },
         Err(e) => {
             println!("Error creating invite code: {}", e);
-            Err( Template::render("error", context! {error: "Error creating invite code"}))
+            Err( TemplateError::InternalServerError(Template::render("error", context! {error: "Error creating invite code"} )))
         }
     }
 }
@@ -891,20 +926,20 @@ async fn view_invite_logged_in(
     id: Uuid,
     ip: IpAddr,
     _user: model::VerifiedUserSession
-) -> Result<Template, Status> {
+) -> Result<Template, TemplateError> {
 
     if services.is_production {
         if services.rate_limit_service.is_rate_limited(&"invite-test".to_string(), &ip.to_string(), RATE_LIMIT_INVITE_CODE_ATTEMPTS).await {
-            return Err(Status::TooManyRequests);
+            return Err(TemplateError::TooMany(Template::render("error", context! {error: "Attempting too fast, please wait a bit and try again!"})));
         }
     }
 
     match services.user_invite_service.invite_exists(&model::InviteCode::from_uuid(id)).await{
         Ok(true) => (),
-        Ok(false) => return Err(Status::NotFound),
+        Ok(false) => return Err(TemplateError::NotFound(Template::render("error", context! {error: "Invite not found"}))),
         Err(e) => {
             println!("Error checking if invite exists: {}", e);
-            return Err(Status::InternalServerError);
+            return Err(TemplateError::InternalServerError(Template::render("error", context! {error: "Error checking if invite exists"})));
         }
     }
     Ok(Template::render("view_invite_logged_in", context! {
@@ -917,22 +952,22 @@ async fn view_invite(
     services: &State<Services>,
     id: Uuid,
     ip: IpAddr,
-) -> Result<Template, Status> {
+) -> Result<Template, TemplateError> {
 
     // CREATE A FORM THAT POSTS THE ID TO /auth/invite
 
     if services.is_production {
         if services.rate_limit_service.is_rate_limited(&"invite-test".to_string(), &ip.to_string(), RATE_LIMIT_INVITE_CODE_ATTEMPTS).await {
-            return Err(Status::TooManyRequests);
+            return Err(TemplateError::TooMany(Template::render("error", context! {error: "Attempting too fast, please wait a bit and try again!"})));
         }
     }
 
     match services.user_invite_service.invite_exists(&model::InviteCode::from_uuid(id)).await{
         Ok(true) => (),
-        Ok(false) => return Err(Status::NotFound),
+        Ok(false) => return Err(TemplateError::NotFound(Template::render("error", context! {error: "Invite not found"}))),
         Err(e) => {
             println!("Error checking if invite exists: {}", e);
-            return Err(Status::InternalServerError);
+            return Err(TemplateError::InternalServerError(Template::render("error", context! {error: "Error checking if invite exists"})));
         }
     }
     Ok(Template::render("view_invite", context! {
@@ -941,12 +976,12 @@ async fn view_invite(
 }
 
 #[post("/invite/<id>/delete")]
-async fn delete_invite(services: &State<Services>, id: Uuid, user: model::VerifiedUserSession) -> Result<Redirect, Status> {
+async fn delete_invite(services: &State<Services>, id: Uuid, user: model::VerifiedUserSession) -> Result<Redirect, TemplateError> {
     match services.delete_invite_code(&user.user_id, &model::InviteCode::from_uuid(id)).await{
         Ok(()) => Ok(Redirect::to("/auth/user/invite")),
         Err(e) => {
             println!("Error deleting invite code: {}", e);
-            Err(Status::InternalServerError)
+            Err(TemplateError::InternalServerError(Template::render("error", context! {error: "Error deleting invite code"})))
         }
     }
 }
@@ -994,6 +1029,7 @@ pub fn mount_routes(app: Rocket<Build>) -> Rocket<Build> {
             logout,
             auth_user,
             list_invites,
+            list_invites_json,
             create_invite,
             view_invite_logged_in,
             view_invite,

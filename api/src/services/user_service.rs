@@ -49,19 +49,35 @@ pub struct UserDatabaseRaw {
 
 const INVITE_CODE_REGENERATION_TIME_MS: i64 = 86400 * 1000 * 4; // 4 days
 
+fn calculate_available_user_invites(created_at: DateTime<Utc>) -> i32 {
+    let time_since_creation = Utc::now() - created_at;
+    let time_in_ms = time_since_creation.num_milliseconds() as f64;
+    let invite_codes = time_in_ms as f64 / INVITE_CODE_REGENERATION_TIME_MS as f64;
+    let n_invite_codes: i32 = invite_codes.floor() as i32;
+    n_invite_codes
+}
+
+#[tokio::test]
+async fn test_user_invites(){
+    let now = Utc::now();
+    let a_few_days_ago = now - (chrono::Duration::milliseconds(INVITE_CODE_REGENERATION_TIME_MS * 3) + chrono::Duration::milliseconds(1000));
+
+    let available_user_invites_now = calculate_available_user_invites(now);
+    let available_user_invites_days_ago = calculate_available_user_invites(a_few_days_ago);
+
+    assert_eq!(available_user_invites_now, 0);
+    assert_eq!(available_user_invites_days_ago, 3);
+}
+
 impl UserDatabaseRaw {
     pub fn available_user_invites(&self) -> i32 {
         if self.is_admin {
-            return 1000000;
+            return 10000;
         }
         if self.tags.contains(&"unlimited_invites".to_string()) {
-            return 1000000;
+            return 10000;
         }
-        let time_since_creation = Utc::now() - self.created_at;
-        let time_in_ms = time_since_creation.num_milliseconds() as f64;
-        let invite_codes = time_in_ms as f64 / INVITE_CODE_REGENERATION_TIME_MS as f64;
-        let n_invite_codes: i32 = invite_codes.ceil() as i32;
-        n_invite_codes
+        calculate_available_user_invites(self.created_at)
     }
 }
 

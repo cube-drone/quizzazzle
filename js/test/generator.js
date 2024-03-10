@@ -41,6 +41,11 @@ async function createUser(userCreate){
     }
 }
 
+async function adminUser(){
+    return createUser({is_admin: true});
+}
+
 module.exports = {
     createUser,
+    adminUser,
 }

@@ -6,7 +6,7 @@ const makeFetchHappen = require('fetch-cookie');
 const { JSDOM } = jsdom;
 
 const { endpoint } = require('./constants');
-const { createUser } = require('./generator');
+const { createUser, adminUser } = require('./generator');
 
 let only = {only: true};
 /*
@@ -366,4 +366,96 @@ test("Unverified users just get overwritten if you create a new user account", a
     // This should not take us to an error page
     let responseText = (await register_form_response.text()).toLowerCase();
     assert(!responseText.includes('error'));
+});
+
+test("A regular user can't create an invite code (until they've existed for a few days)", async () => {
+    let {fetch, user} = await createUser();
+
+    let invites = await (await fetch(`${endpoint}/auth/user/invite/json`)).json();
+
+    assert(invites.length === 0);
+
+    let result = await fetch(`${endpoint}/auth/user/invite`, {method: 'POST'});
+
+    assert(result.status != 200);
+
+    let text = await result.text();
+    assert(text.indexOf("Error") >= 0);
+
+    invites = await (await fetch(`${endpoint}/auth/user/invite/json`)).json();
+
+    assert.strictEqual(invites.length, 0);
+
+});
+
+test("An admin user can create an invite code, which can be used to log in", only, async () => {
+    let {fetch: adminFetch, user} = await adminUser();
+
+    let invites = await (await adminFetch(`${endpoint}/auth/user/invite/json`)).json();
+
+    assert(invites.length === 0);
+
+    await adminFetch(`${endpoint}/auth/user/invite`, {method: 'POST'});
+
+    invites = await (await adminFetch(`${endpoint}/auth/user/invite/json`)).json();
+
+    assert(invites.length === 1);
+
+    let invite = invites[0];
+    let inviteCode = invite.invite_code;
+
+    let invitePage = await adminFetch(`${endpoint}/auth/invite/${inviteCode}`);
+
+    let invitePageText = await invitePage.text();
+    // the invite page for the user who created the invite page should just contain a QR code
+    assert(invitePageText.includes("qr"));
+
+    let newFetch = makeFetchHappen(fetch);
+
+    invitePage = await newFetch(`${endpoint}/auth/invite/${inviteCode}`);
+
+    invitePageText = await invitePage.text();
+
+    assert(invitePageText.includes("You've been invited"));
+
+    const formData = new FormData();
+    formData.append('invite_code', inviteCode);
+
+    let register = await newFetch(`${endpoint}/auth/invite`, {method: 'POST', body: formData});
+
+    let formDom = new JSDOM(await register.text());
+    const csrf_token = formDom.window.document.querySelector("input[name=\"csrf_token\"]").value;
+    const invite_code_again = formDom.window.document.querySelector("input[name=\"invite_code\"]").value;
+    assert.strictEqual(inviteCode, invite_code_again);
+
+    const registerFormData = new FormData();
+    let email = testy.email();
+    let password = `${email}-password`;
+    registerFormData.append('invite_code', inviteCode);
+    registerFormData.append('csrf_token', csrf_token);
+    registerFormData.append('display_name', testy.name());
+    registerFormData.append('email', email);
+    registerFormData.append('password', password);
+    registerFormData.append('tos', true);
+    registerFormData.append('age', true);
+
+    let register_form_response = await newFetch(`${endpoint}/auth/register`, {
+        method: 'POST',
+        body: registerFormData,
+    });
+
+    // This should take us to a page that demands we verify our email
+    let responseText = (await register_form_response.text()).toLowerCase();
+
+    assert(responseText.includes('verify') && responseText.includes('email'));
+
+    // okay, that invite has been used now
+    invites = await (await adminFetch(`${endpoint}/auth/user/invite/json`)).json();
+
+    assert(invites.length === 1);
+
+    invite = invites[0];
+
+    assert(invite.is_used);
+    assert(invite.used_at);
 });
