@@ -15,7 +15,7 @@ class StubServer{
         this.contentLength = 10000;
 
         for(let i = 0; i < this.contentLength; i++){
-            let randomNode = this.generateRandomNode(i);
+            let randomNode = this._generateRandomNode(i);
             this.stubContentById[randomNode.id] = randomNode;
             this.stubContent.push(randomNode);
         }
@@ -34,7 +34,7 @@ class StubServer{
         }
     }
 
-    generateRandomNode(order){
+    _generateRandomNode(order){
         // TODO: generate random notes in a variety of types (once we know how to display a variety of types of node)
         let id = uuid().slice(-6);
         return {
@@ -44,7 +44,7 @@ class StubServer{
             content: `
 ## Node ${order}
 _${id}_
-This is markdown content!
+This is morkdown content!
 
 * I gaze upon the roast,
 * that is sliced and laid out
@@ -110,15 +110,32 @@ class RealServer{
 }
 
 class Data{
+    /*
+        Okay, so, "Data" is kind of a special thing:
+        It's not the same thing as RealServer or StubServer, which are classes which are used to interact with the server.
+        "Data's" job is to keep track of the state of the data that we've loaded from the server -
+            like, if we've got 30 nodes loaded, and there are 10 blank nodes after that, and then there are 30 more nodes loaded?
+            the RealServer/StubServer system is where we go to find out what's ON those nodes,
+            but Data is responsible for keeping track of what nodes we've loaded and what nodes we haven't loaded.
+    */
     constructor({server}){
-        // the purpose of Data is to manage the stuff that we're pulling from the server
         this.server = server;
         this.index = {};
         // this.index.contentIds is a list of every ID of a node in the index
+
+        // fullyLoadedBakedPotato is set once we have _all_ of the content loaded. At this point there's a lot less work for Data to do.
+        //  however! if the story is too large, we might want to start _unloading_ content that's too far away from the current location.
         this.fullyLoadedBakedPotato = false;
+
+        // this.content is a dictionary of every node that we've loaded so far, indexed by their ID
         this.content = {};
+
+        // currentLocation is the index of the node that we're currently looking at
         this.currentLocation = 0;
+        // currentId is the ID of the node that we're currently looking at
         this.currentId = null;
+
+        // while you're staring at the page, we keep loading content in the background
         setTimeout(this.ping.bind(this), 2000);
     }
 
@@ -133,6 +150,7 @@ class Data{
     }
 
     async _loadEndCapItems(){
+        // because there are buttons to skip to the very first and very last node, we need to make sure that we have those nodes loaded
         let firstNodeId = this.index.contentIds[0];
         let lastNodeId = this.index.contentIds[this.index.contentIds.length - 1];
         if(this.content[lastNodeId] != null && this.content[lastNodeId] != null){
@@ -203,6 +221,9 @@ class Data{
     }
 
     async loadIndex({userSlug, contentSlug, contentId}){
+        // userSlug+contentSlug are a pair of strings that identify the index that we're looking at
+        // so, for example, "cubes/testyboy" is an index that belongs to the user "cubes" and is called "testyboy"
+        // the index describes the whole story, in order, it's like a table of contents
         let indexId = await this.server.getIndexId({userSlug, contentSlug});
 
         if(contentId == null){

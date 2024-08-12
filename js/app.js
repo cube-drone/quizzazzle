@@ -15,7 +15,6 @@ function debounce(func, timeout = 300){
 
 let bootupTime = Date.now();
 
-
 const html = htm.bind(h);
 
 function Nav({onTop, onBottom, onDown, onUp, onMenu }){
@@ -66,6 +65,12 @@ function Nav({onTop, onBottom, onDown, onUp, onMenu }){
 }
 
 function FullNav({onMenu}){
+    /*
+        This is the thing that appears when you click the hamburger button.
+        Ideally, it'll have a Table of Contents, and maybe some other stuff?
+        Credits? A link to the source code? A link to the user's profile?
+        The world is our oyster.
+    */
     return html`<nav id="full-nav">
         <ul>
             <li>
@@ -100,6 +105,7 @@ class App extends Component {
     componentDidMount(){
         let element = this.base;
         let everything = element.querySelector('.everything-feed');
+
         everything.addEventListener('scroll', (e) => {
             let scrollTop = everything.scrollTop;
             let changeDirection = debounce((direction) => {
@@ -126,10 +132,10 @@ class App extends Component {
 
         window.onkeyup = (e) => {
             let key = e.key;
-            if (key === 'ArrowUp') {
+            if (key === 'ArrowUp' || key.toLowerCase() === "w") {
                 this.goUpOne();
             }
-            if (key === 'ArrowDown') {
+            if (key === 'ArrowDown' || key.toLowerCase() === "s") {
                 this.goDownOne();
             }
         }
@@ -193,12 +199,15 @@ class App extends Component {
     }
 
     render(){
+        // we go to quite a lot of trouble to determine whether or not the header should be visible
         let justBooted = Date.now() - bootupTime < 5000;
         let justInteracted = Date.now() - this.lastNavInteraction < 5000;
         let headerVisible = this.state.scrollDirection == "backward" ? "header-visible" : "header-invisible";
         if(justBooted || justInteracted){
             headerVisible = "header-visible";
         }
+
+        // if we scroll down a bit, the transparent icons will show content THROUGH them, which looks wonky
         let disableTransparentIcons = this.lastScrollTop > 60 ? "disable-transparent-icons" : "";
 
         let fullNavExpandedClass = this.state.expandedMenu ? "expanded" : "";
