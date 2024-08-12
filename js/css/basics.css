@@ -84,6 +84,7 @@ svg {
     margin: 0 auto;
     padding-top: 60px;
     overscroll-behavior: none;
+    overflow-x: scroll;
 }
 
 .primary-card .gutter, .primary-card .gutters {
