@@ -36,7 +36,7 @@ class StubServer{
 
     _generateRandomNode(order){
         // TODO: generate random notes in a variety of types (once we know how to display a variety of types of node)
-        let id = uuid().slice(-6);
+        let id = uuid().slice(-8);
         return {
             id,
             order,
