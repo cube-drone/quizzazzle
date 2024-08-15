@@ -38,8 +38,6 @@ pub struct UserInviteServiceOptions{
 #[derive(Clone)]
 pub struct UserInviteService{
     connection: Arc<Mutex<SqlConnection>>,
-    token_cache: Arc<Mutex<Cache<Uuid, UserInviteRaw>>>,
-    user_tokens_cache: Arc<Mutex<Cache<Uuid, HashSet<Uuid>>>>
 }
 
 const CREATE_TABLE: &str = r#"CREATE TABLE IF NOT EXISTS tokens (
@@ -83,8 +81,6 @@ impl UserInviteService{
 
         Ok(Self {
             connection: sql_connection,
-            token_cache: Arc::new(Mutex::new(token_cache)),
-            user_tokens_cache: Arc::new(Mutex::new(user_tokens_cache))
         })
     }
 
