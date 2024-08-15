@@ -5,7 +5,7 @@ use rocket::response::Response;
 use rand::Rng;
 
 
-const POWERED_BY: [&str;25] = [
+const POWERED_BY: [&str;31] = [
     "PHP/1.0.4",
     "ASP.NET.NET",
     "JavaServer PageMakers",
@@ -27,10 +27,16 @@ const POWERED_BY: [&str;25] = [
     "ancient plankton, left in the earth for millions of years, and then refined into a flammable liquid",
     "human suffering, specifically my suffering, specifically my suffering at the hands of this project, specifically my suffering at the hands of this project that I am doing for free",
     "AMD Ryzen 9 5950X 16-Core Processor",
+    "AMD Ryzen 1 50X 2-Core Processor",
     "Haskell - ha ha, no, I am joking, I didn't think anybody would believe that, ha ha, Haskell, ha ha",
     "CoffeeScript",
     "MediaWiki",
     "Esperanto",
+    "an armload of hot sausages",
+    "sega genesis evangelion",
+    "bees",
+    "a lot of bees",
+    "a whole lot of angry, angry bees",
 ];
 
 fn get_random_powered_by() -> &'static str {
