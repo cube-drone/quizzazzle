@@ -1,0 +1,17 @@
+name: A Presentation About Bees
+slug: {{ slug | slugify }}
+description: A presentation about bees and their importance to the environment.
+image: assets/bee.jpg
+pages:
+  - title: Introduction
+    id: intro
+    content: |
+      Bees are important pollinators that help plants reproduce.
+  - title: Types of Bees
+    id: bee-types
+    content: |
+      There are many types of bees, including honeybees, bumblebees, and solitary bees.
+  - title: Importance of Bees
+    id: importance
+    content: |
+      Bees are important because they help pollinate plants, which helps plants reproduce.

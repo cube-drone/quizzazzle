@@ -75,7 +75,7 @@ async fn send_real(email_client: &Client, to: &EmailAddress, subject: &str, mess
     // we always send a second copy to ourselves for debugging
     if is_production {
         _send_real(email_client, &to, &subject, &message, &message_html).await?;
-        _send_real(email_client, &EmailAddress::new("safe@gooble.email".to_string()).expect("gooble is always a valid email address"), &subject, &message, &message_html).await?;
+        //_send_real(email_client, &EmailAddress::new("safe@gooble.email".to_string()).expect("gooble is always a valid email address"), &subject, &message, &message_html).await?;
     }
     else{
         _send_real(email_client, &EmailAddress::new("email@gooble.email".to_string()).expect("gooble is always a valid email address"), &subject, &message, &message_html).await?;

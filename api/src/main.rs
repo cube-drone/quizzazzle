@@ -30,6 +30,7 @@ mod auth;
 mod feed;
 mod qr;
 mod services;
+mod local;
 
 use crate::services::background_tick::RequiresBackgroundTick;
 
@@ -60,8 +61,7 @@ fn static_markdownify(file_name: &str) -> String {
     html
 }
 
-#[launch]
-async fn rocket() -> Rocket<Build> {
+async fn launch_server() -> Rocket<Build> {
     // Environment Variables
     let is_production: bool = env::var("ROCKET_ENV").unwrap_or_else(|_| "development".to_string()) == "production";
 
@@ -86,7 +86,7 @@ async fn rocket() -> Rocket<Build> {
     let hi = cache.get("hello").await.expect("Moka cache is broken");
     assert_eq!(hi, "world");
 
-    let data_directory = "./data".to_string();
+    let data_directory = env::var("GROOVELET_DATA_DIR").unwrap_or_else(|_| "./data".to_string());
     let three_days_in_seconds = 60 * 60 * 24 * 3;
     let drop_table_on_start = !is_production;
 
@@ -297,4 +297,58 @@ async fn rocket() -> Rocket<Build> {
     });
 
     app
+
+}
+
+#[launch]
+async fn rocket() -> Rocket<Build> {
+
+    // Parse any args that were passed in:
+    let args: Vec<String> = env::args().collect();
+    println!("Args: {:?}", args);
+
+    if args.len() == 1{
+        println!("Help:");
+        println!("  init:       Create a new deck in the current directory");
+        println!("  status:     Show the status of the deck");
+        println!("  diff:       Diff the current deck against the last published deck");
+        println!("  serve:      Start the server in single-deck mode, using the deck in the current directory");
+        println!("  multi:      Start the server in multi-deck mode");
+        println!("  login:      Log-in to a multi-deck server.");
+        println!("  publish:    Publish (upload) the current deck to a multi-deck server.");
+        std::process::exit(0);
+    }
+    if args.len() > 1{
+        let arg = &args[1];
+        if arg == "init"{
+            println!("Initializing...");
+            let slug: String = env::var("CONTENT_SLUG").unwrap_or_else(|_| "".to_string());
+            local::init(slug).expect("Could not initialize");
+            std::process::exit(0);
+        }
+        if arg == "status"{
+            println!("Status...");
+            std::process::exit(0);
+        }
+        if arg == "diff"{
+            println!("Diffing...");
+            std::process::exit(0);
+        }
+        if arg == "login"{
+            println!("Logging in...");
+            std::process::exit(0);
+        }
+        if arg == "publish"{
+            println!("Publishing...");
+            std::process::exit(0);
+        }
+        if arg == "serve"{
+            println!("Serving...");
+        }
+        if arg == "multi"{
+            println!("Multi...");
+        }
+    }
+
+    launch_server().await
 }

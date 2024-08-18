@@ -9,8 +9,8 @@ start:
 	GROOVELET_ROOT_EMAIL="test@test.test" \
 	GROOVELET_ROOT_AUTH_PASSWORD="test" \
 	ROCKET_ADDRESS="0.0.0.0" \
-	ROCKET_PORT="3333" \
-	ROCKET_PUBLIC_ADDRESS="http://localhost:3333" \
+	ROCKET_PORT="8000" \
+	ROCKET_PUBLIC_ADDRESS="http://localhost:8000" \
 	USE_INSECURE_HASHES="true" \
 	ROCKET_SECRET_KEY="grPMXJszWoqdlGv1M7Y+9f0FsPhxsycGVjuQ6mfobIk=" \
 	RUST_BACKTRACE="full" \

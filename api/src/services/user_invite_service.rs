@@ -1,7 +1,5 @@
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::time::Duration;
-use std::collections::HashSet;
 
 use serde::{Serialize, Deserialize};
 
@@ -9,7 +7,6 @@ use anyhow::Result;
 use rocket::serde::uuid::Uuid;
 use rocket::tokio;
 
-use moka::future::Cache;
 use rusqlite::{Connection as SqlConnection, DatabaseName, params, Error as SqlError};
 use chrono::{DateTime, Utc};
 
@@ -58,15 +55,6 @@ const DELETE: &str = "DELETE FROM tokens WHERE id = ?1;";
 
 impl UserInviteService{
     pub fn new(options: UserInviteServiceOptions) -> Result<Self> {
-        let token_cache: Cache<Uuid, UserInviteRaw> = Cache::builder()
-            .max_capacity(options.cache_capacity)
-            .time_to_idle(Duration::from_secs(options.expiry_seconds))
-            .build();
-
-        let user_tokens_cache: Cache<Uuid, HashSet<Uuid>> = Cache::builder()
-            .max_capacity(options.cache_capacity)
-            .time_to_idle(Duration::from_secs(options.expiry_seconds))
-            .build();
 
         let sql_connection = Arc::new(Mutex::new(SqlConnection::open(format!("{}/invites_{}.db", options.data_directory, options.name)).expect("Could not open Invite SQLite database")));
 

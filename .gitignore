@@ -7,3 +7,6 @@ secrets.sh
 
 api/test_data/*
 api/data/*
+api/assets
+api/content.yml
+api/.ministry

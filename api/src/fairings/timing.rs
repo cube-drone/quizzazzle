@@ -46,6 +46,7 @@ impl Fairing for RequestTimer {
 }
 
 /// Request guard used to retrieve the start time of a request.
+#[allow(dead_code)]
 #[derive(Copy, Clone)]
 pub struct StartTime(pub SystemTime);
 
