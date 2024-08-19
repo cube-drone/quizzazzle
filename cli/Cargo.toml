@@ -1,0 +1,8 @@
+[package]
+name = "cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rocket = { version = "0.5.1", features = ["secrets"] }
+anyhow = "=1.0.86"

@@ -2,6 +2,7 @@ out.js
 build
 node_modules
 api/target
+cli/target
 secrets.sh
 .vscode
 
@@ -10,3 +11,7 @@ api/data/*
 api/assets
 api/content.yml
 api/.ministry
+cli/content.yml
+cli/.ministry
+cli/assets
+cli/assets/*

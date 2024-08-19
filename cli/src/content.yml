@@ -1,5 +1,6 @@
 name: A Presentation About Bees
-description: A presentation about bees and their importance to the environment.
+slug: bees
+description: Whoa, look at all of these bees!
 image: assets/bee.jpg
 pages:
   - title: Introduction
