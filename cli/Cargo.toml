@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 rocket = { version = "0.5.1", features = ["secrets"] }
 anyhow = "=1.0.86"
+yaml-rust2 = "0.8"

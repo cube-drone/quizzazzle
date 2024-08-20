@@ -1,5 +1,14 @@
 use std::path::Path;
 use anyhow::Result;
+use yaml_rust2::YamlLoader;
+
+#[derive(Debug)]
+pub struct DeckMetadata{
+    name: String,
+    slug: String,
+    description: String,
+    image_url: String,
+}
 
 pub struct MinistryDirectory{
     directory_root: String,
@@ -12,10 +21,13 @@ impl MinistryDirectory{
         }
     }
 
-    pub fn init(&self) -> Result<()>{
-        println!("Initializing...");
+    pub fn init(&self, force: bool) -> Result<()>{
         if self.exists()? {
             println!("This directory already contains a deck!");
+            if force {
+                println!("Forcing re-initialization...");
+                return self.create();
+            }
             return Ok(());
         }
         else{
@@ -30,18 +42,29 @@ impl MinistryDirectory{
         let content_yml: &str = include_str!("content.yml");
         // write content_yml to the directory root
         let content_path = format!("{}/content.yml", self.directory_root);
-        println!("... {}", content_path);
+        println!("✅ {}", content_path);
         std::fs::write(content_path, content_yml)?;
 
         // create the .ministry file
         let ministry_path = format!("{}/.ministry", self.directory_root);
-        println!("... {}", ministry_path);
+        println!("✅ {}", ministry_path);
         std::fs::write(ministry_path, "")?;
 
         // create the assets directory
         let assets_path = format!("{}/assets", self.directory_root);
-        println!("... {}", assets_path);
-        std::fs::create_dir(assets_path)?;
+        println!("✅ {}", assets_path);
+        if Path::new(&assets_path).exists(){
+        }
+        else{
+            std::fs::create_dir(assets_path)?;
+        }
+
+        // the default bee.jpg file
+        let content_bee = include_bytes!("bee.jpg");
+        // write content_yml to the directory root
+        let bee_path = format!("{}/assets/bee.jpg", self.directory_root);
+        println!("✅ {}", bee_path);
+        std::fs::write(bee_path, content_bee)?;
 
         Ok(())
     }
@@ -75,6 +98,49 @@ impl MinistryDirectory{
 
         Ok(true)
     }
+
+    pub fn _get_content(&self) -> Result<String>{
+        let content_path = format!("{}/content.yml", self.directory_root);
+        let content = std::fs::read_to_string(content_path)?;
+        Ok(content)
+    }
+
+    pub fn get_metadata(&self) -> Result<DeckMetadata>{
+        // what's a DeckMetadata?
+        let content_string = self._get_content()?;
+        let yaml = YamlLoader::load_from_str(&content_string)?;
+        let doc = &yaml[0];
+
+        let name = doc["name"].as_str().unwrap_or_else(|| "");
+        let slug = doc["slug"].as_str().unwrap_or_else(|| "");
+        let description = doc["description"].as_str().unwrap_or_else(|| "");
+        let image_url = doc["image"].as_str().unwrap_or_else(|| "");
+
+        // test for the existence of image_url as a file
+        let image_path = format!("{}/assets/{}", self.directory_root, image_url);
+        if(Path::new(&image_path).exists()){
+            println!("Image exists: {}", image_path);
+        }
+        else{
+            println!("Image does not exist: {}", image_path);
+        }
+
+        let dm = DeckMetadata{
+            name: name.to_string(),
+            slug: slug.to_string(),
+            description: description.to_string(),
+            image_url: image_url.to_string(),
+        };
+        // Pretty print
+        println!("{:#?}", dm);
+        Ok(dm)
+    }
+
+    /*
+    pub fn get_index(&self) -> Result<Index>{
+        // what's an Index?
+    }
+    */
 
     /*
     pub fn get_ministries(&self) -> Vec<Ministry>{

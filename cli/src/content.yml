@@ -1,7 +1,7 @@
 name: A Presentation About Bees
 slug: bees
 description: Whoa, look at all of these bees!
-image: assets/bee.jpg
+image: bee.jpg
 pages:
   - title: Introduction
     id: intro

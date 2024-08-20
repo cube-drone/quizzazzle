@@ -7,11 +7,23 @@ use rocket::{Build, Rocket};
 
 mod ministry_directory;
 
-fn init(){
+///
+/// Initialize a new deck in the current directory
+///
+/// if the directory already contains a deck, this will fail unless --force is passed
+///
+fn init(force: bool){
     let directory_root = ".";
     let directory = ministry_directory::MinistryDirectory::new(directory_root.to_string());
-    directory.init().expect("Failed to initialize directory.");
+    directory.init(force).expect("Failed to initialize directory.");
 }
+
+fn status(){
+    let directory_root = ".";
+    let directory = ministry_directory::MinistryDirectory::new(directory_root.to_string());
+    directory.get_metadata().expect("Failed to get status.");
+}
+
 
 async fn launch_server(_multi: bool) -> Rocket<Build> {
 
@@ -68,12 +80,22 @@ async fn rocket() -> Rocket<Build> {
     if args.len() > 1{
         let arg = &args[1];
         if arg == "init"{
-            println!("Initializing...");
-            init();
+            let mut force = false;
+            if(args.len() > 2){
+                let remaining_args = &args[2..];
+                // look for --force in the remaining args
+                for arg in remaining_args{
+                    if arg == "--force" || arg == "-f"{
+                        force = true;
+                    }
+                }
+            }
+            init(force);
             std::process::exit(0);
         }
         if arg == "status"{
             println!("Status...");
+            status();
             std::process::exit(0);
         }
         if arg == "diff"{
