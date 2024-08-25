@@ -2,32 +2,193 @@
 extern crate rocket;
 
 use std::env;
+use std::path::Path;
+use url::Url;
+use anyhow::{Result, anyhow};
 
+use ministry_directory::MinistryDirectory;
 use rocket::{Build, Rocket};
+use rocket::response::content;
+use rocket::fs::FileServer;
+use rocket::State;
+use indoc::indoc; // this is a macro that allows us to write multi-line strings in a more readable way
 
 mod ministry_directory;
+
+const APP_JS: &str = include_str!("../../js/build/out.js");
+const APP_CSS: &str = include_str!("../../js/build/style.css");
+//const APP_FAVICON: &str = include_str!("../../target/logo.svg");
 
 ///
 /// Initialize a new deck in the current directory
 ///
 /// if the directory already contains a deck, this will fail unless --force is passed
 ///
-fn init(force: bool){
+fn init(flags: Flags){
     let directory_root = ".";
     let directory = ministry_directory::MinistryDirectory::new(directory_root.to_string());
-    directory.init(force).expect("Failed to initialize directory.");
+    directory.init(flags.force).expect("Failed to initialize directory.");
 }
 
-fn status(){
+fn status(_flags: Flags){
     let directory_root = ".";
     let directory = ministry_directory::MinistryDirectory::new(directory_root.to_string());
     directory.get_metadata().expect("Failed to get status.");
 }
 
+#[get("/js/app.js")]
+async fn js_app() -> content::RawJavaScript<&'static str> {
+    content::RawJavaScript(APP_JS)
+}
+#[get("/js/style.css")]
+async fn js_css() -> content::RawCss<&'static str> {
+    content::RawCss(APP_CSS)
+}
 
-async fn launch_server(_multi: bool) -> Rocket<Build> {
+struct Flags{
+    multi: bool,
+    force: bool,
+}
+
+impl Flags{
+    fn empty() -> Flags{
+        Flags{
+            multi: false,
+            force: false,
+        }
+    }
+
+    fn from_args(args: Vec<String>) -> Flags{
+        let mut multi = false;
+        let mut force = false;
+        for arg in args{
+            if arg == "multi" || arg == "--multi" || arg == "-m" || std::env::var("ROCKET_MULTI").unwrap_or("false".to_string()) == "true"{
+                multi = true;
+            }
+            if arg == "force" || arg == "--force" || arg == "-f" || std::env::var("ROCKET_FORCE").unwrap_or("false".to_string()) == "true"{
+                force = true;
+            }
+        }
+        Flags{
+            multi,
+            force,
+        }
+    }
+}
+struct Config{
+    server_url: Url,
+    site_name: String,
+    default_locale: String,
+}
+
+impl Config{
+    fn from_env() -> Config{
+        let server_url = std::env::var("ROCKET_SERVER_URL").unwrap_or("http://localhost:8000".to_string());
+        let site_name = std::env::var("ROCKET_SITE_NAME").unwrap_or("Ministry".to_string());
+        let default_locale = std::env::var("ROCKET_DEFAULT_LOCALE").unwrap_or("en_US".to_string());
+        Config{
+            server_url: Url::parse(&server_url).unwrap(),
+            site_name,
+            default_locale,
+        }
+    }
+}
+
+fn index_template(directory: MinistryDirectory, config: &State<Config>) -> Result<String> {
+    if !directory.exists()?{
+        return Err(anyhow!("Directory does not exist"));
+    }
+    let deck_metadata = directory.get_metadata()?;
+    let title = if deck_metadata.title != "" { deck_metadata.title } else { "Untitled".to_string() };
+    let description = deck_metadata.description;
+    let author = deck_metadata.author;
+    let server_url = config.server_url.as_str();
+    let url = format!("{}/{}/{}", server_url, deck_metadata.author_slug, deck_metadata.slug);
+    let image = format!("{}/{}/{}/{}", server_url, deck_metadata.author_slug, deck_metadata.slug, deck_metadata.image_url);
+    let site_name = config.site_name.clone();
+    let locale = if deck_metadata.locale != "" { deck_metadata.locale } else { config.default_locale.clone() } ;
+    return Ok(format!(indoc!(r#"
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>{}</title>
+            <meta property="og:title" content="{}" />
+            <meta property="og:description" content="{}" />
+            <meta property="article:author" content="{}" />
+            <meta property="og:url" content="{}" />
+            <meta property="og:site_name" content="{}" />
+            <meta property="og:locale" content="{}" />
+            <meta property="og:image" content="{}" />
+            <link rel="stylesheet" href="/js/style.css">
+            <link rel="icon" type="image/svg+xml" href="/favicon.svg" sizes="any"/>
+        </head>
+        <body>
+            <div id="app"/>
+            <script src="/js/app.js"></script>
+        </body>
+    </html>
+    "#), title, title, description, author, url, site_name, locale, image));
+}
+
+fn error_template(message: &str) -> String {
+    return format!(indoc!(r#"
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Error</title>
+        </head>
+        <body>
+            <h1>Error</h1>
+            <p>{}</p>
+        </body>
+    </html>
+    "#), message);
+}
+
+
+#[get("/")]
+fn index(flags: &State<Flags>, config: &State<Config>) -> content::RawHtml<String> {
+    if flags.multi{
+        println!("loading multi-deck index");
+    }
+    let directory_root = ".";
+    let directory = ministry_directory::MinistryDirectory::new(directory_root.to_string());
+    let rendered = index_template(directory, config);
+    match rendered{
+        Ok(html) => content::RawHtml(html),
+        Err(e) => content::RawHtml(error_template(&e.to_string())),
+    }
+}
+
+async fn launch_server(flags: Flags, config: Config) -> Rocket<Build> {
 
     let mut app = rocket::build();
+
+    app = app.mount("/", routes![index]);
+
+    if std::env::var("ROCKET_ENV").unwrap_or("development".to_string()) == "development"{
+        // here we point to the JS and CSS build directories:
+        // we only bother with this next bit if we're in dev mode: otherwise we should use include_str! to bundle the files directly into the binary
+        let dev_ui_location = std::env::var("JS_BUILD_LOCATION").unwrap_or("../../js/build".to_string());
+        //if location exists:
+        match Path::new(&dev_ui_location).exists(){
+            true => {
+                println!("Serving from: {}", dev_ui_location);
+                app = app.mount("/js", FileServer::from(dev_ui_location));
+            },
+            false => {
+                app = app.mount("/", routes![js_app, js_css]);
+            }
+        }
+    }
+    else{
+        app = app.mount("/", routes![js_app, js_css]);
+    }
+
+    app = app.manage(flags);
+    app = app.manage(config);
 
     // if _multi is false, we are running in single-deck mode
     // the only goal here is to serve the deck in the current directory
@@ -64,7 +225,8 @@ async fn rocket() -> Rocket<Build> {
     // Parse any args that were passed in:
     let args: Vec<String> = env::args().collect();
 
-    let mut multi: bool = false;
+    let flags = Flags::empty();
+    let config = Config::from_env();
 
     if args.len() == 1{
         println!("Help:");
@@ -78,24 +240,16 @@ async fn rocket() -> Rocket<Build> {
         std::process::exit(0);
     }
     if args.len() > 1{
+        let flags = Flags::from_args(args.clone());
+
         let arg = &args[1];
         if arg == "init"{
-            let mut force = false;
-            if(args.len() > 2){
-                let remaining_args = &args[2..];
-                // look for --force in the remaining args
-                for arg in remaining_args{
-                    if arg == "--force" || arg == "-f"{
-                        force = true;
-                    }
-                }
-            }
-            init(force);
+            init(flags);
             std::process::exit(0);
         }
         if arg == "status"{
             println!("Status...");
-            status();
+            status(flags);
             std::process::exit(0);
         }
         if arg == "diff"{
@@ -117,9 +271,8 @@ async fn rocket() -> Rocket<Build> {
             // a multi server is the final production server this project is intended to be run on
             // it is a server that can host multiple decks, multiple users, etc.
             println!("Multi...");
-            multi = true;
         }
     }
 
-    launch_server(multi).await
+    launch_server(flags, config).await
 }

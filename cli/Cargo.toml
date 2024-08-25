@@ -7,3 +7,6 @@ edition = "2021"
 rocket = { version = "0.5.1", features = ["secrets"] }
 anyhow = "=1.0.86"
 yaml-rust2 = "0.8"
+indoc = "2.0.5"
+slugify = "0.1.0"
+url = { version = "2", features = ["serde"] }

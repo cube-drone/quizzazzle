@@ -2,12 +2,21 @@ use std::path::Path;
 use anyhow::Result;
 use yaml_rust2::YamlLoader;
 
+use slugify::slugify;
+
 #[derive(Debug)]
 pub struct DeckMetadata{
-    name: String,
-    slug: String,
-    description: String,
-    image_url: String,
+    pub title: String,
+    pub slug: String,
+    pub author: String,
+    pub author_slug: String,
+    pub description: String,
+    pub image_url: String,
+    pub locale: String,
+}
+
+pub struct Card{
+    id: String,
 }
 
 pub struct MinistryDirectory{
@@ -112,13 +121,17 @@ impl MinistryDirectory{
         let doc = &yaml[0];
 
         let name = doc["name"].as_str().unwrap_or_else(|| "");
-        let slug = doc["slug"].as_str().unwrap_or_else(|| "");
+        let title = doc["title"].as_str().unwrap_or_else(|| "");
+        let name_or_title = if name == "" { title } else { name };
+        let author = doc["author"].as_str().unwrap_or_else(|| "");
+
         let description = doc["description"].as_str().unwrap_or_else(|| "");
         let image_url = doc["image"].as_str().unwrap_or_else(|| "");
+        let locale = doc["locale"].as_str().unwrap_or_else(|| "");
 
         // test for the existence of image_url as a file
         let image_path = format!("{}/assets/{}", self.directory_root, image_url);
-        if(Path::new(&image_path).exists()){
+        if Path::new(&image_path).exists() {
             println!("Image exists: {}", image_path);
         }
         else{
@@ -126,10 +139,13 @@ impl MinistryDirectory{
         }
 
         let dm = DeckMetadata{
-            name: name.to_string(),
-            slug: slug.to_string(),
+            title: name_or_title.to_string(),
+            slug: slugify!(name_or_title),
+            author: author.to_string(),
+            author_slug: slugify!(author),
             description: description.to_string(),
             image_url: image_url.to_string(),
+            locale: locale.to_string(),
         };
         // Pretty print
         println!("{:#?}", dm);
