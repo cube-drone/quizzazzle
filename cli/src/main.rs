@@ -36,6 +36,12 @@ fn status(_flags: Flags){
     directory.get_metadata().expect("Failed to get status.");
 }
 
+fn assets(_flags: Flags){
+    let directory_root = ".";
+    let directory = ministry_directory::MinistryDirectory::new(directory_root.to_string());
+    directory.compile_assets().expect("Failed to compile assets.");
+}
+
 #[get("/js/app.js")]
 async fn js_app() -> content::RawJavaScript<&'static str> {
     content::RawJavaScript(APP_JS)
@@ -99,14 +105,23 @@ fn index_template(directory: MinistryDirectory, config: &State<Config>) -> Resul
         return Err(anyhow!("Directory does not exist"));
     }
     let deck_metadata = directory.get_metadata()?;
-    let title = if deck_metadata.title != "" { deck_metadata.title } else { "Untitled".to_string() };
-    let description = deck_metadata.description;
+    let title = deck_metadata.title;
     let author = deck_metadata.author;
+    let description = match deck_metadata.description {
+        Some(description) => description,
+        None => "".to_string(),
+    };
     let server_url = config.server_url.as_str();
     let url = format!("{}/{}/{}", server_url, deck_metadata.author_slug, deck_metadata.slug);
-    let image = format!("{}/{}/{}/{}", server_url, deck_metadata.author_slug, deck_metadata.slug, deck_metadata.image_url);
+    let image = match deck_metadata.image_url {
+        Some(image_url) => format!("{}/{}/{}/{}", server_url, deck_metadata.author_slug, deck_metadata.slug, image_url),
+        None => "".to_string(),
+    };
     let site_name = config.site_name.clone();
-    let locale = if deck_metadata.locale != "" { deck_metadata.locale } else { config.default_locale.clone() } ;
+    let locale = match deck_metadata.locale {
+        Some(locale) => locale,
+        None => config.default_locale.clone(),
+    };
     return Ok(format!(indoc!(r#"
     <!DOCTYPE html>
     <html>
@@ -161,6 +176,7 @@ fn index(flags: &State<Flags>, config: &State<Config>) -> content::RawHtml<Strin
         Err(e) => content::RawHtml(error_template(&e.to_string())),
     }
 }
+
 
 async fn launch_server(flags: Flags, config: Config) -> Rocket<Build> {
 
@@ -232,6 +248,7 @@ async fn rocket() -> Rocket<Build> {
         println!("Help:");
         println!("  init:       Create a new deck in the current directory");
         println!("  status:     Show the status of the deck");
+        println!("  assets:     Compile all assets into a built assets directory");
         println!("  diff:       Diff the current deck against the last published deck");
         println!("  serve:      Start the server in single-deck mode, using the deck in the current directory");
         println!("  multi:      Start the server in multi-deck mode");
@@ -250,6 +267,11 @@ async fn rocket() -> Rocket<Build> {
         if arg == "status"{
             println!("Status...");
             status(flags);
+            std::process::exit(0);
+        }
+        if arg == "assets"{
+            println!("Assets...");
+            assets(flags);
             std::process::exit(0);
         }
         if arg == "diff"{

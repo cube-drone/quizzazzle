@@ -1,18 +1,20 @@
 use std::path::Path;
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use yaml_rust2::YamlLoader;
 
 use slugify::slugify;
 
 #[derive(Debug)]
 pub struct DeckMetadata{
+    // title & author are non-optional
     pub title: String,
     pub slug: String,
     pub author: String,
     pub author_slug: String,
-    pub description: String,
-    pub image_url: String,
-    pub locale: String,
+    pub author_link: Option<String>,
+    pub description: Option<String>,
+    pub image_url: Option<String>,
+    pub locale: Option<String>,
 }
 
 pub struct Card{
@@ -123,40 +125,84 @@ impl MinistryDirectory{
         let name = doc["name"].as_str().unwrap_or_else(|| "");
         let title = doc["title"].as_str().unwrap_or_else(|| "");
         let name_or_title = if name == "" { title } else { name };
+        if name_or_title == "" {
+            return Err(anyhow!("No name or title found: this is a mandatory field"));
+        }
         let author = doc["author"].as_str().unwrap_or_else(|| "");
-
-        let description = doc["description"].as_str().unwrap_or_else(|| "");
-        let image_url = doc["image"].as_str().unwrap_or_else(|| "");
-        let locale = doc["locale"].as_str().unwrap_or_else(|| "");
-
-        // test for the existence of image_url as a file
-        let image_path = format!("{}/assets/{}", self.directory_root, image_url);
-        if Path::new(&image_path).exists() {
-            println!("Image exists: {}", image_path);
+        if author == "" {
+            return Err(anyhow!("No author found: this is a mandatory field"));
         }
-        else{
-            println!("Image does not exist: {}", image_path);
-        }
+
+        let author_link = match doc["author_link"].as_str(){
+            Some(author_link) => Some(author_link.to_string()),
+            None => None,
+        };
+        let description = match doc["description"].as_str(){
+            Some(description) => Some(description.to_string()),
+            None => None,
+        };
+        let image_url = match doc["image"].as_str(){
+            Some(image_url) => {
+                // test for the existence of image_url as a file
+                let image_path = format!("{}/assets/{}", self.directory_root, image_url);
+                if Path::new(&image_path).exists() {
+                    println!("Image exists: {}", image_path);
+                    Some(image_url.to_string())
+                }
+                else{
+                    println!("Image does not exist: {}", image_path);
+                    None
+                }
+            }
+            None => None,
+        };
+        let locale = match doc["locale"].as_str(){
+            Some(locale) => Some(locale.to_string()),
+            None => None,
+        };
 
         let dm = DeckMetadata{
             title: name_or_title.to_string(),
             slug: slugify!(name_or_title),
             author: author.to_string(),
             author_slug: slugify!(author),
-            description: description.to_string(),
-            image_url: image_url.to_string(),
-            locale: locale.to_string(),
+            author_link: author_link,
+            description: description,
+            image_url: image_url,
+            locale: locale,
         };
         // Pretty print
         println!("{:#?}", dm);
         Ok(dm)
     }
 
-    /*
-    pub fn get_index(&self) -> Result<Index>{
-        // what's an Index?
+    pub fn compile_assets(&self) -> Result<()>{
+        // target directory is:
+        // /build/assets/{author_slug}/{slug}
+
+        let deck_metadata = self.get_metadata()?;
+        let target_directory = format!("./build/assets/{}/{}/", deck_metadata.author_slug, deck_metadata.slug);
+        let source_directory = format!("{}/assets", self.directory_root);
+        println!("Copying assets from {} to {}", source_directory, target_directory);
+
+        Ok(())
     }
-    */
+
+    pub fn get_index(&self) -> Result<()>{
+        // what's an Index?
+        let content_string = self._get_content()?;
+        let yaml = YamlLoader::load_from_str(&content_string)?;
+        let doc = &yaml[0];
+        let list = match doc["content"].as_vec() {
+            Some(list) => list,
+            None => return Err(anyhow!("No content found")),
+        };
+
+        for item in list {
+        }
+
+        Ok(())
+    }
 
     /*
     pub fn get_ministries(&self) -> Vec<Ministry>{
