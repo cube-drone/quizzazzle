@@ -1,10 +1,11 @@
 use std::path::Path;
 use anyhow::{Result, anyhow};
+use serde::Serialize;
 use yaml_rust2::YamlLoader;
 
 use slugify::slugify;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct DeckMetadata{
     // title & author are non-optional
     pub title: String,
@@ -17,8 +18,12 @@ pub struct DeckMetadata{
     pub locale: Option<String>,
 }
 
+#[derive(Debug, Serialize, Clone)]
 pub struct Card{
-    id: String,
+    pub id: String,
+    pub content: Option<String>,
+    pub image_url: Option<String>,
+    pub title: Option<String>,
 }
 
 pub struct MinistryDirectory{
@@ -188,20 +193,30 @@ impl MinistryDirectory{
         Ok(())
     }
 
-    pub fn get_index(&self) -> Result<()>{
+    pub fn get_deck(&self) -> Result<Vec<Card>>{
         // what's an Index?
         let content_string = self._get_content()?;
         let yaml = YamlLoader::load_from_str(&content_string)?;
         let doc = &yaml[0];
-        let list = match doc["content"].as_vec() {
+        let list = match doc["pages"].as_vec() {
             Some(list) => list,
             None => return Err(anyhow!("No content found")),
         };
 
+        let mut deck = Vec::new();
+        let mut counter = 0;
         for item in list {
+            let counter_string = counter.to_string();
+            deck.push(Card{
+                id: item["id"].as_str().unwrap_or_else(|| counter_string.as_str()).to_string(),
+                content: item["content"].as_str().map(|s| s.to_string()),
+                image_url: item["image"].as_str().map(|s| s.to_string()),
+                title: item["title"].as_str().map(|s| s.to_string()),
+            });
+            counter += 1;
         }
 
-        Ok(())
+        Ok(deck)
     }
 
     /*

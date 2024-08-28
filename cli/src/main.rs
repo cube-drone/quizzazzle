@@ -10,12 +10,15 @@ use ministry_directory::MinistryDirectory;
 use rocket::{Build, Rocket};
 use rocket::response::content;
 use rocket::fs::FileServer;
+use rocket::http::Status;
 use rocket::State;
+use rocket::serde::json::Json;
 use indoc::indoc; // this is a macro that allows us to write multi-line strings in a more readable way
+use serde::{Serialize, Deserialize};
 
 mod ministry_directory;
 
-const APP_JS: &str = include_str!("../../js/build/out.js");
+const APP_JS: &str = include_str!("../../js/build/feed.js");
 const APP_CSS: &str = include_str!("../../js/build/style.css");
 //const APP_FAVICON: &str = include_str!("../../target/logo.svg");
 
@@ -42,7 +45,7 @@ fn assets(_flags: Flags){
     directory.compile_assets().expect("Failed to compile assets.");
 }
 
-#[get("/js/app.js")]
+#[get("/js/feed.js")]
 async fn js_app() -> content::RawJavaScript<&'static str> {
     content::RawJavaScript(APP_JS)
 }
@@ -140,7 +143,7 @@ fn index_template(directory: MinistryDirectory, config: &State<Config>) -> Resul
         </head>
         <body>
             <div id="app"/>
-            <script src="/js/app.js"></script>
+            <script src="/js/feed.js"></script>
         </body>
     </html>
     "#), title, title, description, author, url, site_name, locale, image));
@@ -177,12 +180,80 @@ fn index(flags: &State<Flags>, config: &State<Config>) -> content::RawHtml<Strin
     }
 }
 
+#[derive(Serialize)]
+pub struct Index{
+    id: String,
+    metadata: ministry_directory::DeckMetadata,
+    deck_ids: Vec<String>,
+}
+
+#[get("/<author_slug>/<deck_slug>/index")]
+fn deck_index(author_slug: String, deck_slug: String, flags: &State<Flags>, config: &State<Config>) -> Result<Json<Index>, Status> {
+    let directory: MinistryDirectory;
+    if flags.multi{
+        println!("loading multi-deck index for {}/{}", author_slug, deck_slug);
+        directory = ministry_directory::MinistryDirectory::new(".".to_string());
+    }
+    else{
+        directory = ministry_directory::MinistryDirectory::new(".".to_string());
+    }
+    let metadata = directory.get_metadata();
+    let deck = directory.get_deck();
+    match (metadata, deck) {
+        (Ok(metadata), Ok(deck)) => Ok(Json(Index{
+            id: format!("{}/{}", metadata.author_slug, metadata.slug),
+            metadata,
+            deck_ids: deck.into_iter().map(|card| card.id).collect(),
+        })),
+        (Err(err), _) => {
+            println!("Error getting metadata: {}", err);
+            Err(Status::InternalServerError)
+        },
+        (_, Err(err)) => {
+            println!("Error getting deck: {}", err);
+            Err(Status::InternalServerError)
+        },
+        _ => Err(Status::InternalServerError),
+    }
+}
+
+#[get("/<author_slug>/<deck_slug>/range/<start_id>/<end_id>")]
+fn deck_range(author_slug: String, deck_slug: String, start_id: String, end_id: String, flags: &State<Flags>, config: &State<Config>) -> Result<Json<Vec<ministry_directory::Card>>, Status> {
+    let directory: MinistryDirectory;
+    if flags.multi{
+        println!("loading multi-deck index for {}/{}", author_slug, deck_slug);
+        directory = ministry_directory::MinistryDirectory::new(".".to_string());
+    }
+    else{
+        directory = ministry_directory::MinistryDirectory::new(".".to_string());
+    }
+    let deck = directory.get_deck();
+    match deck {
+        Ok(deck) => {
+            // find the start and end indices
+            let start = deck.iter().position(|card| card.id == start_id).unwrap_or(0);
+            let mut end = deck.iter().position(|card| card.id == end_id).unwrap_or(deck.len());
+            if end < start {
+                return Err(Status::BadRequest);
+            }
+            if end < deck.len(){
+                // we want to include the end card
+                end += 1;
+            }
+            Ok(Json(deck[start..end].to_vec()))
+        },
+        Err(err) => {
+            println!("Error getting deck: {}", err);
+            Err(Status::InternalServerError)
+        },
+    }
+}
 
 async fn launch_server(flags: Flags, config: Config) -> Rocket<Build> {
 
     let mut app = rocket::build();
 
-    app = app.mount("/", routes![index]);
+    app = app.mount("/", routes![index, deck_index, deck_range]);
 
     if std::env::var("ROCKET_ENV").unwrap_or("development".to_string()) == "development"{
         // here we point to the JS and CSS build directories:
