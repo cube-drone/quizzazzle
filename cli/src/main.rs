@@ -54,6 +54,7 @@ async fn js_css() -> content::RawCss<&'static str> {
     content::RawCss(APP_CSS)
 }
 
+#[derive(Clone)]
 struct Flags{
     multi: bool,
     force: bool,
@@ -84,10 +85,13 @@ impl Flags{
         }
     }
 }
+
+#[derive(Clone)]
 struct Config{
     server_url: Url,
     site_name: String,
     default_locale: String,
+    asset_directory: String,
 }
 
 impl Config{
@@ -95,10 +99,12 @@ impl Config{
         let server_url = std::env::var("ROCKET_SERVER_URL").unwrap_or("http://localhost:8000".to_string());
         let site_name = std::env::var("ROCKET_SITE_NAME").unwrap_or("Ministry".to_string());
         let default_locale = std::env::var("ROCKET_DEFAULT_LOCALE").unwrap_or("en_US".to_string());
+        let asset_directory = std::env::var("ROCKET_ASSET_DIRECTORY").unwrap_or("./assets".to_string());
         Config{
             server_url: Url::parse(&server_url).unwrap(),
             site_name,
             default_locale,
+            asset_directory,
         }
     }
 }
@@ -310,6 +316,9 @@ async fn launch_server(flags: Flags, config: Config) -> Rocket<Build> {
         app = app.mount("/", routes![js_app, js_css]);
     }
 
+    let config_copy = config.clone();
+    app = app.mount("/assets", FileServer::from(config_copy.asset_directory));
+
     app = app.manage(flags);
     app = app.manage(config);
 
@@ -333,11 +342,6 @@ async fn launch_server(flags: Flags, config: Config) -> Rocket<Build> {
 	// Mount Routes
     app = app.mount("/static", FileServer::from("../js/static"));
     app = app.mount("/build", FileServer::from("../js/build"));
-
-    // home is where "/" lives.
-    app = home::routes::mount_routes(app);
-    // auth: login, registration, that sort of stuff
-    app = auth::routes::mount_routes(app);
     */
 
     app
