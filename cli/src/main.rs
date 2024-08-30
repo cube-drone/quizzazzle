@@ -187,8 +187,18 @@ pub struct Index{
     deck_ids: Vec<String>,
 }
 
+fn get_index(directory: MinistryDirectory) -> Result<Index> {
+    let metadata = directory.get_metadata()?;
+    let deck = directory.get_deck()?;
+    Ok(Index{
+        id: format!("{}/{}", metadata.author_slug, metadata.slug),
+        metadata,
+        deck_ids: deck.into_iter().map(|card| card.id).collect(),
+    })
+}
+
 #[get("/<author_slug>/<deck_slug>/index")]
-fn deck_index(author_slug: String, deck_slug: String, flags: &State<Flags>, config: &State<Config>) -> Result<Json<Index>, Status> {
+fn deck_index(author_slug: String, deck_slug: String, flags: &State<Flags>) -> Result<Json<Index>, Status> {
     let directory: MinistryDirectory;
     if flags.multi{
         println!("loading multi-deck index for {}/{}", author_slug, deck_slug);
@@ -197,28 +207,29 @@ fn deck_index(author_slug: String, deck_slug: String, flags: &State<Flags>, conf
     else{
         directory = ministry_directory::MinistryDirectory::new(".".to_string());
     }
-    let metadata = directory.get_metadata();
-    let deck = directory.get_deck();
-    match (metadata, deck) {
-        (Ok(metadata), Ok(deck)) => Ok(Json(Index{
-            id: format!("{}/{}", metadata.author_slug, metadata.slug),
-            metadata,
-            deck_ids: deck.into_iter().map(|card| card.id).collect(),
-        })),
-        (Err(err), _) => {
-            println!("Error getting metadata: {}", err);
+    match get_index(directory){
+        Ok(index) => Ok(Json(index)),
+        Err(err) => {
+            println!("Error getting index: {}", err);
             Err(Status::InternalServerError)
         },
-        (_, Err(err)) => {
-            println!("Error getting deck: {}", err);
+    }
+}
+#[get("/index")]
+fn default_index() -> Result<Json<Index>, Status> {
+    let directory: MinistryDirectory;
+    directory = ministry_directory::MinistryDirectory::new(".".to_string());
+    match get_index(directory){
+        Ok(index) => Ok(Json(index)),
+        Err(err) => {
+            println!("Error getting index: {}", err);
             Err(Status::InternalServerError)
         },
-        _ => Err(Status::InternalServerError),
     }
 }
 
 #[get("/<author_slug>/<deck_slug>/range/<start_id>/<end_id>")]
-fn deck_range(author_slug: String, deck_slug: String, start_id: String, end_id: String, flags: &State<Flags>, config: &State<Config>) -> Result<Json<Vec<ministry_directory::Card>>, Status> {
+fn deck_range(author_slug: String, deck_slug: String, start_id: String, end_id: String, flags: &State<Flags>) -> Result<Json<Vec<ministry_directory::Card>>, Status> {
     let directory: MinistryDirectory;
     if flags.multi{
         println!("loading multi-deck index for {}/{}", author_slug, deck_slug);
@@ -249,16 +260,40 @@ fn deck_range(author_slug: String, deck_slug: String, start_id: String, end_id: 
     }
 }
 
+#[get("/<author_slug>/<deck_slug>/content/<content_id>")]
+fn deck_id(author_slug: String, deck_slug: String, content_id: String, flags: &State<Flags>) -> Result<Json<ministry_directory::Card>, Status> {
+    let directory: MinistryDirectory;
+    if flags.multi{
+        println!("loading multi-deck index for {}/{}", author_slug, deck_slug);
+        directory = ministry_directory::MinistryDirectory::new(".".to_string());
+    }
+    else{
+        directory = ministry_directory::MinistryDirectory::new(".".to_string());
+    }
+    let deck = directory.get_deck();
+    match deck {
+        Ok(deck) => {
+            //find the matching card
+            let index = deck.iter().position(|card| card.id == content_id).unwrap_or(0);
+            Ok(Json(deck[index].clone()))
+        },
+        Err(err) => {
+            println!("Error getting deck: {}", err);
+            Err(Status::InternalServerError)
+        },
+    }
+}
+
 async fn launch_server(flags: Flags, config: Config) -> Rocket<Build> {
 
     let mut app = rocket::build();
 
-    app = app.mount("/", routes![index, deck_index, deck_range]);
+    app = app.mount("/", routes![index, deck_index, default_index, deck_range, deck_id]);
 
     if std::env::var("ROCKET_ENV").unwrap_or("development".to_string()) == "development"{
         // here we point to the JS and CSS build directories:
         // we only bother with this next bit if we're in dev mode: otherwise we should use include_str! to bundle the files directly into the binary
-        let dev_ui_location = std::env::var("JS_BUILD_LOCATION").unwrap_or("../../js/build".to_string());
+        let dev_ui_location = std::env::var("JS_BUILD_LOCATION").unwrap_or("../js/build".to_string());
         //if location exists:
         match Path::new(&dev_ui_location).exists(){
             true => {
@@ -266,6 +301,7 @@ async fn launch_server(flags: Flags, config: Config) -> Rocket<Build> {
                 app = app.mount("/js", FileServer::from(dev_ui_location));
             },
             false => {
+                println!("No JS build location found at: {}", dev_ui_location);
                 app = app.mount("/", routes![js_app, js_css]);
             }
         }

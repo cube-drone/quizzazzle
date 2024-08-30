@@ -44,7 +44,7 @@ class StubServer{
             content: `
 ## Node ${order}
 _${id}_
-This is morkdown content!
+This is murkdown content!
 
 * I gaze upon the roast,
 * that is sliced and laid out
@@ -106,6 +106,82 @@ This is morkdown content!
 class RealServer{
     constructor({serverUrl}){
         this.serverUrl = serverUrl;
+        this.index = null;
+    }
+
+    async getIndexId({userSlug, contentSlug}){
+        if(userSlug == null || contentSlug == null){
+            const response = await fetch(`${this.serverUrl}/index`, {});
+            this.index = await response.json();
+            return `${this.index.metadata.authorSlug}/${this.index.metadata.slug}`;
+        }
+        return `${userSlug}/${contentSlug}`;
+    }
+
+    indexTransform(serverIndex){
+        let appIndex = {
+            id: serverIndex.id,
+            userSlug: serverIndex.metadata.authorSlug,
+            contentSlug: serverIndex.metadata.slug,
+            name: serverIndex.metadata.title,
+            description: serverIndex.metadata.description,
+            thumbnailImageUrl: serverIndex.metadata.image_url,
+            locale: serverIndex.metadata.locale,
+            order: serverIndex.metadata.order || 'newest content first',
+            contentIds: serverIndex.deck_ids || [],
+            created_at: serverIndex.metadata.created_at || new Date(),
+            updated_at: serverIndex.metadata.updated_at || new Date(),
+        }
+        return appIndex;
+    }
+
+    async getIndex({indexId}){
+        if(this.index == null){
+            const response = await fetch(`${this.serverUrl}/${indexId}/index`, {});
+            this.index = await response.json();
+        }
+
+        return this.indexTransform(this.index);
+    }
+
+    cardTransform(card){
+        let appCard = {
+            id: card.id,
+            type: card.type || "markdown",
+            content: card.content || "content not found",
+            created_at: card.created_at || new Date(),
+            updated_at: card.updated_at || new Date(),
+        }
+        return appCard;
+    }
+
+    async getRange({indexId, startId, endId}){
+        if(startId == null){
+            startId = 0;
+        }
+        if(endId == null){
+            endId = startId + PAGE_SIZE
+        }
+        const response = await fetch(`${this.serverUrl}/${indexId}/range/${startId}/${endId}`, {});
+        let cards = await response.json();
+        console.dir(cards);
+        return cards.map(this.cardTransform);
+    }
+
+    async getContent({indexId, contentId}){
+        const response = await fetch(`${this.serverUrl}/${indexId}/content/${contentId}`, {});
+        let card = await response.json();
+        console.dir(card);
+        return this.cardTransform(card);
+    }
+
+    async getContents({indexId, contentIds}){
+        let contents = [];
+        for (let contentId of contentIds){
+            let content = await this.getContent({indexId, contentId});
+            console.warn(content);
+        }
+        return contents;
     }
 }
 

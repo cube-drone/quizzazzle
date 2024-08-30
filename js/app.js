@@ -251,7 +251,8 @@ class App extends Component {
 
 }
 
-let Data = initialize({serverUrl: null});
+let serverUrl = window.location.origin;
+let Data = initialize({serverUrl});
 
 // load the index
 // determine where we are in the index, using the hash

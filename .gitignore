@@ -15,3 +15,4 @@ cli/content.yml
 cli/.ministry
 cli/assets
 cli/assets/*
+*.DS_Store
