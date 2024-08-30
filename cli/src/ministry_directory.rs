@@ -21,6 +21,7 @@ pub struct DeckMetadata{
 #[derive(Debug, Serialize, Clone)]
 pub struct Card{
     pub id: String,
+    pub card_type: String,
     pub content: Option<String>,
     pub image_url: Option<String>,
     pub title: Option<String>,
@@ -193,6 +194,32 @@ impl MinistryDirectory{
         Ok(())
     }
 
+    fn parse_card(doc: &yaml_rust2::Yaml, default_id: String) -> Card{
+        let id = doc["id"].as_str().unwrap_or_else(|| &default_id).to_string();
+        let mut card_type = doc["type"].as_str().unwrap_or_else(|| "").to_string();
+
+        if card_type == "" {
+            if doc["content"].as_str().is_some(){
+                card_type = "markdown".to_string();
+            }
+            else if doc["image"].as_str().is_some(){
+                card_type = "image".to_string();
+            }
+            else{
+                // this is our defaultiest default
+                card_type = "title".to_string();
+            }
+        }
+
+        Card{
+            id: id,
+            card_type: card_type,
+            content: doc["content"].as_str().map(|s| s.to_string()),
+            image_url: doc["image"].as_str().map(|s| s.to_string()),
+            title: doc["title"].as_str().map(|s| s.to_string()),
+        }
+    }
+
     pub fn get_deck(&self) -> Result<Vec<Card>>{
         // what's an Index?
         let content_string = self._get_content()?;
@@ -207,12 +234,9 @@ impl MinistryDirectory{
         let mut counter = 0;
         for item in list {
             let counter_string = counter.to_string();
-            deck.push(Card{
-                id: item["id"].as_str().unwrap_or_else(|| counter_string.as_str()).to_string(),
-                content: item["content"].as_str().map(|s| s.to_string()),
-                image_url: item["image"].as_str().map(|s| s.to_string()),
-                title: item["title"].as_str().map(|s| s.to_string()),
-            });
+            deck.push(
+                MinistryDirectory::parse_card(&item, counter_string)
+            );
             counter += 1;
         }
 

@@ -147,8 +147,10 @@ class RealServer{
     cardTransform(card){
         let appCard = {
             id: card.id,
-            type: card.type || "markdown",
-            content: card.content || "content not found",
+            title: card.title,
+            type: card.card_type || "title",
+            imageUrl: card.image_url,
+            content: card.content,
             created_at: card.created_at || new Date(),
             updated_at: card.updated_at || new Date(),
         }

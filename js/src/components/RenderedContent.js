@@ -7,34 +7,56 @@ import insane from 'insane';
 
 const html = htm.bind(h);
 
-export default class RenderedContent extends Component {
-    constructor(props){
-        super(props);
-        //console.dir(Object.keys(props.content));
-        console.dir(props);
-        let {id, order, type, content, created_at, updated_at, primary, visible} = props.content;
-        this.state = {
-            id,
-            order,
-            type,
-            content,
-            created_at,
-            updated_at,
-            primary,
-            visible
-        }
-    }
-
-    render(){
-        let {type, content} = this.state;
-
-        let maybeContent = "";
-        if(content){
-            maybeContent = html`<div class="frame-content" dangerouslySetInnerHTML=${{ __html: insane(marked.parse(content)) }}></div>`;
-        }
-
-        return html`<div class="rendered-content" class="frame-${type}">
-            ${maybeContent}
+function TitleCard({card}){
+    if(!card.title){
+        return html`<div class="title-card">
+            <h1>${card.id}</h1>
         </div>`;
     }
+    else{
+        return html`<div class="card title-card">
+            <h1>${card.title}</h1>
+        </div>`;
+    }
+}
+
+function MarkdownCard({card}){
+    return html`<div class="card markdown-card">
+        <div class="markdown-content" dangerouslySetInnerHTML=${{ __html: insane(marked.parse(card.content)) }}></div>
+    </div>`;
+}
+
+function HtmlCard({card}){
+    return html`<div class="card html-card">
+        <div class="markdown-content" dangerouslySetInnerHTML=${{ __html: insane(card.content) }}></div>
+    </div>`;
+}
+
+function ErrorCard({card}){
+    return html`<div class="card error-card">
+        <div class="error-content">
+            <pre>
+            <code>
+                ${JSON.stringify(card, null, 2)}
+            </code>
+            </pre>
+        </div>
+    </div>`;
+}
+
+export default function RenderedContent({content, primary, visible}){
+    let card = content;
+    let cardClass = ErrorCard;
+    if(card.type === 'markdown'){
+        cardClass = MarkdownCard;
+    }
+    if(card.type === 'html'){
+        cardClass = HtmlCard;
+    }
+    if(card.type === 'title'){
+        cardClass = TitleCard
+    }
+    return html`<div class="rendered-content">
+        <${cardClass} card=${card} primary=${primary} visible=${visible}/>
+    </div>`;
 }

@@ -3,12 +3,24 @@
     margin-bottom: 100px;
 }
 
+:root {
+    --frame-width: 330px;
+    --frame-height: 400px;
+}
+
+
 .frame{
-    width: 330px;
+    width: var(--frame-width);
+    height: var(--frame-height);
     margin: 10px auto;
-    height: 400px;
-    border: 2px solid black;
     overflow: hidden;
+}
+
+.card{
+    width: var(--frame-width);
+    height: var(--frame-height);
+    overflow: hidden;
+    box-sizing: border-box;
 }
 
 .frame-primary{
@@ -16,17 +28,20 @@
 }
 
 .frame-visible{
-    opacity: 0.7;
+    opacity: 0.5;
 }
 
 .frame-invisible{
     opacity: 0.1;
 }
 
-.frame-markdown{
+.markdown-card, .html-card{
     padding: 5px;
-    height: 100%;
-    width: 100%;
     font-size: small;
     background-color: rgb(255, 255, 255, 0.3);
+}
+
+.error-card{
+    background-color: rgba(235, 79, 79, 0.3);
+    font-size: small;
 }
