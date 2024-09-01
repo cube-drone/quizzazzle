@@ -14,7 +14,7 @@ use rocket::http::Status;
 use rocket::State;
 use rocket::serde::json::Json;
 use indoc::indoc; // this is a macro that allows us to write multi-line strings in a more readable way
-use serde::{Serialize, Deserialize};
+use serde::Serialize;
 
 mod ministry_directory;
 
@@ -173,7 +173,21 @@ fn error_template(message: &str) -> String {
 
 
 #[get("/")]
-fn index(flags: &State<Flags>, config: &State<Config>) -> content::RawHtml<String> {
+fn home(flags: &State<Flags>, config: &State<Config>) -> content::RawHtml<String> {
+    if flags.multi{
+        println!("loading multi-deck index");
+    }
+    let directory_root = ".";
+    let directory = ministry_directory::MinistryDirectory::new(directory_root.to_string());
+    let rendered = index_template(directory, config);
+    match rendered{
+        Ok(html) => content::RawHtml(html),
+        Err(e) => content::RawHtml(error_template(&e.to_string())),
+    }
+}
+
+#[get("/s/<author_slug>/<deck_slug>")]
+fn deck_home(flags: &State<Flags>, config: &State<Config>, author_slug: String, deck_slug: String) -> content::RawHtml<String> {
     if flags.multi{
         println!("loading multi-deck index");
     }
@@ -203,7 +217,7 @@ fn get_index(directory: MinistryDirectory) -> Result<Index> {
     })
 }
 
-#[get("/<author_slug>/<deck_slug>/index")]
+#[get("/s/<author_slug>/<deck_slug>/index")]
 fn deck_index(author_slug: String, deck_slug: String, flags: &State<Flags>) -> Result<Json<Index>, Status> {
     let directory: MinistryDirectory;
     if flags.multi{
@@ -234,7 +248,7 @@ fn default_index() -> Result<Json<Index>, Status> {
     }
 }
 
-#[get("/<author_slug>/<deck_slug>/range/<start_id>/<end_id>")]
+#[get("/s/<author_slug>/<deck_slug>/range/<start_id>/<end_id>")]
 fn deck_range(author_slug: String, deck_slug: String, start_id: String, end_id: String, flags: &State<Flags>) -> Result<Json<Vec<ministry_directory::Card>>, Status> {
     let directory: MinistryDirectory;
     if flags.multi{
@@ -266,8 +280,8 @@ fn deck_range(author_slug: String, deck_slug: String, start_id: String, end_id: 
     }
 }
 
-#[get("/<author_slug>/<deck_slug>/content/<content_id>")]
-fn deck_id(author_slug: String, deck_slug: String, content_id: String, flags: &State<Flags>) -> Result<Json<ministry_directory::Card>, Status> {
+#[get("/s/<author_slug>/<deck_slug>/content/<content_id>")]
+fn deck_id(author_slug: &str, deck_slug: &str, content_id: &str, flags: &State<Flags>) -> Result<Json<ministry_directory::Card>, Status> {
     let directory: MinistryDirectory;
     if flags.multi{
         println!("loading multi-deck index for {}/{}", author_slug, deck_slug);
@@ -290,11 +304,54 @@ fn deck_id(author_slug: String, deck_slug: String, content_id: String, flags: &S
     }
 }
 
+#[get("/s/<author_slug>/<deck_slug>/assets/<asset_path..>")]
+async fn deck_assets(author_slug: &str, deck_slug: &str, asset_path: std::path::PathBuf, flags: &State<Flags>) -> Result<rocket::fs::NamedFile, Status> {
+    let directory: MinistryDirectory;
+    if flags.multi{
+        println!("loading multi-deck index for {}/{}", author_slug, deck_slug);
+        directory = ministry_directory::MinistryDirectory::new(".".to_string());
+    }
+    else{
+        directory = ministry_directory::MinistryDirectory::new(".".to_string());
+    }
+    let asset_path = directory.get_asset_path(asset_path);
+    match rocket::fs::NamedFile::open(asset_path).await{
+        Ok(opened_file) => Ok(opened_file),
+        Err(err) => {
+            println!("Error getting asset: {}", err);
+            Err(Status::NotFound)
+        },
+    }
+}
+
+#[get("/assets/<asset_path..>")]
+async fn default_assets(asset_path: std::path::PathBuf) -> Result<rocket::fs::NamedFile, Status> {
+    let directory: MinistryDirectory;
+    directory = ministry_directory::MinistryDirectory::new(".".to_string());
+    let asset_path = directory.get_asset_path(asset_path);
+    match rocket::fs::NamedFile::open(asset_path).await{
+        Ok(opened_file) => Ok(opened_file),
+        Err(err) => {
+            println!("Error getting asset: {}", err);
+            Err(Status::NotFound)
+        },
+    }
+}
+
 async fn launch_server(flags: Flags, config: Config) -> Rocket<Build> {
 
     let mut app = rocket::build();
 
-    app = app.mount("/", routes![index, deck_index, default_index, deck_range, deck_id]);
+    app = app.mount("/", routes![
+        home,
+        deck_home,
+        deck_index,
+        default_index,
+        deck_range,
+        deck_id,
+        deck_assets,
+        default_assets,
+    ]);
 
     if std::env::var("ROCKET_ENV").unwrap_or("development".to_string()) == "development"{
         // here we point to the JS and CSS build directories:
@@ -315,9 +372,6 @@ async fn launch_server(flags: Flags, config: Config) -> Rocket<Build> {
     else{
         app = app.mount("/", routes![js_app, js_css]);
     }
-
-    let config_copy = config.clone();
-    app = app.mount("/assets", FileServer::from(config_copy.asset_directory));
 
     app = app.manage(flags);
     app = app.manage(config);

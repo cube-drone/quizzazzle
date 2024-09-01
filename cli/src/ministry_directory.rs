@@ -243,17 +243,8 @@ impl MinistryDirectory{
         Ok(deck)
     }
 
-    /*
-    pub fn get_ministries(&self) -> Vec<Ministry>{
-        let mut ministries: Vec<Ministry> = Vec::new();
-        let paths = fs::read_dir(self.directory_root).unwrap();
-        for path in paths {
-            let path = path.unwrap().path();
-            let path_str = path.to_str().unwrap();
-            let ministry = Ministry::new(path_str);
-            ministries.push(ministry);
-        }
-        ministries
+    pub fn get_asset_path(&self, asset_path: std::path::PathBuf) -> String{
+        let asset_path = asset_path.to_str().unwrap_or_else(|| "");
+        format!("{}/assets/{}", self.directory_root, asset_path)
     }
-    */
 }
