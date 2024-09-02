@@ -45,3 +45,8 @@
     background-color: rgba(235, 79, 79, 0.3);
     font-size: small;
 }
+
+.image-card img{
+    max-width: var(--frame-width);
+    max-height: var(--frame-height);
+}

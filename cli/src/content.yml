@@ -7,7 +7,9 @@ pages:
   - title: Introduction
     id: intro
     content: |
-      Bees are important pollinators that help plants reproduce.
+      Bees are **important pollinators** that help plants reproduce.
+
+      ![A bee](bee.jpg?width=100)
   - title: Types of Bees
     id: bee-types
     content: |

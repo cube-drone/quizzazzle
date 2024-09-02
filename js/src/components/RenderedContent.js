@@ -32,6 +32,12 @@ function HtmlCard({card}){
     </div>`;
 }
 
+function ImageCard({card}){
+    return html`<div class="card image-card">
+        <img src=${card.imageUrl} alt=${card.alt} title=${card.title}/>
+    </div>`;
+}
+
 function ErrorCard({card}){
     return html`<div class="card error-card">
         <div class="error-content">
@@ -55,6 +61,9 @@ export default function RenderedContent({content, primary, visible}){
     }
     if(card.type === 'title'){
         cardClass = TitleCard
+    }
+    if(card.type === 'image'){
+        cardClass = ImageCard;
     }
     return html`<div class="rendered-content">
         <${cardClass} card=${card} primary=${primary} visible=${visible}/>

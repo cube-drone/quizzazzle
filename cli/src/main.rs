@@ -146,6 +146,7 @@ fn index_template(directory: MinistryDirectory, config: &State<Config>) -> Resul
         <head>
             <meta charset="UTF-8">
             <title>{}</title>
+            <meta name="viewport" content="width=device-width">
             <meta property="og:title" content="{}" />
             <meta property="og:description" content="{}" />
             <meta property="article:author" content="{}" />
@@ -170,6 +171,7 @@ fn error_template(message: &str) -> String {
     <html>
         <head>
             <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width">
             <title>Error</title>
         </head>
         <body>
@@ -179,7 +181,6 @@ fn error_template(message: &str) -> String {
     </html>
     "#), message);
 }
-
 
 #[get("/")]
 fn home(flags: &State<Flags>, config: &State<Config>) -> content::RawHtml<String> {
@@ -318,19 +319,27 @@ pub struct FileDirectives{
     grayscale: Option<bool>, // remove color from the image
     tall: Option<bool>,      // ignore max height
     wide: Option<bool>,      // ignore max width
+    width: Option<u32>,      // force the width of the image
+    height: Option<u32>,     // force the height of the image
 }
 
 impl FileDirectives{
     pub fn to_string(&self) -> String{
         let mut directives = vec![];
         if self.grayscale.unwrap_or(false){
-            directives.push("grayscale");
+            directives.push("grayscale".to_string());
         }
         if self.tall.unwrap_or(false){
-            directives.push("tall");
+            directives.push("tall".to_string());
         }
         if self.wide.unwrap_or(false){
-            directives.push("wide");
+            directives.push("wide".to_string());
+        }
+        if let Some(width) = self.width{
+            directives.push(format!("width{}", width));
+        }
+        if let Some(height) = self.height{
+            directives.push(format!("height{}", height));
         }
         directives.join("_")
     }

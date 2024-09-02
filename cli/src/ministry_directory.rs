@@ -278,10 +278,16 @@ impl MinistryDirectory{
                 if file_directives.wide.unwrap_or(false) {
                     max_width = w;
                 }
+                if file_directives.width.unwrap_or(0) > 0 {
+                    max_width = file_directives.width.unwrap_or(0);
+                }
                 let h = img.height();
                 let mut max_height = config.max_height;
                 if file_directives.tall.unwrap_or(false) {
                     max_height = h;
+                }
+                if file_directives.height.unwrap_or(0) > 0 {
+                    max_height = file_directives.height.unwrap_or(0);
                 }
 
                 if w > max_width && h > max_height {
