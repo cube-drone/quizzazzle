@@ -113,7 +113,7 @@ class RealServer{
         if(userSlug == null || contentSlug == null){
             const response = await fetch(`${this.serverUrl}/index`, {});
             this.index = await response.json();
-            return `${this.index.metadata.authorSlug}/${this.index.metadata.slug}`;
+            return `s/${this.index.metadata.authorSlug}/${this.index.metadata.slug}`;
         }
         return `${userSlug}/${contentSlug}`;
     }

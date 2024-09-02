@@ -2,6 +2,8 @@ use std::path::Path;
 use anyhow::{Result, anyhow};
 use serde::Serialize;
 use yaml_rust2::YamlLoader;
+use image::{ImageReader, imageops};
+use webp::Encoder;
 
 use slugify::slugify;
 
@@ -246,5 +248,114 @@ impl MinistryDirectory{
     pub fn get_asset_path(&self, asset_path: std::path::PathBuf) -> String{
         let asset_path = asset_path.to_str().unwrap_or_else(|| "");
         format!("{}/assets/{}", self.directory_root, asset_path)
+    }
+
+    pub async fn get_named_file(&self, asset_path: std::path::PathBuf, config: &crate::Config, file_directives: &crate::FileDirectives) -> Result<rocket::fs::NamedFile>{
+        let asset_path: &str = &self.get_asset_path(asset_path);
+        let filename = asset_path.split("/").last().unwrap_or_else(|| "");
+        if filename.ends_with(".jpg") || filename.ends_with(".png") || filename.ends_with(".gif"){
+            // so, we want to replace the file with a .webp
+            // but what if two different projects both have `bee.jpg`?
+            // let's do the conversion
+            let metadata = self.get_metadata()?;
+            let webp_filename = filename.replace(".jpg", ".webp")
+                                     .replace(".png", ".webp")
+                                     .replace(".gif", ".webp");
+            let webp_filename = format!("{}_{}_{}_{}", metadata.author_slug, metadata.slug, file_directives.to_string(), webp_filename);
+            let temp_directory = config.temporary_asset_directory.clone();
+            let webp_path = format!("{}/{}", temp_directory, webp_filename);
+
+            let lossless = filename.ends_with(".png");
+
+            // if the file already exists, return it
+            if !Path::new(&webp_path).exists(){
+                println!("Converting {} to {}", asset_path, webp_path);
+                let mut img = ImageReader::open(asset_path)?.decode()?;
+                // create the temp directory if it doesn't exist
+
+                let mut max_width = config.max_width;
+                let w = img.width();
+                if file_directives.wide.unwrap_or(false) {
+                    max_width = w;
+                }
+                let h = img.height();
+                let mut max_height = config.max_height;
+                if file_directives.tall.unwrap_or(false) {
+                    max_height = h;
+                }
+
+                if w > max_width && h > max_height {
+                    if w > h {
+                        img = image::DynamicImage::ImageRgba8(imageops::resize(
+                            &img,
+                            max_width,
+                            (max_width as f64 * h as f64 / w as f64) as u32,
+                            imageops::FilterType::Lanczos3,
+                        ));
+                    }
+                    else{
+                        img = image::DynamicImage::ImageRgba8(imageops::resize(
+                            &img,
+                            (max_height as f64 * w as f64 / h as f64) as u32,
+                            max_height,
+                            imageops::FilterType::Lanczos3,
+                        ));
+                    }
+                }
+                else if w > max_width {
+                    img = image::DynamicImage::ImageRgba8(imageops::resize(
+                        &img,
+                        max_width,
+                        (max_width as f64 * h as f64 / w as f64) as u32,
+                        imageops::FilterType::Lanczos3,
+                    ));
+                }
+                else if h > max_height {
+                    img = image::DynamicImage::ImageRgba8(imageops::resize(
+                        &img,
+                        (max_height as f64 * w as f64 / h as f64) as u32,
+                        max_height,
+                        imageops::FilterType::Lanczos3,
+                    ));
+                }
+
+                if file_directives.grayscale.unwrap_or(false) {
+                    img = image::DynamicImage::ImageLumaA8(imageops::grayscale_alpha(&img));
+                    img = image::DynamicImage::ImageRgba8(img.to_rgba8());
+                }
+
+                if !Path::new(&temp_directory).exists(){
+                    std::fs::create_dir(temp_directory)?;
+                }
+                let enc = Encoder::from_image(&img).unwrap();
+                if lossless{
+                    std::fs::write(&webp_path, &*enc.encode_lossless())?;
+                }
+                else{
+                    std::fs::write(&webp_path, &*enc.encode(config.webp_quality))?;
+                }
+            }
+            else{
+                println!("Using existing {}", webp_path);
+            }
+            let opened_file = rocket::fs::NamedFile::open(webp_path).await?;
+            return Ok(opened_file);
+        }
+        else if asset_path.ends_with(".webp") ||
+                asset_path.ends_with(".mp3") ||
+                asset_path.ends_with(".mp4") ||
+                asset_path.ends_with(".webm") ||
+                asset_path.ends_with(".ogg"){
+            let opened_file = rocket::fs::NamedFile::open(asset_path).await?;
+            // if the file is a .jpg, a .png, or a .gif, replace it with a .webp
+            //  also: there are some automatic effects that can be applied to the image
+            //  like, for example, a blur effect
+
+            Ok(opened_file)
+        }
+        else{
+            // the file is not one of the approved types
+            Err(anyhow!("File type not supported"))
+        }
     }
 }

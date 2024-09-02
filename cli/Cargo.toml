@@ -11,3 +11,5 @@ yaml-rust2 = "0.8"
 indoc = "2.0.5"
 slugify = "0.1.0"
 url = { version = "2", features = ["serde"] }
+image = "0.25.2"
+webp = "0.3"

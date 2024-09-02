@@ -55,7 +55,7 @@ async fn js_css() -> content::RawCss<&'static str> {
 }
 
 #[derive(Clone)]
-struct Flags{
+pub struct Flags{
     multi: bool,
     force: bool,
 }
@@ -87,11 +87,15 @@ impl Flags{
 }
 
 #[derive(Clone)]
-struct Config{
+pub struct Config{
     server_url: Url,
     site_name: String,
     default_locale: String,
     asset_directory: String,
+    temporary_asset_directory: String,
+    max_height: u32,
+    max_width: u32,
+    webp_quality: f32,
 }
 
 impl Config{
@@ -100,11 +104,16 @@ impl Config{
         let site_name = std::env::var("ROCKET_SITE_NAME").unwrap_or("Ministry".to_string());
         let default_locale = std::env::var("ROCKET_DEFAULT_LOCALE").unwrap_or("en_US".to_string());
         let asset_directory = std::env::var("ROCKET_ASSET_DIRECTORY").unwrap_or("./assets".to_string());
+        let temporary_asset_directory = std::env::var("ROCKET_TEMPORARY_ASSET_DIRECTORY").unwrap_or("./temp_assets".to_string());
         Config{
             server_url: Url::parse(&server_url).unwrap(),
             site_name,
             default_locale,
             asset_directory,
+            temporary_asset_directory,
+            max_height: 800,
+            max_width: 660,
+            webp_quality: 30f32,
         }
     }
 }
@@ -304,8 +313,31 @@ fn deck_id(author_slug: &str, deck_slug: &str, content_id: &str, flags: &State<F
     }
 }
 
-#[get("/s/<author_slug>/<deck_slug>/assets/<asset_path..>")]
-async fn deck_assets(author_slug: &str, deck_slug: &str, asset_path: std::path::PathBuf, flags: &State<Flags>) -> Result<rocket::fs::NamedFile, Status> {
+#[derive(FromForm)]
+pub struct FileDirectives{
+    grayscale: Option<bool>, // remove color from the image
+    tall: Option<bool>,      // ignore max height
+    wide: Option<bool>,      // ignore max width
+}
+
+impl FileDirectives{
+    pub fn to_string(&self) -> String{
+        let mut directives = vec![];
+        if self.grayscale.unwrap_or(false){
+            directives.push("grayscale");
+        }
+        if self.tall.unwrap_or(false){
+            directives.push("tall");
+        }
+        if self.wide.unwrap_or(false){
+            directives.push("wide");
+        }
+        directives.join("_")
+    }
+}
+
+#[get("/s/<author_slug>/<deck_slug>/assets/<asset_path..>?<file_directives..>")]
+async fn deck_assets(author_slug: &str, deck_slug: &str, asset_path: std::path::PathBuf, file_directives: FileDirectives, flags: &State<Flags>, config: &State<Config>) -> Result<rocket::fs::NamedFile, Status> {
     let directory: MinistryDirectory;
     if flags.multi{
         println!("loading multi-deck index for {}/{}", author_slug, deck_slug);
@@ -314,8 +346,7 @@ async fn deck_assets(author_slug: &str, deck_slug: &str, asset_path: std::path::
     else{
         directory = ministry_directory::MinistryDirectory::new(".".to_string());
     }
-    let asset_path = directory.get_asset_path(asset_path);
-    match rocket::fs::NamedFile::open(asset_path).await{
+    match directory.get_named_file(asset_path, &config, &file_directives).await{
         Ok(opened_file) => Ok(opened_file),
         Err(err) => {
             println!("Error getting asset: {}", err);
@@ -324,12 +355,11 @@ async fn deck_assets(author_slug: &str, deck_slug: &str, asset_path: std::path::
     }
 }
 
-#[get("/assets/<asset_path..>")]
-async fn default_assets(asset_path: std::path::PathBuf) -> Result<rocket::fs::NamedFile, Status> {
+#[get("/assets/<asset_path..>?<file_directives..>")]
+async fn default_assets(asset_path: std::path::PathBuf, file_directives: FileDirectives, config: &State<Config>) -> Result<rocket::fs::NamedFile, Status> {
     let directory: MinistryDirectory;
     directory = ministry_directory::MinistryDirectory::new(".".to_string());
-    let asset_path = directory.get_asset_path(asset_path);
-    match rocket::fs::NamedFile::open(asset_path).await{
+    match directory.get_named_file(asset_path, &config, &file_directives).await{
         Ok(opened_file) => Ok(opened_file),
         Err(err) => {
             println!("Error getting asset: {}", err);
