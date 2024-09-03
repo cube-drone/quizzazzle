@@ -2,7 +2,7 @@ use std::path::Path;
 use anyhow::{Result, anyhow};
 use serde::Serialize;
 use yaml_rust2::YamlLoader;
-use image::{ImageReader, imageops};
+use image::{ImageReader, imageops, DynamicImage, ImageBuffer};
 use webp::Encoder;
 
 use slugify::slugify;
@@ -339,25 +339,47 @@ impl MinistryDirectory{
                 }
 
                 if file_directives.grayscale.unwrap_or(false) {
-                    img = image::DynamicImage::ImageLumaA8(imageops::grayscale_alpha(&img));
-                    img = image::DynamicImage::ImageRgba8(img.to_rgba8());
+                    img = DynamicImage::ImageLumaA8(imageops::grayscale_alpha(&img));
+                    img = DynamicImage::ImageRgba8(img.to_rgba8());
+                }
+
+                if file_directives.color.is_some() {
+                    img = DynamicImage::ImageLumaA8(imageops::grayscale_alpha(&img));
+                    img = DynamicImage::ImageRgba8(img.to_rgba8());
+
+                    let (r, g, b) = file_directives.color().unwrap();
+
+                    let existing_image = img.into_rgba8();
+                    let e_width = existing_image.width();
+                    let e_height = existing_image.height();
+
+                    let buffer = ImageBuffer::from_fn(e_width, e_height, |x, y| {
+                        let pixel = existing_image.get_pixel(x, y);
+                        let mut pixel = pixel.0;
+                        pixel[0] = (r as u32 * (255-pixel[0] as u32) / 255) as u8;
+                        pixel[1] = (g as u32 * (255-pixel[1] as u32) / 255) as u8;
+                        pixel[2] = (b as u32 * (255-pixel[2] as u32) / 255) as u8;
+                        image::Rgba(pixel)
+                    });
+
+                    img = DynamicImage::ImageRgba8(buffer);
                 }
 
                 if file_directives.blur.unwrap_or(0.0) > 0.1 {
                     let blur_amount = file_directives.blur.unwrap_or(5.0);
-                    img = image::DynamicImage::ImageRgba8(imageops::blur(&img, blur_amount));
+                    img = DynamicImage::ImageRgba8(imageops::blur(&img, blur_amount));
                 }
 
                 if file_directives.flip_horizontal.unwrap_or(false) {
-                    img = image::DynamicImage::ImageRgba8(imageops::flip_horizontal(&img));
+                    img = DynamicImage::ImageRgba8(imageops::flip_horizontal(&img));
                 }
 
                 if file_directives.flip_vertical.unwrap_or(false) {
-                    img = image::DynamicImage::ImageRgba8(imageops::flip_vertical(&img));
+                    img = DynamicImage::ImageRgba8(imageops::flip_vertical(&img));
                 }
 
                 if file_directives.flip_turnwise.unwrap_or(false) {
-                    img = image::DynamicImage::ImageRgba8(imageops::rotate180(&img));
+                    img = DynamicImage::ImageRgba8(imageops::rotate180(&img));
                 }
 
                 if !Path::new(&temp_directory).exists(){

@@ -325,7 +325,8 @@ pub struct FileDirectives{
     blur: Option<f32>,       // apply a blur to the image
     flip_horizontal: Option<bool>, // flip the image horizontally
     flip_vertical: Option<bool>,   // flip the image vertically
-    flip_turnwise: Option<bool>,   // rotate the image 180 degrees
+    flip_turnwise: Option<bool>,   // rotate the image 180 degrees (note: this is exactly the same as flipping both horizontally and vertically)
+    color: Option<String>,   // grayscale, but instead: the whole image will be tinted this #hex color
 }
 
 impl FileDirectives{
@@ -350,16 +351,47 @@ impl FileDirectives{
         if let Some(blur) = self.blur{
             directives.push(format!("blur{}", blur));
         }
-        if let Some(flip_horizontal) = self.flip_horizontal{
+        if self.flip_horizontal.unwrap_or(false){
             directives.push("flip_horizontal".to_string());
         }
-        if let Some(flip_vertical) = self.flip_vertical{
+        if self.flip_vertical.unwrap_or(false){
             directives.push("flip_vertical".to_string());
         }
-        if let Some(flip_turnwise) = self.flip_turnwise{
+        if self.flip_turnwise.unwrap_or(false){
             directives.push("flip_turnwise".to_string());
         }
+        if let Some(color) = &self.color{
+            directives.push(format!("color{}", color));
+        }
         directives.join("_")
+    }
+
+    pub fn color(&self) -> Option<(u8, u8, u8)>{
+        if self.color.is_none(){
+            return None;
+        }
+        let color = self.color.as_ref().unwrap();
+        if color == "red"{
+            return Some((255, 0, 0));
+        }
+        if color == "green"{
+            return Some((0, 255, 0));
+        }
+        if color == "blue"{
+            return Some((0, 0, 255));
+        }
+        if color == "black"{
+            return Some((0, 0, 0));
+        }
+        if color == "white"{
+            return Some((255, 255, 255));
+        }
+        // TODO: handle every other color name ( https://mk.bcgsc.ca/colornames/ , https://mk.bcgsc.ca/colornames/color.names.txt )
+
+        let r = u8::from_str_radix(&color[0..2], 16).unwrap_or(0);
+        let g = u8::from_str_radix(&color[2..4], 16).unwrap_or(0);
+        let b = u8::from_str_radix(&color[4..6], 16).unwrap_or(0);
+        Some((r, g, b))
     }
 }
 
