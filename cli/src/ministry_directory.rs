@@ -26,6 +26,10 @@ pub struct Card{
     pub card_type: String,
     pub content: Option<String>,
     pub image_url: Option<String>,
+    pub video_url: Option<String>,
+    pub video_has_sound: bool,
+    pub video_loop: bool,
+    pub video_controls: bool,
     pub title: Option<String>,
 }
 
@@ -207,6 +211,9 @@ impl MinistryDirectory{
             else if doc["image"].as_str().is_some(){
                 card_type = "image".to_string();
             }
+            else if doc["video"].as_str().is_some(){
+                card_type = "video".to_string();
+            }
             else{
                 // this is our defaultiest default
                 card_type = "title".to_string();
@@ -218,6 +225,10 @@ impl MinistryDirectory{
             card_type: card_type,
             content: doc["content"].as_str().map(|s| s.to_string()),
             image_url: doc["image"].as_str().map(|s| s.to_string()),
+            video_url: doc["video"].as_str().map(|s| s.to_string()),
+            video_has_sound: doc["video_has_sound"].as_bool().unwrap_or(false),
+            video_loop: doc["video_loop"].as_bool().unwrap_or(false),
+            video_controls: doc["video_controls"].as_bool().unwrap_or(false),
             title: doc["title"].as_str().map(|s| s.to_string()),
         }
     }

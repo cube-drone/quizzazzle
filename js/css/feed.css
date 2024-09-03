@@ -50,3 +50,8 @@
     max-width: var(--frame-width);
     max-height: var(--frame-height);
 }
+
+.video-card video{
+    max-width: var(--frame-width);
+    max-height: var(--frame-height);
+}

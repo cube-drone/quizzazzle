@@ -1,5 +1,6 @@
 
-import { h, Component, render} from 'preact';
+import { h, Component, render } from 'preact';
+import { useEffect } from 'preact/hooks';
 import htm from 'htm';
 
 import { marked } from 'marked';
@@ -38,6 +39,35 @@ function ImageCard({card}){
     </div>`;
 }
 
+function VideoCard({card, primary}){
+
+    // if primary is true, then the video should start playing automatically
+    useEffect(() => {
+        let video = this.base.querySelector('video');
+        if(primary){
+            video.play();
+        }
+        else{
+            // reset the video
+            video.currentTime = 0;
+            video.pause();
+        }
+    }, [primary]);
+
+    let loop = card.videoLoop ? "loop" : "";
+    let muted = card.videoHasSound ? "" : "muted";
+    let controls = card.videoControls ? "controls" : "";
+
+    console.log(`video: ${loop} ${muted} ${controls}`);
+
+    let videoType = card.videoUrl.split('.').pop();
+    return html`<div class="card video-card">
+        <video muted=${!card.videoHasSound} loop=${card.videoLoop} controls=${card.videoControls}>
+            <source src=${card.videoUrl} type="video/${videoType}" />
+        </video>
+    </div>`;
+}
+
 function ErrorCard({card}){
     return html`<div class="card error-card">
         <div class="error-content">
@@ -64,6 +94,9 @@ export default function RenderedContent({content, primary, visible}){
     }
     if(card.type === 'image'){
         cardClass = ImageCard;
+    }
+    if(card.type === 'video'){
+        cardClass = VideoCard;
     }
     return html`<div class="rendered-content">
         <${cardClass} card=${card} primary=${primary} visible=${visible}/>
