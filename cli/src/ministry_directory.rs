@@ -264,7 +264,9 @@ impl MinistryDirectory{
     pub async fn get_named_file(&self, asset_path: std::path::PathBuf, config: &crate::Config, file_directives: &crate::FileDirectives) -> Result<rocket::fs::NamedFile>{
         let asset_path: &str = &self.get_asset_path(asset_path);
         let filename = asset_path.split("/").last().unwrap_or_else(|| "");
-        if filename.ends_with(".jpg") || filename.ends_with(".png") || filename.ends_with(".gif"){
+        let do_not_modify_file = file_directives.unmodified.unwrap_or(false);
+
+        if !do_not_modify_file && (filename.ends_with(".jpg") || filename.ends_with(".png") || filename.ends_with(".gif")){
             // so, we want to replace the file with a .webp
             // but what if two different projects both have `bee.jpg`?
             // let's do the conversion
@@ -341,6 +343,23 @@ impl MinistryDirectory{
                     img = image::DynamicImage::ImageRgba8(img.to_rgba8());
                 }
 
+                if file_directives.blur.unwrap_or(0.0) > 0.1 {
+                    let blur_amount = file_directives.blur.unwrap_or(5.0);
+                    img = image::DynamicImage::ImageRgba8(imageops::blur(&img, blur_amount));
+                }
+
+                if file_directives.flip_horizontal.unwrap_or(false) {
+                    img = image::DynamicImage::ImageRgba8(imageops::flip_horizontal(&img));
+                }
+
+                if file_directives.flip_vertical.unwrap_or(false) {
+                    img = image::DynamicImage::ImageRgba8(imageops::flip_vertical(&img));
+                }
+
+                if file_directives.flip_turnwise.unwrap_or(false) {
+                    img = image::DynamicImage::ImageRgba8(imageops::rotate180(&img));
+                }
+
                 if !Path::new(&temp_directory).exists(){
                     std::fs::create_dir(temp_directory)?;
                 }
@@ -356,23 +375,17 @@ impl MinistryDirectory{
                 println!("Using existing {}", webp_path);
             }
             let opened_file = rocket::fs::NamedFile::open(webp_path).await?;
-            return Ok(opened_file);
-        }
-        else if asset_path.ends_with(".webp") ||
-                asset_path.ends_with(".mp3") ||
-                asset_path.ends_with(".mp4") ||
-                asset_path.ends_with(".webm") ||
-                asset_path.ends_with(".ogg"){
-            let opened_file = rocket::fs::NamedFile::open(asset_path).await?;
-            // if the file is a .jpg, a .png, or a .gif, replace it with a .webp
-            //  also: there are some automatic effects that can be applied to the image
-            //  like, for example, a blur effect
 
             Ok(opened_file)
         }
         else{
-            // the file is not one of the approved types
-            Err(anyhow!("File type not supported"))
+            // send it anyway
+            //  earlier, I had a plan to only send files from an approved list of file extension or mimetypes
+            //  but, remember, this is a content server for just ME, right?
+            //  anyways, file extension is not a secure way to determine file type
+            let opened_file = rocket::fs::NamedFile::open(asset_path).await?;
+
+            Ok(opened_file)
         }
     }
 }

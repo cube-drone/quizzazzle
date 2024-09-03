@@ -316,16 +316,22 @@ fn deck_id(author_slug: &str, deck_slug: &str, content_id: &str, flags: &State<F
 
 #[derive(FromForm)]
 pub struct FileDirectives{
+    unmodified: Option<bool>, // return the image as-is
     grayscale: Option<bool>, // remove color from the image
     tall: Option<bool>,      // ignore max height
     wide: Option<bool>,      // ignore max width
     width: Option<u32>,      // force the width of the image
     height: Option<u32>,     // force the height of the image
+    blur: Option<f32>,       // apply a blur to the image
+    flip_horizontal: Option<bool>, // flip the image horizontally
+    flip_vertical: Option<bool>,   // flip the image vertically
+    flip_turnwise: Option<bool>,   // rotate the image 180 degrees
 }
 
 impl FileDirectives{
     pub fn to_string(&self) -> String{
         let mut directives = vec![];
+        // unmodified is not included because... if the file isn't modified, we don't need to save anything
         if self.grayscale.unwrap_or(false){
             directives.push("grayscale".to_string());
         }
@@ -340,6 +346,18 @@ impl FileDirectives{
         }
         if let Some(height) = self.height{
             directives.push(format!("height{}", height));
+        }
+        if let Some(blur) = self.blur{
+            directives.push(format!("blur{}", blur));
+        }
+        if let Some(flip_horizontal) = self.flip_horizontal{
+            directives.push("flip_horizontal".to_string());
+        }
+        if let Some(flip_vertical) = self.flip_vertical{
+            directives.push("flip_vertical".to_string());
+        }
+        if let Some(flip_turnwise) = self.flip_turnwise{
+            directives.push("flip_turnwise".to_string());
         }
         directives.join("_")
     }
