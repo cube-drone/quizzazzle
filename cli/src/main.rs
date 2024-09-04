@@ -17,6 +17,7 @@ use indoc::indoc; // this is a macro that allows us to write multi-line strings 
 use serde::Serialize;
 
 mod ministry_directory;
+mod file_modifiers;
 
 const APP_JS: &str = include_str!("../../js/build/feed.js");
 const APP_CSS: &str = include_str!("../../js/build/style.css");
@@ -314,89 +315,9 @@ fn deck_id(author_slug: &str, deck_slug: &str, content_id: &str, flags: &State<F
     }
 }
 
-#[derive(FromForm)]
-pub struct FileDirectives{
-    unmodified: Option<bool>, // return the image as-is
-    grayscale: Option<bool>, // remove color from the image
-    tall: Option<bool>,      // ignore max height
-    wide: Option<bool>,      // ignore max width
-    width: Option<u32>,      // force the width of the image
-    height: Option<u32>,     // force the height of the image
-    blur: Option<f32>,       // apply a blur to the image
-    flip_horizontal: Option<bool>, // flip the image horizontally
-    flip_vertical: Option<bool>,   // flip the image vertically
-    flip_turnwise: Option<bool>,   // rotate the image 180 degrees (note: this is exactly the same as flipping both horizontally and vertically)
-    color: Option<String>,   // grayscale, but instead: the whole image will be tinted this #hex color
-}
-
-impl FileDirectives{
-    pub fn to_string(&self) -> String{
-        let mut directives = vec![];
-        // unmodified is not included because... if the file isn't modified, we don't need to save anything
-        if self.grayscale.unwrap_or(false){
-            directives.push("grayscale".to_string());
-        }
-        if self.tall.unwrap_or(false){
-            directives.push("tall".to_string());
-        }
-        if self.wide.unwrap_or(false){
-            directives.push("wide".to_string());
-        }
-        if let Some(width) = self.width{
-            directives.push(format!("width{}", width));
-        }
-        if let Some(height) = self.height{
-            directives.push(format!("height{}", height));
-        }
-        if let Some(blur) = self.blur{
-            directives.push(format!("blur{}", blur));
-        }
-        if self.flip_horizontal.unwrap_or(false){
-            directives.push("flip_horizontal".to_string());
-        }
-        if self.flip_vertical.unwrap_or(false){
-            directives.push("flip_vertical".to_string());
-        }
-        if self.flip_turnwise.unwrap_or(false){
-            directives.push("flip_turnwise".to_string());
-        }
-        if let Some(color) = &self.color{
-            directives.push(format!("color{}", color));
-        }
-        directives.join("_")
-    }
-
-    pub fn color(&self) -> Option<(u8, u8, u8)>{
-        if self.color.is_none(){
-            return None;
-        }
-        let color = self.color.as_ref().unwrap();
-        if color == "red"{
-            return Some((255, 0, 0));
-        }
-        if color == "green"{
-            return Some((0, 255, 0));
-        }
-        if color == "blue"{
-            return Some((0, 0, 255));
-        }
-        if color == "black"{
-            return Some((0, 0, 0));
-        }
-        if color == "white"{
-            return Some((255, 255, 255));
-        }
-        // TODO: handle every other color name ( https://mk.bcgsc.ca/colornames/ , https://mk.bcgsc.ca/colornames/color.names.txt )
-
-        let r = u8::from_str_radix(&color[0..2], 16).unwrap_or(0);
-        let g = u8::from_str_radix(&color[2..4], 16).unwrap_or(0);
-        let b = u8::from_str_radix(&color[4..6], 16).unwrap_or(0);
-        Some((r, g, b))
-    }
-}
 
 #[get("/s/<author_slug>/<deck_slug>/assets/<asset_path..>?<file_directives..>")]
-async fn deck_assets(author_slug: &str, deck_slug: &str, asset_path: std::path::PathBuf, file_directives: FileDirectives, flags: &State<Flags>, config: &State<Config>) -> Result<rocket::fs::NamedFile, Status> {
+async fn deck_assets(author_slug: &str, deck_slug: &str, asset_path: std::path::PathBuf, file_directives: file_modifiers::FileDirectives, flags: &State<Flags>, config: &State<Config>) -> Result<rocket::fs::NamedFile, Status> {
     let directory: MinistryDirectory;
     if flags.multi{
         println!("loading multi-deck index for {}/{}", author_slug, deck_slug);
@@ -415,7 +336,7 @@ async fn deck_assets(author_slug: &str, deck_slug: &str, asset_path: std::path::
 }
 
 #[get("/assets/<asset_path..>?<file_directives..>")]
-async fn default_assets(asset_path: std::path::PathBuf, file_directives: FileDirectives, config: &State<Config>) -> Result<rocket::fs::NamedFile, Status> {
+async fn default_assets(asset_path: std::path::PathBuf, file_directives: file_modifiers::FileDirectives, config: &State<Config>) -> Result<rocket::fs::NamedFile, Status> {
     let directory: MinistryDirectory;
     directory = ministry_directory::MinistryDirectory::new(".".to_string());
     match directory.get_named_file(asset_path, &config, &file_directives).await{

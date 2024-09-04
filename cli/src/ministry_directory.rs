@@ -261,7 +261,7 @@ impl MinistryDirectory{
         format!("{}/assets/{}", self.directory_root, asset_path)
     }
 
-    pub async fn get_named_file(&self, asset_path: std::path::PathBuf, config: &crate::Config, file_directives: &crate::FileDirectives) -> Result<rocket::fs::NamedFile>{
+    pub async fn get_named_file(&self, asset_path: std::path::PathBuf, config: &crate::Config, file_directives: &crate::file_modifiers::FileDirectives) -> Result<rocket::fs::NamedFile>{
         let asset_path: &str = &self.get_asset_path(asset_path);
         let filename = asset_path.split("/").last().unwrap_or_else(|| "");
         let do_not_modify_file = file_directives.unmodified.unwrap_or(false);
