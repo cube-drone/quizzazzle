@@ -18,6 +18,7 @@ pub struct DeckMetadata{
     pub description: Option<String>,
     pub image_url: Option<String>,
     pub locale: Option<String>,
+    pub extra_header: Option<String>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -145,14 +146,6 @@ impl MinistryDirectory{
             return Err(anyhow!("No author found: this is a mandatory field"));
         }
 
-        let author_link = match doc["author_link"].as_str(){
-            Some(author_link) => Some(author_link.to_string()),
-            None => None,
-        };
-        let description = match doc["description"].as_str(){
-            Some(description) => Some(description.to_string()),
-            None => None,
-        };
         let image_url = match doc["image"].as_str(){
             Some(image_url) => {
                 // test for the existence of image_url as a file
@@ -168,20 +161,17 @@ impl MinistryDirectory{
             }
             None => None,
         };
-        let locale = match doc["locale"].as_str(){
-            Some(locale) => Some(locale.to_string()),
-            None => None,
-        };
 
         let dm = DeckMetadata{
             title: name_or_title.to_string(),
             slug: slugify!(name_or_title),
             author: author.to_string(),
             author_slug: slugify!(author),
-            author_link: author_link,
-            description: description,
+            author_link: doc["author_link"].as_str().map(|s| s.to_string()),
+            description: doc["description"].as_str().map(|s| s.to_string()),
             image_url: image_url,
-            locale: locale,
+            locale: doc["locale"].as_str().map(|s| s.to_string()),
+            extra_header: doc["extra_header"].as_str().map(|s| s.to_string()),
         };
         // Pretty print
         println!("{:#?}", dm);

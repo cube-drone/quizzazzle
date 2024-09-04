@@ -124,6 +124,7 @@ fn index_template(directory: MinistryDirectory, config: &State<Config>) -> Resul
         return Err(anyhow!("Directory does not exist"));
     }
     let deck_metadata = directory.get_metadata()?;
+
     let title = deck_metadata.title;
     let author = deck_metadata.author;
     let description = match deck_metadata.description {
@@ -141,6 +142,7 @@ fn index_template(directory: MinistryDirectory, config: &State<Config>) -> Resul
         Some(locale) => locale,
         None => config.default_locale.clone(),
     };
+    let extra_header = deck_metadata.extra_header.clone().unwrap_or("".to_string());
     return Ok(format!(indoc!(r#"
     <!DOCTYPE html>
     <html>
@@ -157,13 +159,14 @@ fn index_template(directory: MinistryDirectory, config: &State<Config>) -> Resul
             <meta property="og:image" content="{}" />
             <link rel="stylesheet" href="/js/style.css">
             <link rel="icon" type="image/svg+xml" href="/favicon.svg" sizes="any"/>
+            {}
         </head>
         <body>
             <div id="app"/>
             <script src="/js/feed.js"></script>
         </body>
     </html>
-    "#), title, title, description, author, url, site_name, locale, image));
+    "#), title, title, description, author, url, site_name, locale, image, extra_header));
 }
 
 fn error_template(message: &str) -> String {
