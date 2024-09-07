@@ -113,7 +113,7 @@ class RealServer{
         if(userSlug == null || contentSlug == null){
             const response = await fetch(`${this.serverUrl}/index`, {});
             this.index = await response.json();
-            return `s/${this.index.metadata.authorSlug}/${this.index.metadata.slug}`;
+            return `s/${this.index.metadata.author_slug}/${this.index.metadata.slug}`;
         }
         return `${userSlug}/${contentSlug}`;
     }
@@ -157,6 +157,9 @@ class RealServer{
             content: card.content,
             created_at: card.created_at || new Date(),
             updated_at: card.updated_at || new Date(),
+            pngs: card.pngs,
+            pngsFps: card.pngs_fps,
+            pngsLoop: card.pngs_loop,
         }
         return appCard;
     }

@@ -39,6 +39,49 @@ function ImageCard({card}){
     </div>`;
 }
 
+let animatedImageInterval = null;
+
+function AnimatedImageCard({card, primary}){
+    let imagesToCycleThrough = card.pngs;
+    let fps = card.pngsFps ?? 24;
+    let isLoop = card.pngsLoop;
+
+    useEffect(() => {
+        if(primary){
+            // start the video
+            clearInterval(animatedImageInterval);
+            let images = this.base.querySelectorAll('img');
+            let index = 0;
+            animatedImageInterval = setInterval(() => {
+                images.forEach((img, i) => {
+                    if(i === index){
+                        img.style.display = 'block';
+                    }
+                    else{
+                        img.style.display = 'none';
+                    }
+                });
+                index = (index + 1) % images.length;
+                if(!isLoop && index === 0){
+                    clearInterval(animatedImageInterval);
+                }
+            }, 1000 / fps);
+        }
+        else{
+            clearInterval(animatedImageInterval);
+        }
+
+    }, [primary]);
+
+    let images = imagesToCycleThrough.map((imageUrl, index) => {
+        return html`<img src=${imageUrl} alt=${card.alt} title=${card.title} style="display: ${index === 0 ? 'block' : 'none'};"/>`;
+    });
+
+    return html`<div class="card animated-image-card">
+        ${images}
+    </div>`;
+}
+
 function VideoCard({card, primary}){
 
     // if primary is true, then the video should start playing automatically
@@ -62,7 +105,7 @@ function VideoCard({card, primary}){
 
     let videoType = card.videoUrl.split('.').pop();
     return html`<div class="card video-card">
-        <video muted=${!card.videoHasSound} loop=${card.videoLoop} controls=${card.videoControls}>
+        <video muted=${!card.videoHasSound} loop=${card.videoLoop} controls=${card.videoControls} playsinline="true" preload="true">
             <source src=${card.videoUrl} type="video/${videoType}" />
         </video>
     </div>`;
@@ -97,6 +140,9 @@ export default function RenderedContent({content, primary, visible}){
     }
     if(card.type === 'video'){
         cardClass = VideoCard;
+    }
+    if(card.type === 'pngs'){
+        cardClass = AnimatedImageCard;
     }
     return html`<div class="rendered-content">
         <${cardClass} card=${card} primary=${primary} visible=${visible}/>

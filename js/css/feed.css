@@ -51,7 +51,7 @@
     font-size: small;
 }
 
-.image-card img{
+.image-card img, .animated-image-card img{
     max-width: var(--frame-width);
     max-height: var(--frame-height);
 }

@@ -40,12 +40,6 @@ fn status(_flags: Flags){
     directory.get_metadata().expect("Failed to get status.");
 }
 
-fn assets(_flags: Flags){
-    let directory_root = ".";
-    let directory = ministry_directory::MinistryDirectory::new(directory_root.to_string());
-    directory.compile_assets().expect("Failed to compile assets.");
-}
-
 #[get("/js/feed.js")]
 async fn js_app() -> content::RawJavaScript<&'static str> {
     content::RawJavaScript(APP_JS)
@@ -120,7 +114,7 @@ impl Config{
 }
 
 fn index_template(directory: MinistryDirectory, config: &State<Config>) -> Result<String> {
-    if !directory.exists()?{
+    if !directory.exists(){
         return Err(anyhow!("Directory does not exist"));
     }
     let deck_metadata = directory.get_metadata()?;
@@ -426,7 +420,6 @@ async fn rocket() -> Rocket<Build> {
         println!("Help:");
         println!("  init:       Create a new deck in the current directory");
         println!("  status:     Show the status of the deck");
-        println!("  assets:     Compile all assets into a built assets directory");
         println!("  diff:       Diff the current deck against the last published deck");
         println!("  serve:      Start the server in single-deck mode, using the deck in the current directory");
         println!("  multi:      Start the server in multi-deck mode");
@@ -445,11 +438,6 @@ async fn rocket() -> Rocket<Build> {
         if arg == "status"{
             println!("Status...");
             status(flags);
-            std::process::exit(0);
-        }
-        if arg == "assets"{
-            println!("Assets...");
-            assets(flags);
             std::process::exit(0);
         }
         if arg == "diff"{
