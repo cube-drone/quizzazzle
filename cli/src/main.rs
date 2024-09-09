@@ -364,7 +364,8 @@ async fn launch_server(flags: Flags, config: Config) -> Rocket<Build> {
     if std::env::var("ROCKET_ENV").unwrap_or("production".to_string()) == "development"{
         // here we point to the JS and CSS build directories:
         // we only bother with this next bit if we're in dev mode: otherwise we should use include_str! to bundle the files directly into the binary
-        let dev_ui_location = std::env::var("JS_BUILD_LOCATION").unwrap_or("js".to_string());
+        println!("Serving JS in dev mode...");
+        let dev_ui_location = std::env::var("JS_BUILD_LOCATION").unwrap_or("src/js".to_string());
         //if location exists:
         match Path::new(&dev_ui_location).exists(){
             true => {
@@ -378,6 +379,7 @@ async fn launch_server(flags: Flags, config: Config) -> Rocket<Build> {
         }
     }
     else{
+        println!("Serving JS in production mode... (using baked-in JS)");
         app = app.mount("/", routes![js_app, js_css]);
     }
 

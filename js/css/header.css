@@ -69,7 +69,7 @@ header.header-invisible{
     width: 100%;
 }
 
-#primary-nav ul, #full-nav ul {
+.navbar {
     list-style-type: none;
     margin: 0;
     padding: 0;
@@ -79,7 +79,7 @@ header.header-invisible{
     justify-content: space-evenly;
 }
 
-#primary-nav ul li, #full-nav ul li {
+.navbar li {
     list-style-type: none;
     display: block;
     width: 40px;
@@ -89,26 +89,48 @@ header.header-invisible{
     color: white;
 }
 
-#primary-nav a svg, #full-nav a svg{
+.navbar a svg{
     width: 40px;
     height: 40px;
     cursor: pointer;
 }
 
-#primary-nav a svg path, #full-nav a svg path{
+.navbar a svg path{
     fill: white;
 }
 
-#primary-nav a .opt, #full-nav a .opt{
+.navbar a .opt{
     transition: opacity 1s ease 100ms;
     opacity: 1;
 }
 
-#primary-nav a:hover .hide-sometimes, #primary-nav a:hover .opt, #full-nav a:hover .hide-sometimes, #full-nav a:hover .opt{
+.navbar a:hover .hide-sometimes, .navbar a:hover .opt{
     opacity: 0.2;
 }
 
-#primary-nav a.selected, #full-nav a.selected{
+.navbar a.selected{
     filter: none;
     border-bottom: 2px solid white;
+}
+
+#full-nav{
+    color: white;
+}
+
+#full-nav .nav-dropdown{
+    padding: 10px 20px;
+    width: 100%;
+    margin-top: 5px;
+    height: 550px;
+    border: 2px dashed white;
+    box-sizing: border-box;
+    text-align: left;
+    overflow-y: scroll;
+}
+
+#full-nav .nav-dropdown img{
+    width: 100px;
+    height: 100px;
+    float: left;
+    margin: 10px;
 }

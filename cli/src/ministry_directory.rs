@@ -159,7 +159,7 @@ impl MinistryDirectory{
         let image_url = match doc["image"].as_str(){
             Some(image_url) => {
                 // test for the existence of image_url as a file
-                let image_path = PathBuf::from(&self.directory_root).join("assets").join(image_url);
+                let image_path = PathBuf::from(&self.directory_root).join(image_url);
                 if Path::new(&image_path).exists() {
                     println!("Image exists: {}", image_path.to_str().unwrap_or_else(|| ""));
                     Some(image_url.to_string())

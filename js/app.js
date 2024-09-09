@@ -1,10 +1,11 @@
 import { h, Component, render} from 'preact';
 import { useState } from 'preact/hooks'
 import htm from 'htm';
-import Icon from './src/components/Icon.js';
 import { initialize } from './src/data.js';
 import VisibilityTriggerFrame from './src/components/VisibilityTriggerFrame.js';
-import anime from 'animejs';
+import Nav from './src/components/Nav.js';
+import NavDropdown from './src/components/NavDropdown.js';
+
 
 function debounce(func, timeout = 300){
     let timer;
@@ -17,102 +18,6 @@ function debounce(func, timeout = 300){
 let bootupTime = Date.now();
 
 const html = htm.bind(h);
-
-function Nav({onTop, onBottom, onDown, onUp, onMenu }){
-    if(!onTop){
-        onTop = () => {};
-    }
-    if(!onBottom){
-        onBottom = () => {};
-    }
-    if(!onDown){
-        onDown = () => {};
-    }
-    if(!onUp){
-        onUp = () => {};
-    }
-    if(!onMenu){
-        onMenu = () => {};
-    }
-
-    const pressAnimation = (thinger) => {
-        anime({
-            targets: `.nav-${thinger} svg`,
-            scale: 1.3,
-            duration: 200,
-            easing: 'easeInOutQuad',
-            direction: 'alternate',
-            loop: 1
-        });
-    }
-    const top = () => {
-        pressAnimation("top");
-        onTop();
-    }
-    const bottom = () => {
-        pressAnimation("bottom");
-        onBottom();
-    }
-    const down = () => {
-        pressAnimation("down");
-        onDown();
-    }
-    const up = () => {
-        pressAnimation("up");
-        onUp();
-    }
-    const menu = () => {
-        pressAnimation("menu");
-        onMenu();
-    }
-    return html`<nav id="primary-nav">
-            <ul>
-                <li>
-                    <a onClick=${top} title="top" class="nav-top">
-                        <${Icon} name="double-up" />
-                    </a>
-                </li>
-                <li>
-                    <a onClick=${up} title="up" class="nav-up">
-                        <${Icon} name="chevron-up" />
-                    </a>
-                </li>
-                <li>
-                    <a onClick=${menu} title="Menu" class="nav-menu">
-                        <${Icon} name="hamburger" />
-                    </a>
-                </li>
-                <li>
-                    <a onClick=${down} title="down" class="nav-down">
-                        <${Icon} name="chevron-down" />
-                    </a>
-                </li>
-                <li>
-                    <a onClick=${bottom} title="bottom" class="nav-bottom">
-                        <${Icon} name="double-down" />
-                    </a>
-                </li>
-            </ul>
-        </nav>`;
-}
-
-function FullNav({onMenu}){
-    /*
-        This is the thing that appears when you click the hamburger button.
-        Ideally, it'll have a Table of Contents, and maybe some other stuff?
-        Credits? A link to the source code? A link to the user's profile?
-        The world is our oyster.
-    */
-    return html`<nav id="full-nav">
-        <ul>
-            <li>
-                <a onClick=${onMenu} title="Menu">
-                    <${Icon} name="hamburger" />
-                </a>
-            </li>
-        </ul>
-    </nav>`;
-}
 
 class App extends Component {
 
@@ -234,10 +139,13 @@ class App extends Component {
         // we go to quite a lot of trouble to determine whether or not the header should be visible
         let justBooted = Date.now() - bootupTime < 5000;
         let justInteracted = Date.now() - this.lastNavInteraction < 5000;
+        /*
         let headerVisible = this.state.scrollDirection == "backward" ? "header-visible" : "header-invisible";
         if(justBooted || justInteracted){
             headerVisible = "header-visible";
         }
+        */
+        let headerVisible = "header-visible";
 
         // if we scroll down a bit, the transparent icons will show content THROUGH them, which looks wonky
         let disableTransparentIcons = this.lastScrollTop > 60 ? "disable-transparent-icons" : "";
@@ -268,8 +176,9 @@ class App extends Component {
                     />
                 </header>
                 <header id="full-header" class="${fullNavExpandedClass} disable-transparent-icons">
-                    <${FullNav}
+                    <${NavDropdown}
                         onMenu=${onMenu}
+                        data=${this.data}
                     />
                 </header>
                 <div class="everything-feed">
