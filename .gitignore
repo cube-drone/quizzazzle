@@ -16,5 +16,4 @@ cli/.ministry
 cli/assets
 cli/assets/*
 cli/temp_assets
-cli/src/js/*
 *.DS_Store

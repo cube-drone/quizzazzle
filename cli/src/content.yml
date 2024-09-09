@@ -2,14 +2,14 @@ name: A Presentation About Bees
 author: Mr. Bee
 authorlink: https://example.com
 description: Whoa, look at all of these bees!
-image: bee.jpg
+image: assets/bee.jpg
 pages:
   - title: Introduction
     id: intro
     content: |
       Bees are **important pollinators** that help plants reproduce.
 
-      ![A bee](bee.jpg?width=100)
+      ![A bee](assets/bee.jpg?width=100)
   - title: Types of Bees
     id: bee-types
     content: |
