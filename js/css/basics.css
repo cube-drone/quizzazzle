@@ -12,9 +12,6 @@ svg {
     min-width: 20px;
 }
 
-h1, h2, h3, h4, h5, h6{
-    line-height: 1.5;
-}
 
 /* the primary card is the central frame, the card that sits around all of the content */
 .primary-card {
