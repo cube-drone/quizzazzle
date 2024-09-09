@@ -158,6 +158,7 @@ class RealServer{
             created_at: card.created_at || new Date(),
             updated_at: card.updated_at || new Date(),
             pngs: card.pngs,
+            extraClass: card.extra_class,
             pngsFps: card.pngs_fps,
             pngsLoop: card.pngs_loop,
             fadeIn: card.fade_in,

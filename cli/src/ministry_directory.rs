@@ -27,6 +27,7 @@ pub struct Card{
     pub card_type: String,
     pub content: Option<String>,
     pub image_url: Option<String>,
+    pub extra_class: Vec<String>,
     pub video_url: Option<String>,
     pub video_has_sound: bool,
     pub video_loop: bool,
@@ -236,15 +237,27 @@ impl MinistryDirectory{
                     }
                 }
             }
-
         }
 
+        let mut extra_class = Vec::new();
+        let default_vec = Vec::new();
+        if doc["extra_class"].as_str().is_some(){
+            extra_class.push(doc["extra_class"].as_str().unwrap().to_string());
+        }
+        for item in doc["extra_class"].as_vec().unwrap_or_else(|| &default_vec){
+            if item.as_str().is_some(){
+                extra_class.push(item.as_str().unwrap().to_string());
+            }
+        }
+        println!("{:#?}", extra_class);
+
         Card{
-            id: id,
-            card_type: card_type,
+            id,
+            card_type,
             title: doc["title"].as_str().map(|s| s.to_string()),
             content: doc["content"].as_str().map(|s| s.to_string()),
             image_url: doc["image"].as_str().map(|s| s.to_string()),
+            extra_class,
             video_url: doc["video"].as_str().map(|s| s.to_string()),
             video_has_sound: doc["video_has_sound"].as_bool().unwrap_or(false),
             video_loop: doc["video_loop"].as_bool().unwrap_or(false),

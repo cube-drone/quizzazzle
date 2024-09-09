@@ -20,7 +20,7 @@ function AnyCard({card, cardType, stackIndex, primary, visible, children}){
         }, [primary]);
     }
     let z = stackIndex != null ? `z-index:${stackIndex};color:pink;` : "";
-    return html `<div style=${z} class="card ${cardType}-card any-card ${stackIndex ? "stacked" : ""}">
+    return html `<div style=${z} class="card ${cardType}-card any-card ${stackIndex ? "stacked" : ""} ${card.extraClass.join(" ")}">
         ${children}
     </div>`;
 }
@@ -162,13 +162,13 @@ function typeToCardClass(type){
 }
 
 function StackedCard({card, primary, visible, stackIndex}){
-    return html`<div class="card stacked-card">
+    return html`<${AnyCard} card=${card} cardType="stack" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
         ${card.stack.map((c, index) => {
             let cardClass = typeToCardClass(c.type);
             let newStackIndex = (stackIndex ?? 0 * 100) + index + 1;
             return html`<${cardClass} card=${c} primary=${primary} visible=${visible} stackIndex=${newStackIndex} />`;
         })}
-    </div>`;
+    </${AnyCard}>`;
 }
 
 export default function RenderedContent({content, primary, visible}){
