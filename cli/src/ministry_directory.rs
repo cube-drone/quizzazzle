@@ -35,6 +35,8 @@ pub struct Card{
     pub pngs: Vec<String>,
     pub pngs_fps: Option<i64>,
     pub pngs_loop: Option<bool>,
+    pub fade_in: Option<i64>,
+    pub stack: Vec<Card>
 }
 
 pub struct MinistryDirectory{
@@ -201,6 +203,24 @@ impl MinistryDirectory{
             }
         }
 
+        let mut stack = Vec::new();
+        if card_type == "stack"{
+
+            // the card has multiple cards in it
+            doc["pages"].as_vec().map(|list| {
+                let mut counter = 0;
+                for item in list
+                {
+                    let counter_string = counter.to_string();
+                    let id = format!("{}-{}", id, counter_string);
+                    stack.push(
+                        self.parse_card(&item, id)
+                    );
+                    counter += 1;
+                }
+            });
+        }
+
         let mut pngs = Vec::new();
         if card_type == "pngs" {
             let directory = doc["pngs"].as_str().unwrap_or_else(|| "");
@@ -232,6 +252,8 @@ impl MinistryDirectory{
             pngs,
             pngs_fps: doc["pngs_fps"].as_i64(),
             pngs_loop: doc["pngs_loop"].as_bool(),
+            fade_in: doc["fade_in"].as_i64(),
+            stack,
         }
     }
 

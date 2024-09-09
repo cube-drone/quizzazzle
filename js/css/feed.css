@@ -36,6 +36,14 @@
     opacity: 0.1;
 }
 
+.stacked-card{
+    position: relative;
+}
+
+.stacked {
+    position: absolute;
+}
+
 .title-card{
     text-align: center;
     background-color: rgb(255, 255, 255, 0.3);

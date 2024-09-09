@@ -2,46 +2,56 @@
 import { h, Component, render } from 'preact';
 import { useEffect } from 'preact/hooks';
 import htm from 'htm';
+import anime from 'animejs';
 
 import { marked } from 'marked';
 import insane from 'insane';
 
 const html = htm.bind(h);
 
-function TitleCard({card}){
-    if(!card.title){
-        return html`<div class="title-card">
-            <h1>${card.id}</h1>
-        </div>`;
+
+function AnyCard({card, cardType, stackIndex, primary, visible, children}){
+    if(card.fadeIn){
+        useEffect(() => {
+            if(primary){
+                let el = this.base;
+                anime({targets: el, opacity: [0, 1], duration: 500, delay: card.fadeIn, easing: 'easeInOutQuad'});
+            }
+        }, [primary]);
     }
-    else{
-        return html`<div class="card title-card">
-            <h1>${card.title}</h1>
-        </div>`;
-    }
+    let z = stackIndex != null ? `z-index:${stackIndex};color:pink;` : "";
+    return html `<div style=${z} class="card ${cardType}-card any-card ${stackIndex ? "stacked" : ""}">
+        ${children}
+    </div>`;
 }
 
-function MarkdownCard({card}){
-    return html`<div class="card markdown-card">
+function TitleCard({card, stackIndex, primary, visible}){
+    return html`<${AnyCard} card=${card} cardType="title" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
+        <h1>${card.title ?? card.id}</h1>
+    </${AnyCard}>`;
+}
+
+function MarkdownCard({card, stackIndex, primary, visible}){
+    return html`<${AnyCard} card=${card} cardType="markdown" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
         <div class="markdown-content" dangerouslySetInnerHTML=${{ __html: insane(marked.parse(card.content)) }}></div>
-    </div>`;
+    </${AnyCard}>`;
 }
 
-function HtmlCard({card}){
-    return html`<div class="card html-card">
-        <div class="markdown-content" dangerouslySetInnerHTML=${{ __html: insane(card.content) }}></div>
-    </div>`;
+function HtmlCard({card, stackIndex, primary, visible}){
+    return html`<${AnyCard} card=${card} cardType="html" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
+        <div class="html-content" dangerouslySetInnerHTML=${{ __html: insane(card.content) }}></div>
+    </${AnyCard}>`;
 }
 
-function ImageCard({card}){
-    return html`<div class="card image-card">
+function ImageCard({card, stackIndex, primary, visible}){
+    return html`<${AnyCard} card=${card} cardType="image" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
         <img src=${card.imageUrl} alt=${card.alt} title=${card.title}/>
-    </div>`;
+    </${AnyCard}>`;
 }
 
 let animatedImageInterval = null;
 
-function AnimatedImageCard({card, primary}){
+function AnimatedImageCard({card, primary, visible, stackIndex}){
     let imagesToCycleThrough = card.pngs;
     let fps = card.pngsFps ?? 24;
     let isLoop = card.pngsLoop;
@@ -77,12 +87,12 @@ function AnimatedImageCard({card, primary}){
         return html`<img src=${imageUrl} alt=${card.alt} title=${card.title} style="display: ${index === 0 ? 'block' : 'none'};"/>`;
     });
 
-    return html`<div class="card animated-image-card">
+    return html`<${AnyCard} card=${card} cardType="animated-image" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
         ${images}
-    </div>`;
+    </${AnyCard}>`;
 }
 
-function VideoCard({card, primary}){
+function VideoCard({card, primary, visible, stackIndex}){
 
     // if primary is true, then the video should start playing automatically
     useEffect(() => {
@@ -104,15 +114,17 @@ function VideoCard({card, primary}){
     console.log(`video: ${loop} ${muted} ${controls}`);
 
     let videoType = card.videoUrl.split('.').pop();
-    return html`<div class="card video-card">
+
+    return html`<${AnyCard} card=${card} cardType="video" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
         <video muted=${!card.videoHasSound} loop=${card.videoLoop} controls=${card.videoControls} playsinline="true" preload="true">
             <source src=${card.videoUrl} type="video/${videoType}" />
         </video>
-    </div>`;
+    </${AnyCard}>`;
 }
 
-function ErrorCard({card}){
-    return html`<div class="card error-card">
+function ErrorCard({card, stackIndex, primary, visible}){
+
+    return html`<${AnyCard} card=${card} cardType="error" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
         <div class="error-content">
             <pre>
             <code>
@@ -120,30 +132,48 @@ function ErrorCard({card}){
             </code>
             </pre>
         </div>
+    </${AnyCard}>`;
+}
+
+function typeToCardClass(type){
+    let cardClass = ErrorCard;
+    if(type === 'markdown'){
+        cardClass = MarkdownCard;
+    }
+    if(type === 'html'){
+        cardClass = HtmlCard;
+    }
+    if(type === 'title'){
+        cardClass = TitleCard
+    }
+    if(type === 'image'){
+        cardClass = ImageCard;
+    }
+    if(type === 'video'){
+        cardClass = VideoCard;
+    }
+    if(type === 'pngs'){
+        cardClass = AnimatedImageCard;
+    }
+    if(type === 'stack'){
+        cardClass = StackedCard;
+    }
+    return cardClass;
+}
+
+function StackedCard({card, primary, visible, stackIndex}){
+    return html`<div class="card stacked-card">
+        ${card.stack.map((c, index) => {
+            let cardClass = typeToCardClass(c.type);
+            let newStackIndex = (stackIndex ?? 0 * 100) + index + 1;
+            return html`<${cardClass} card=${c} primary=${primary} visible=${visible} stackIndex=${newStackIndex} />`;
+        })}
     </div>`;
 }
 
 export default function RenderedContent({content, primary, visible}){
     let card = content;
-    let cardClass = ErrorCard;
-    if(card.type === 'markdown'){
-        cardClass = MarkdownCard;
-    }
-    if(card.type === 'html'){
-        cardClass = HtmlCard;
-    }
-    if(card.type === 'title'){
-        cardClass = TitleCard
-    }
-    if(card.type === 'image'){
-        cardClass = ImageCard;
-    }
-    if(card.type === 'video'){
-        cardClass = VideoCard;
-    }
-    if(card.type === 'pngs'){
-        cardClass = AnimatedImageCard;
-    }
+    let cardClass = typeToCardClass(card.type);
     return html`<div class="rendered-content">
         <${cardClass} card=${card} primary=${primary} visible=${visible}/>
     </div>`;

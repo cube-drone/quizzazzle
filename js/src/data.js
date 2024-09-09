@@ -160,6 +160,8 @@ class RealServer{
             pngs: card.pngs,
             pngsFps: card.pngs_fps,
             pngsLoop: card.pngs_loop,
+            fadeIn: card.fade_in,
+            stack: card.stack.map(this.cardTransform.bind(this)),
         }
         return appCard;
     }
@@ -174,14 +176,14 @@ class RealServer{
         const response = await fetch(`${this.serverUrl}/${indexId}/range/${startId}/${endId}`, {});
         let cards = await response.json();
         console.dir(cards);
-        return cards.map(this.cardTransform);
+        return cards.map(this.cardTransform.bind(this));
     }
 
     async getContent({indexId, contentId}){
         const response = await fetch(`${this.serverUrl}/${indexId}/content/${contentId}`, {});
         let card = await response.json();
         console.dir(card);
-        return this.cardTransform(card);
+        return this.cardTransform(card).bind(this);
     }
 
     async getContents({indexId, contentIds}){
