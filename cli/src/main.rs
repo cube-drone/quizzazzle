@@ -15,6 +15,7 @@ use rocket::State;
 use rocket::serde::json::Json;
 use indoc::indoc; // this is a macro that allows us to write multi-line strings in a more readable way
 use serde::Serialize;
+use slugify::slugify;
 
 mod ministry_directory;
 mod file_modifiers;
@@ -34,10 +35,31 @@ fn init(flags: Flags){
     directory.init(flags.force).expect("Failed to initialize directory.");
 }
 
+fn new(flags: Flags){
+    println!("What's your name?");
+    let mut author = String::new();
+    std::io::stdin().read_line(&mut author).expect("Failed to read line.");
+    author = author.trim().to_string();
+    println!("What's the name of your deck?");
+    let mut title = String::new();
+    std::io::stdin().read_line(&mut title).expect("Failed to read line.");
+    title = title.trim().to_string();
+    let author_slug = slugify!(&author);
+    let deck_slug = slugify!(&title);
+
+    // create the directory ${author_slug}/$}{deck_slug}
+    let directory_root = std::path::PathBuf::from(author_slug.clone()).join(deck_slug.clone());
+    std::fs::create_dir_all(directory_root.clone()).expect("Failed to create directory.");
+
+    let directory = ministry_directory::MinistryDirectory::new(directory_root.to_str().unwrap_or_else(|| ".").to_string());
+    directory.init(flags.force).expect("Failed to initialize directory.");
+}
+
 fn status(_flags: Flags){
     let directory_root = ".";
     let directory = ministry_directory::MinistryDirectory::new(directory_root.to_string());
-    directory.get_metadata().expect("Failed to get status.");
+    let metadata = directory.get_metadata().expect("Failed to get status.");
+    println!("Deck: {}", metadata.title);
 }
 
 #[get("/js/feed.js")]
@@ -51,31 +73,24 @@ async fn js_css() -> content::RawCss<&'static str> {
 
 #[derive(Clone)]
 pub struct Flags{
-    multi: bool,
     force: bool,
 }
 
 impl Flags{
     fn empty() -> Flags{
         Flags{
-            multi: false,
             force: false,
         }
     }
 
     fn from_args(args: Vec<String>) -> Flags{
-        let mut multi = false;
         let mut force = false;
         for arg in args{
-            if arg == "multi" || arg == "--multi" || arg == "-m" || std::env::var("ROCKET_MULTI").unwrap_or("false".to_string()) == "true"{
-                multi = true;
-            }
             if arg == "force" || arg == "--force" || arg == "-f" || std::env::var("ROCKET_FORCE").unwrap_or("false".to_string()) == "true"{
                 force = true;
             }
         }
         Flags{
-            multi,
             force,
         }
     }
@@ -86,7 +101,6 @@ pub struct Config{
     server_url: Url,
     site_name: String,
     default_locale: String,
-    asset_directory: String,
     temporary_asset_directory: String,
     max_height: u32,
     max_width: u32,
@@ -98,13 +112,11 @@ impl Config{
         let server_url = std::env::var("ROCKET_SERVER_URL").unwrap_or("http://localhost:8000".to_string());
         let site_name = std::env::var("ROCKET_SITE_NAME").unwrap_or("Ministry".to_string());
         let default_locale = std::env::var("ROCKET_DEFAULT_LOCALE").unwrap_or("en_US".to_string());
-        let asset_directory = std::env::var("ROCKET_ASSET_DIRECTORY").unwrap_or("./assets".to_string());
         let temporary_asset_directory = std::env::var("ROCKET_TEMPORARY_ASSET_DIRECTORY").unwrap_or("./temp_assets".to_string());
         Config{
             server_url: Url::parse(&server_url).unwrap(),
             site_name,
             default_locale,
-            asset_directory,
             temporary_asset_directory,
             max_height: 800,
             max_width: 660,
@@ -181,10 +193,7 @@ fn error_template(message: &str) -> String {
 }
 
 #[get("/")]
-fn home(flags: &State<Flags>, config: &State<Config>) -> content::RawHtml<String> {
-    if flags.multi{
-        println!("loading multi-deck index");
-    }
+fn home(config: &State<Config>) -> content::RawHtml<String> {
     let directory_root = ".";
     let directory = ministry_directory::MinistryDirectory::new(directory_root.to_string());
     let rendered = index_template(directory, config);
@@ -195,7 +204,7 @@ fn home(flags: &State<Flags>, config: &State<Config>) -> content::RawHtml<String
 }
 
 #[get("/s/<author_slug>/<deck_slug>")]
-fn deck_home(flags: &State<Flags>, config: &State<Config>, author_slug: String, deck_slug: String) -> content::RawHtml<String> {
+fn deck_home(config: &State<Config>, author_slug: String, deck_slug: String) -> content::RawHtml<String> {
     let path = std::path::PathBuf::from(author_slug).join(deck_slug);
     let directory = ministry_directory::MinistryDirectory::new(path.to_str().unwrap_or_else(|| ".").to_string());
     let rendered = index_template(directory, config);
@@ -223,7 +232,7 @@ fn get_index(directory: MinistryDirectory) -> Result<Index> {
 }
 
 #[get("/s/<author_slug>/<deck_slug>/index")]
-fn deck_index(author_slug: String, deck_slug: String, flags: &State<Flags>) -> Result<Json<Index>, Status> {
+fn deck_index(author_slug: String, deck_slug: String) -> Result<Json<Index>, Status> {
     let path = std::path::PathBuf::from(author_slug).join(deck_slug);
     let directory = ministry_directory::MinistryDirectory::new(path.to_str().unwrap_or_else(|| ".").to_string());
     match get_index(directory){
@@ -248,7 +257,7 @@ fn default_index() -> Result<Json<Index>, Status> {
 }
 
 #[get("/s/<author_slug>/<deck_slug>/range/<start_id>/<end_id>")]
-fn deck_range(author_slug: String, deck_slug: String, start_id: String, end_id: String, flags: &State<Flags>) -> Result<Json<Vec<ministry_directory::Card>>, Status> {
+fn deck_range(author_slug: String, deck_slug: String, start_id: String, end_id: String) -> Result<Json<Vec<ministry_directory::Card>>, Status> {
     let path = std::path::PathBuf::from(author_slug.clone()).join(deck_slug.clone());
     let directory: MinistryDirectory;
     if author_slug == "default" && deck_slug == "default"{
@@ -292,7 +301,7 @@ fn deck_range(author_slug: String, deck_slug: String, start_id: String, end_id: 
 }
 
 #[get("/s/<author_slug>/<deck_slug>/content/<content_id>")]
-fn deck_id(author_slug: &str, deck_slug: &str, content_id: &str, flags: &State<Flags>) -> Result<Json<ministry_directory::Card>, Status> {
+fn deck_id(author_slug: &str, deck_slug: &str, content_id: &str) -> Result<Json<ministry_directory::Card>, Status> {
     let path = std::path::PathBuf::from(author_slug).join(deck_slug);
     let directory = ministry_directory::MinistryDirectory::new(path.to_str().unwrap_or_else(|| ".").to_string());
     let deck = directory.get_deck();
@@ -311,7 +320,7 @@ fn deck_id(author_slug: &str, deck_slug: &str, content_id: &str, flags: &State<F
 
 
 #[get("/s/<author_slug>/<deck_slug>/assets/<asset_path..>?<file_directives..>")]
-async fn deck_assets(author_slug: &str, deck_slug: &str, asset_path: std::path::PathBuf, file_directives: file_modifiers::FileDirectives, flags: &State<Flags>, config: &State<Config>) -> Result<rocket::fs::NamedFile, Status> {
+async fn deck_assets(author_slug: &str, deck_slug: &str, asset_path: std::path::PathBuf, file_directives: file_modifiers::FileDirectives, config: &State<Config>) -> Result<rocket::fs::NamedFile, Status> {
     let path = std::path::PathBuf::from(author_slug).join(deck_slug);
     let directory = ministry_directory::MinistryDirectory::new(path.to_str().unwrap_or_else(|| ".").to_string());
 
@@ -411,12 +420,8 @@ async fn rocket() -> Rocket<Build> {
     if args.len() == 1{
         println!("Help:");
         println!("  init:       Create a new deck in the current directory");
-        println!("  status:     Show the status of the deck");
-        println!("  diff:       Diff the current deck against the last published deck");
-        println!("  serve:      Start the server in single-deck mode, using the deck in the current directory");
-        println!("  multi:      Start the server in multi-deck mode");
-        println!("  login:      Log-in to a multi-deck server.");
-        println!("  publish:    Publish (upload) the current deck to a multi-deck server.");
+        println!("  new:        Create a new deck in a specified directory");
+        println!("  serve:      Start the server");
         std::process::exit(0);
     }
     if args.len() > 1{
@@ -425,6 +430,10 @@ async fn rocket() -> Rocket<Build> {
         let arg = &args[1];
         if arg == "init"{
             init(flags);
+            std::process::exit(0);
+        }
+        if arg == "new"{
+            new(flags);
             std::process::exit(0);
         }
         if arg == "status"{
@@ -446,11 +455,6 @@ async fn rocket() -> Rocket<Build> {
         }
         if arg == "serve"{
             println!("Serving...");
-        }
-        if arg == "multi"{
-            // a multi server is the final production server this project is intended to be run on
-            // it is a server that can host multiple decks, multiple users, etc.
-            println!("Multi...");
         }
     }
 
