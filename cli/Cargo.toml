@@ -1,10 +1,16 @@
 [package]
-name = "cli"
+name = "cardchapter"
+description = "this is a weird one, it's kind of a statically hosted website but for micro-presentations"
 version = "0.1.0"
 edition = "2021"
+license = "AGPL-3.0-or-later"
+categories = ["command-line-utilities"]
+exclude = ["/assets", "/example", ".ministry", "content.yml", "Makefile", "/temp_assets"]
+badges = ["experimental"]
+repository = "https://github.com/cube-drone/ministry"
 
 [dependencies]
-rocket = { version = "0.5.1", features = ["secrets", "json"] }
+rocket = { version = "0.5.1", features = ["json"] }
 serde = { version = "1.0", features=["derive"]}
 anyhow = "=1.0.86"
 yaml-rust2 = "0.8"
