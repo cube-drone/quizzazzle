@@ -36,9 +36,11 @@ pub struct Card{
     pub pngs: Vec<String>,
     pub pngs_fps: Option<i64>,
     pub fade_in: Option<i64>,
+    pub shake: Option<i64>,
     pub stack: Vec<Card>,
     pub duration: Option<i64>,
     pub amount: Option<i64>,
+    pub delay: Option<i64>,
     pub easing: Option<String>,
 }
 
@@ -267,9 +269,11 @@ impl MinistryDirectory{
             pngs,
             pngs_fps: doc["pngs_fps"].as_i64(),
             fade_in: doc["fade_in"].as_i64(),
+            shake: doc["shake"].as_i64(),
             stack,
             duration: doc["duration"].as_i64(),
             amount: doc["amount"].as_i64(),
+            delay: doc["delay"].as_i64(),
             easing: doc["easing"].as_str().map(|s| s.to_string()),
         }
     }

@@ -8,7 +8,6 @@
     --frame-height: 400px;
 }
 
-
 .frame{
     width: var(--frame-width);
     height: var(--frame-height);
@@ -21,6 +20,7 @@
     height: var(--frame-height);
     overflow: hidden;
     box-sizing: border-box;
+    border: 1px dashed black;
 }
 
 .frame-primary{
@@ -45,12 +45,13 @@
 }
 
 .title-card{
+    padding: 5px 15px;
     text-align: center;
     background-color: rgb(255, 255, 255, 0.3);
 }
 
 .markdown-card, .html-card{
-    padding: 5px;
+    padding: 5px 15px;
     background-color: rgb(255, 255, 255, 0.3);
 }
 

@@ -161,10 +161,12 @@ class RealServer{
             extraClass: card.extra_class,
             pngsFps: card.pngs_fps,
             fadeIn: card.fade_in,
+            shake: card.shake,
             stack: card.stack.map(this.cardTransform.bind(this)),
             duration: card.duration,
             amount: card.amount,
             easing: card.easing,
+            delay: card.delay,
         }
         return appCard;
     }

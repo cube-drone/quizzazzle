@@ -16,7 +16,24 @@ function AnyCard({card, cardType, stackIndex, primary, visible, children}){
         useEffect(() => {
             if(primary){
                 let el = this.base;
-                anime({targets: el, opacity: [0, 1], duration: 500, delay: card.fadeIn, easing});
+                anime({targets: el, opacity: [0, 1], duration: 500, delay: card.delay ?? card.fadeIn ?? 0, easing});
+            }
+        }, [primary]);
+    }
+    if(card.shake){
+        useEffect(() => {
+            if(primary){
+                let el = this.base;
+                let duration = card.shake ?? card.duration ?? 500;
+                let amount = card.amount ?? 5;
+                let translateX = [];
+                translateX.push(0);
+                for(let i = 0; i < duration / 100; i++){
+                    translateX.push(i % 2 === 0 ? amount : -amount);
+                }
+                translateX.push(0);
+                console.warn(translateX);
+                anime({targets: el, translateX, duration, delay: card.delay ?? 0, easing, loop: card.loop});
             }
         }, [primary]);
     }
@@ -59,7 +76,7 @@ function PanDownCard({card, stackIndex, primary, visible}){
             if(!animation){
                 let y = card.amount ?? 400;
                 let duration = card.duration ?? 5000;
-                let animation = anime({targets: el, translateY: -y, duration, easing, loop: card.loop});
+                let animation = anime({targets: el, translateY: -y, duration, easing, loop: card.loop, delay: card.delay ?? 0});
                 setAnimation(animation);
             }
             animation?.play();
@@ -84,7 +101,7 @@ function PanLeftCard({card, stackIndex, primary, visible}){
             if(!animation){
                 let x = card.amount ?? 330;
                 let duration = card.duration ?? 5000;
-                let animation = anime({targets: el, translateX: -x, duration, easing, loop: card.loop});
+                let animation = anime({targets: el, translateX: -x, duration, easing, loop: card.loop, delay: card.delay ?? 0});
                 setAnimation(animation);
             }
             animation?.play();
@@ -108,7 +125,7 @@ function PanUpCard({card, stackIndex, primary, visible}){
         if(primary){
             if(!animation){
                 let duration = card.duration ?? 5000;
-                let animation = anime({targets: el, translateY: 0, duration, easing, loop: card.loop});
+                let animation = anime({targets: el, translateY: 0, duration, easing, loop: card.loop, delay: card.delay ?? 0});
                 setAnimation(animation);
             }
             animation?.play();
@@ -134,7 +151,7 @@ function PanRightCard({card, stackIndex, primary, visible}){
         if(primary){
             if(!animation){
                 let duration = card.duration ?? 5000;
-                let animation = anime({targets: el, translateX: 0, duration, easing, loop: card.loop});
+                let animation = anime({targets: el, translateX: 0, duration, easing, loop: card.loop, delay: card.delay ?? 0});
                 setAnimation(animation);
             }
             animation?.play();
@@ -165,21 +182,23 @@ function AnimatedImageCard({card, primary, visible, stackIndex}){
             clearInterval(animatedImageInterval);
             let images = this.base.querySelectorAll('img');
             let index = 0;
-            animatedImageInterval = setInterval(() => {
-                images.forEach((img, i) => {
-                    if(i === index){
-                        img.style.display = 'block';
+            setTimeout(() => {
+                animatedImageInterval = setInterval(() => {
+                    images.forEach((img, i) => {
+                        if(i === index){
+                            img.style.display = 'block';
+                        }
+                        else{
+                            img.style.display = 'none';
+                        }
+                    });
+                    index = (index + 1) % images.length;
+                    if(!isLoop && index === 0){
+                        clearInterval(animatedImageInterval);
                     }
-                    else{
-                        img.style.display = 'none';
-                    }
-                });
-                index = (index + 1) % images.length;
-                if(!isLoop && index === 0){
-                    clearInterval(animatedImageInterval);
-                }
-            }, 1000 / fps);
-            setAnimatedImageInterval(animatedImageInterval);
+                }, 1000 / fps);
+                setAnimatedImageInterval(animatedImageInterval);
+            }, card.delay ?? 0)
         }
         else{
             clearInterval(animatedImageInterval);
@@ -193,6 +212,56 @@ function AnimatedImageCard({card, primary, visible, stackIndex}){
 
     return html`<${AnyCard} card=${card} cardType="animated-image" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
         ${images}
+    </${AnyCard}>`;
+}
+
+function AnimatedTextCard({card, primary, visible, stackIndex}){
+    let textToAnimate = card.content;
+    let fps = card.fps ?? 24;
+
+    let [animatedTextInterval, setAnimatedTextInterval] = useState(null);
+
+    useEffect(() => {
+        let characters = this.base.querySelectorAll('span');
+        if(primary){
+            // start the video
+            setTimeout(() => {
+                clearInterval(animatedTextInterval);
+                let index = 0;
+                animatedTextInterval = setInterval(() => {
+                    characters.forEach((char, i) => {
+                        if(i === index){
+                            char.style.opacity = '1';
+                        }
+                    });
+                    index = (index + 1) % (characters.length+20);
+                    if(!card.loop && index === 0){
+                        clearInterval(animatedTextInterval);
+                    }
+                    else if (index === 0){
+                        characters.forEach((char, i) => {
+                            char.style.opacity = '0';
+                        });
+                    }
+                }, 1000 / fps);
+                setAnimatedTextInterval(animatedTextInterval);
+            }, card.delay ?? 0);
+        }
+        else{
+            characters.forEach((char, i) => {
+                char.style.opacity = '0';
+            });
+            clearInterval(animatedTextInterval);
+        }
+
+    }, [primary]);
+
+    let textSeparated = textToAnimate.split('').map((char, index) => {return html`<span style="opacity: 0;">${char}</span>`;});
+
+    return html`<${AnyCard} card=${card} cardType="animated-text" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
+        <div class="animated-text-content">
+            ${textSeparated}
+        </div>
     </${AnyCard}>`;
 }
 
@@ -264,6 +333,9 @@ function typeToCardClass(type){
     }
     if(type === 'pan_right' || type === "pan-right"){
         cardClass = PanRightCard;
+    }
+    if(type === "animated_text" || type === "animated-text"){
+        cardClass = AnimatedTextCard;
     }
     if(type === 'video'){
         cardClass = VideoCard;
