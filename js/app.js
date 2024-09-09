@@ -301,7 +301,19 @@ let hash = window.location.hash;
 let pathParts = path.split('/');
 
 async function main(){
-    await Data.loadIndex({user: null, indexId: null, contentId: null});
+    if(window.location.pathname == "/"){
+        let hash = window.location.hash;
+        await Data.loadIndex({userSlug: null, contentSlug: null, contentId: hash});
+    }
+    else{
+        // we're at /s/userSlug/contentSlug
+        let parts = window.location.pathname.split('/');
+        userSlug = parts[2];
+        contentSlug = parts[3];
+        let hash = window.location.hash;
+        console.warn(`loading index for s/${userSlug}/${contentSlug}#${hash}`);
+        await Data.loadIndex({userSlug: userSlug, contentSlug: contentSlug, contentId: hash});
+    }
     let app = html`<${App} data=${Data} />`;
     render(app, document.getElementById('app'));
 }

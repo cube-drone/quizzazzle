@@ -1,0 +1,148 @@
+name: Example
+author: Example
+authorlink: https://example.com
+description: Whoa, look at all of these bees!
+image: bee.jpg
+extra_header: |
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&display=swap" rel="stylesheet">
+  <style>
+    h1, h2, h3, h4, h5, h6{
+      font-family: "Bebas Neue", sans-serif;
+      font-weight: 400;
+      font-style: normal;
+    }
+    .textboss{
+      height: 100px;
+      width: 100%;
+      font-family: "Pixelify Sans", sans-serif;
+      font-optical-sizing: auto;
+      padding: 10px;
+      box-sizing: border-box;
+      border: 3px solid white;
+      bottom: 2px;
+      background-color: black;
+      color: white !important;
+      margin-top: 300px;
+      border-radius: 2px;
+    }
+  </style>
+pages:
+  - title: A Presentation about Bees
+    extra_class: border
+    fade_in: 1000
+    shake: 5000
+    amount: 2
+    id: cover
+  - type: stack
+    id: owen-says-hi
+    pages:
+      - id: owen
+        fade_in: 1000
+        image: assets/owen.png
+      - id: says-hi
+        type: animated-text
+        fade_in: 1500
+        delay: 1800
+        extra_class:
+          - textboss
+        content: Hi, I'm Owen! I'm here to help you learn about BEEEEEEEES.
+  - type: animated-text
+    extra_class:
+      - textboss
+    content: Just because the text is here doesn't mean it's important.
+    id: animated-text
+  - id: wow
+    type: pan_down
+    duration: 5000
+    amount: 400
+    delay: 1500
+    easing: easeInOutCubic
+    loop: true
+    image: assets/wow.png?tall
+  - id: wow-2
+    type: pan_up
+    loop: true
+    easing: easeInOutElastic
+    duration: 10000
+    delay: 1500
+    amount: 400
+    image: assets/wow.png?tall
+  - id: wow-3
+    type: pan_left
+    easing: easeInOutElastic
+    loop: true
+    delay: 1500
+    duration: 3000
+    amount: 330
+    image: assets/wow-across.png?wide
+  - id: wow-4
+    type: pan_right
+    loop: true
+    delay: 1500
+    duration: 3000
+    amount: 330
+    image: assets/wow-across.png?wide
+  - title: Introduction
+    extra_class:
+      - opaque
+      - border
+    id: intro
+    content: |
+      Bees are **important pollinators** that help plants reproduce.
+
+      Bee-hold:
+
+      ![A bee](assets/bee.jpg?width=100)
+  - id: stack
+    extra_class:
+      - opaque
+      - border
+    type: stack
+    pages:
+      - id: stacked-1
+        fade_in: 750
+        image: assets/stacked/1.png
+      - id: stacked-2
+        fade_in: 1500
+        image: assets/stacked/2.png
+      - id: stacked-3
+        fade_in: 2250
+        image: assets/stacked/3.png
+  - id: stack-2
+    type: stack
+    pages:
+      - id: stacked-bg
+        fade_in: 1000
+        image: assets/stacked/bg.png
+      - id: stacked-mg
+        fade_in: 2000
+        image: assets/stacked/mg.png
+      - id: stacked-fg
+        fade_in: 3000
+        image: assets/stacked/fg.png
+  - title: Florb!
+    id: florb
+    type: pngs
+    pngs: assets/florb
+    pngs_fps: 12
+    loop: true
+    overlay_animated_text:
+  - image: assets/sample.png?color=111111
+    id: sample-image
+  - video: assets/test_mp4_video.mp4
+    video_controls: true
+    id: test-mp4
+  - video: assets/test_webm_video.webm
+    loop: true
+    id: test-webm
+  - title: Types of Bees
+    id: bee-types
+    content: |
+      There are many types of bees, including honeybees, bumblebees, and solitary bees.
+  - title: Importance of Bees
+    id: importance
+    content: |
+      Bees are important because they help pollinate plants, which helps plants reproduce.

@@ -196,11 +196,8 @@ fn home(flags: &State<Flags>, config: &State<Config>) -> content::RawHtml<String
 
 #[get("/s/<author_slug>/<deck_slug>")]
 fn deck_home(flags: &State<Flags>, config: &State<Config>, author_slug: String, deck_slug: String) -> content::RawHtml<String> {
-    if flags.multi{
-        println!("loading multi-deck index");
-    }
-    let directory_root = ".";
-    let directory = ministry_directory::MinistryDirectory::new(directory_root.to_string());
+    let path = std::path::PathBuf::from(author_slug).join(deck_slug);
+    let directory = ministry_directory::MinistryDirectory::new(path.to_str().unwrap_or_else(|| ".").to_string());
     let rendered = index_template(directory, config);
     match rendered{
         Ok(html) => content::RawHtml(html),
@@ -227,14 +224,8 @@ fn get_index(directory: MinistryDirectory) -> Result<Index> {
 
 #[get("/s/<author_slug>/<deck_slug>/index")]
 fn deck_index(author_slug: String, deck_slug: String, flags: &State<Flags>) -> Result<Json<Index>, Status> {
-    let directory: MinistryDirectory;
-    if flags.multi{
-        println!("loading multi-deck index for {}/{}", author_slug, deck_slug);
-        directory = ministry_directory::MinistryDirectory::new(".".to_string());
-    }
-    else{
-        directory = ministry_directory::MinistryDirectory::new(".".to_string());
-    }
+    let path = std::path::PathBuf::from(author_slug).join(deck_slug);
+    let directory = ministry_directory::MinistryDirectory::new(path.to_str().unwrap_or_else(|| ".").to_string());
     match get_index(directory){
         Ok(index) => Ok(Json(index)),
         Err(err) => {
@@ -258,20 +249,32 @@ fn default_index() -> Result<Json<Index>, Status> {
 
 #[get("/s/<author_slug>/<deck_slug>/range/<start_id>/<end_id>")]
 fn deck_range(author_slug: String, deck_slug: String, start_id: String, end_id: String, flags: &State<Flags>) -> Result<Json<Vec<ministry_directory::Card>>, Status> {
+    let path = std::path::PathBuf::from(author_slug.clone()).join(deck_slug.clone());
     let directory: MinistryDirectory;
-    if flags.multi{
-        println!("loading multi-deck index for {}/{}", author_slug, deck_slug);
+    if author_slug == "default" && deck_slug == "default"{
         directory = ministry_directory::MinistryDirectory::new(".".to_string());
     }
     else{
-        directory = ministry_directory::MinistryDirectory::new(".".to_string());
+        directory = ministry_directory::MinistryDirectory::new(path.to_str().unwrap_or_else(|| ".").to_string());
     }
     let deck = directory.get_deck();
     match deck {
         Ok(deck) => {
             // find the start and end indices
-            let start = deck.iter().position(|card| card.id == start_id).unwrap_or(0);
-            let mut end = deck.iter().position(|card| card.id == end_id).unwrap_or(deck.len());
+            let start: usize;
+            if start_id == "0" || start_id == "undefined" || start_id == "" || start_id == "null" {
+                start = 0;
+            }
+            else{
+                start = deck.iter().position(|card| card.id == start_id).unwrap_or(0);
+            }
+            let mut end: usize;
+            if end_id == "0" || end_id == "undefined" || end_id == "" || end_id == "null" {
+                end = std::cmp::min(start + 100, deck.len());
+            }
+            else{
+                end = deck.iter().position(|card| card.id == end_id).unwrap_or(deck.len());
+            }
             if end < start {
                 return Err(Status::BadRequest);
             }
@@ -290,14 +293,8 @@ fn deck_range(author_slug: String, deck_slug: String, start_id: String, end_id: 
 
 #[get("/s/<author_slug>/<deck_slug>/content/<content_id>")]
 fn deck_id(author_slug: &str, deck_slug: &str, content_id: &str, flags: &State<Flags>) -> Result<Json<ministry_directory::Card>, Status> {
-    let directory: MinistryDirectory;
-    if flags.multi{
-        println!("loading multi-deck index for {}/{}", author_slug, deck_slug);
-        directory = ministry_directory::MinistryDirectory::new(".".to_string());
-    }
-    else{
-        directory = ministry_directory::MinistryDirectory::new(".".to_string());
-    }
+    let path = std::path::PathBuf::from(author_slug).join(deck_slug);
+    let directory = ministry_directory::MinistryDirectory::new(path.to_str().unwrap_or_else(|| ".").to_string());
     let deck = directory.get_deck();
     match deck {
         Ok(deck) => {
@@ -315,14 +312,9 @@ fn deck_id(author_slug: &str, deck_slug: &str, content_id: &str, flags: &State<F
 
 #[get("/s/<author_slug>/<deck_slug>/assets/<asset_path..>?<file_directives..>")]
 async fn deck_assets(author_slug: &str, deck_slug: &str, asset_path: std::path::PathBuf, file_directives: file_modifiers::FileDirectives, flags: &State<Flags>, config: &State<Config>) -> Result<rocket::fs::NamedFile, Status> {
-    let directory: MinistryDirectory;
-    if flags.multi{
-        println!("loading multi-deck index for {}/{}", author_slug, deck_slug);
-        directory = ministry_directory::MinistryDirectory::new(".".to_string());
-    }
-    else{
-        directory = ministry_directory::MinistryDirectory::new(".".to_string());
-    }
+    let path = std::path::PathBuf::from(author_slug).join(deck_slug);
+    let directory = ministry_directory::MinistryDirectory::new(path.to_str().unwrap_or_else(|| ".").to_string());
+
     match directory.get_named_file(asset_path, &config, &file_directives).await{
         Ok(opened_file) => Ok(opened_file),
         Err(err) => {

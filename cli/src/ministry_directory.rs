@@ -183,8 +183,6 @@ impl MinistryDirectory{
             locale: doc["locale"].as_str().map(|s| s.to_string()),
             extra_header: doc["extra_header"].as_str().map(|s| s.to_string()),
         };
-        // Pretty print
-        println!("{:#?}", dm);
         Ok(dm)
     }
 
@@ -253,7 +251,6 @@ impl MinistryDirectory{
                 extra_class.push(item.as_str().unwrap().to_string());
             }
         }
-        println!("{:#?}", extra_class);
 
         Card{
             id,

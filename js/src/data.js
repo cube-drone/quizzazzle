@@ -110,12 +110,13 @@ class RealServer{
     }
 
     async getIndexId({userSlug, contentSlug}){
+        console.warn(`getting index id for ${userSlug}/${contentSlug}`);
         if(userSlug == null || contentSlug == null){
             const response = await fetch(`${this.serverUrl}/index`, {});
             this.index = await response.json();
-            return `s/${this.index.metadata.author_slug}/${this.index.metadata.slug}`;
+            return `/s/default/default`;
         }
-        return `${userSlug}/${contentSlug}`;
+        return `/s/${userSlug}/${contentSlug}`;
     }
 
     indexTransform(serverIndex){
@@ -137,7 +138,7 @@ class RealServer{
 
     async getIndex({indexId}){
         if(this.index == null){
-            const response = await fetch(`${this.serverUrl}/${indexId}/index`, {});
+            const response = await fetch(`${this.serverUrl}${indexId}/index`, {});
             this.index = await response.json();
         }
 
@@ -176,16 +177,16 @@ class RealServer{
             startId = 0;
         }
         if(endId == null){
-            endId = startId + PAGE_SIZE
+            endId = 0
         }
-        const response = await fetch(`${this.serverUrl}/${indexId}/range/${startId}/${endId}`, {});
+        const response = await fetch(`${this.serverUrl}${indexId}/range/${startId}/${endId}`, {});
         let cards = await response.json();
         console.dir(cards);
         return cards.map(this.cardTransform.bind(this));
     }
 
     async getContent({indexId, contentId}){
-        const response = await fetch(`${this.serverUrl}/${indexId}/content/${contentId}`, {});
+        const response = await fetch(`${this.serverUrl}${indexId}/content/${contentId}`, {});
         let card = await response.json();
         console.dir(card);
         return this.cardTransform(card).bind(this);
@@ -290,10 +291,12 @@ class Data{
     }
 
     async _loadIndexFromMiddle({indexId, contentId}){
-        let [index, beforeRange, afterRange] = await Promise.all([
-            this.server.getIndex({user, indexId}),
-            this.server.getRange({user, indexId, endId: contentId}),
-            this.server.getRange({user, indexId, startId: contentId}),
+        contentId = contentId.replace("#", "");
+        let index = await this.server.getIndex({indexId});
+
+        let [beforeRange, afterRange] = await Promise.all([
+            this.server.getRange({indexId, endId: contentId}),
+            this.server.getRange({indexId, startId: contentId}),
         ]);
 
         this.index = index;
@@ -309,7 +312,14 @@ class Data{
         }
 
         // we keep track of where the user is in the content so that we can load more content as they scroll
-        this.currentLocation = this.content.findIndex(node => node.id === contentId);
+        this.currentLocation = 0;
+        for(let i = 0; i < this.index.contentIds.length; i++){
+            if(this.index.contentIds[i] === contentId){
+                this.currentLocation = i;
+                break;
+            }
+        }
+        this.currentId = contentId;
     }
 
     async loadIndex({userSlug, contentSlug, contentId}){
@@ -317,8 +327,9 @@ class Data{
         // so, for example, "cubes/testyboy" is an index that belongs to the user "cubes" and is called "testyboy"
         // the index describes the whole story, in order, it's like a table of contents
         let indexId = await this.server.getIndexId({userSlug, contentSlug});
+        console.warn(`got index id ${indexId}`);
 
-        if(contentId == null){
+        if(contentId == null || contentId == ""){
             return this._loadIndexFromBeginning({indexId});
         }
         else{
