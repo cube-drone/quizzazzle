@@ -4,6 +4,7 @@ import htm from 'htm';
 import Icon from './src/components/Icon.js';
 import { initialize } from './src/data.js';
 import VisibilityTriggerFrame from './src/components/VisibilityTriggerFrame.js';
+import anime from 'animejs';
 
 function debounce(func, timeout = 300){
     let timer;
@@ -33,30 +34,61 @@ function Nav({onTop, onBottom, onDown, onUp, onMenu }){
     if(!onMenu){
         onMenu = () => {};
     }
+
+    const pressAnimation = (thinger) => {
+        anime({
+            targets: `.nav-${thinger} svg`,
+            scale: 1.3,
+            duration: 200,
+            easing: 'easeInOutQuad',
+            direction: 'alternate',
+            loop: 1
+        });
+    }
+    const top = () => {
+        pressAnimation("top");
+        onTop();
+    }
+    const bottom = () => {
+        pressAnimation("bottom");
+        onBottom();
+    }
+    const down = () => {
+        pressAnimation("down");
+        onDown();
+    }
+    const up = () => {
+        pressAnimation("up");
+        onUp();
+    }
+    const menu = () => {
+        pressAnimation("menu");
+        onMenu();
+    }
     return html`<nav id="primary-nav">
             <ul>
                 <li>
-                    <a onClick=${onTop} title="top">
+                    <a onClick=${top} title="top" class="nav-top">
                         <${Icon} name="double-up" />
                     </a>
                 </li>
                 <li>
-                    <a onClick=${onUp} title="up">
+                    <a onClick=${up} title="up" class="nav-up">
                         <${Icon} name="chevron-up" />
                     </a>
                 </li>
                 <li>
-                    <a onClick=${onMenu} title="Menu">
+                    <a onClick=${menu} title="Menu" class="nav-menu">
                         <${Icon} name="hamburger" />
                     </a>
                 </li>
                 <li>
-                    <a onClick=${onDown} title="down">
+                    <a onClick=${down} title="down" class="nav-down">
                         <${Icon} name="chevron-down" />
                     </a>
                 </li>
                 <li>
-                    <a onClick=${onBottom} title="bottom">
+                    <a onClick=${bottom} title="bottom" class="nav-bottom">
                         <${Icon} name="double-down" />
                     </a>
                 </li>
