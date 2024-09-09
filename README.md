@@ -7,7 +7,8 @@ hybrid between "comic book" and "visual novel" that will look good
 on your phone's screen.
 
 ## Ministry?
-The original version of CardChapter lives at `https://cardchapter.com/v1` and has its repository at `https://github.com/cube-drone/cardchapter`.
+The original version of CardChapter lives at `https://cardchapter.com` (for now)
+and has its repository at `https://github.com/cube-drone/cardchapter`.
 It is ... a whole different software package,
 although it is intended to solve a similar problem to this one.
 
