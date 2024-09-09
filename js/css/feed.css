@@ -64,6 +64,14 @@
     max-height: var(--frame-height);
 }
 
+.pan-down-card img, .pan-up-card img {
+    max-width: var(--frame-width);
+}
+
+.pan-left-card img, .pan-right-card img {
+    max-height: var(--frame-height);
+}
+
 .video-card video{
     max-width: var(--frame-width);
     max-height: var(--frame-height);

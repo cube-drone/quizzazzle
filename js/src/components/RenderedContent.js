@@ -1,6 +1,6 @@
 
 import { h, Component, render } from 'preact';
-import { useEffect } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import htm from 'htm';
 import anime from 'animejs';
 
@@ -11,11 +11,12 @@ const html = htm.bind(h);
 
 
 function AnyCard({card, cardType, stackIndex, primary, visible, children}){
+    let easing = card.easing ?? 'easeInOutQuad';
     if(card.fadeIn){
         useEffect(() => {
             if(primary){
                 let el = this.base;
-                anime({targets: el, opacity: [0, 1], duration: 500, delay: card.fadeIn, easing: 'easeInOutQuad'});
+                anime({targets: el, opacity: [0, 1], duration: 500, delay: card.fadeIn, easing});
             }
         }, [primary]);
     }
@@ -49,12 +50,114 @@ function ImageCard({card, stackIndex, primary, visible}){
     </${AnyCard}>`;
 }
 
-let animatedImageInterval = null;
+function PanDownCard({card, stackIndex, primary, visible}){
+    let [animation, setAnimation] = useState(null);
+    let easing = card.easing ?? 'easeInOutQuad';
+    useEffect(() => {
+        let el = this.base.querySelector('img');
+        if(primary){
+            if(!animation){
+                let y = card.amount ?? 400;
+                let duration = card.duration ?? 5000;
+                let animation = anime({targets: el, translateY: -y, duration, easing, loop: card.loop});
+                setAnimation(animation);
+            }
+            animation?.play();
+        }
+        else{
+            animation?.restart();
+            animation?.pause();
+        }
+    }, [primary]);
+
+    return html`<${AnyCard} card=${card} cardType="pan-down" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
+        <img src=${card.imageUrl} alt=${card.alt} title=${card.title}/>
+    </${AnyCard}>`;
+}
+
+function PanLeftCard({card, stackIndex, primary, visible}){
+    let [animation, setAnimation] = useState(null);
+    let easing = card.easing ?? 'easeInOutQuad';
+    useEffect(() => {
+        let el = this.base.querySelector('img');
+        if(primary){
+            if(!animation){
+                let x = card.amount ?? 330;
+                let duration = card.duration ?? 5000;
+                let animation = anime({targets: el, translateX: -x, duration, easing, loop: card.loop});
+                setAnimation(animation);
+            }
+            animation?.play();
+        }
+        else{
+            animation?.restart();
+            animation?.pause();
+        }
+    }, [primary]);
+
+    return html`<${AnyCard} card=${card} cardType="pan-left" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
+        <img src=${card.imageUrl} alt=${card.alt} title=${card.title}/>
+    </${AnyCard}>`;
+}
+
+function PanUpCard({card, stackIndex, primary, visible}){
+    let [animation, setAnimation] = useState(null);
+    let easing = card.easing ?? 'easeInOutQuad';
+    useEffect(() => {
+        let el = this.base.querySelector('img');
+        if(primary){
+            if(!animation){
+                let duration = card.duration ?? 5000;
+                let animation = anime({targets: el, translateY: 0, duration, easing, loop: card.loop});
+                setAnimation(animation);
+            }
+            animation?.play();
+        }
+        else{
+            animation?.restart();
+            animation?.pause();
+        }
+    }, [primary]);
+
+    let initialStyle = `transform: translateY(-${card.amount ?? 400}px);`;
+
+    return html`<${AnyCard} card=${card} cardType="pan-up" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
+        <img style=${initialStyle} src=${card.imageUrl} alt=${card.alt} title=${card.title}/>
+    </${AnyCard}>`;
+}
+
+function PanRightCard({card, stackIndex, primary, visible}){
+    let [animation, setAnimation] = useState(null);
+    let easing = card.easing ?? 'easeInOutQuad';
+    useEffect(() => {
+        let el = this.base.querySelector('img');
+        if(primary){
+            if(!animation){
+                let duration = card.duration ?? 5000;
+                let animation = anime({targets: el, translateX: 0, duration, easing, loop: card.loop});
+                setAnimation(animation);
+            }
+            animation?.play();
+        }
+        else{
+            animation?.restart();
+            animation?.pause();
+        }
+    }, [primary]);
+
+    let initialStyle = `transform: translateX(-${card.amount ?? 300}px);`;
+
+    return html`<${AnyCard} card=${card} cardType="pan-right" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
+        <img style=${initialStyle} src=${card.imageUrl} alt=${card.alt} title=${card.title}/>
+    </${AnyCard}>`;
+}
+
 
 function AnimatedImageCard({card, primary, visible, stackIndex}){
+    let [animatedImageInterval, setAnimatedImageInterval] = useState(null);
     let imagesToCycleThrough = card.pngs;
     let fps = card.pngsFps ?? 24;
-    let isLoop = card.pngsLoop;
+    let isLoop = card.loop;
 
     useEffect(() => {
         if(primary){
@@ -76,6 +179,7 @@ function AnimatedImageCard({card, primary, visible, stackIndex}){
                     clearInterval(animatedImageInterval);
                 }
             }, 1000 / fps);
+            setAnimatedImageInterval(animatedImageInterval);
         }
         else{
             clearInterval(animatedImageInterval);
@@ -107,7 +211,7 @@ function VideoCard({card, primary, visible, stackIndex}){
         }
     }, [primary]);
 
-    let loop = card.videoLoop ? "loop" : "";
+    let loop = card.loop ? "loop" : "";
     let muted = card.videoHasSound ? "" : "muted";
     let controls = card.videoControls ? "controls" : "";
 
@@ -116,7 +220,7 @@ function VideoCard({card, primary, visible, stackIndex}){
     let videoType = card.videoUrl.split('.').pop();
 
     return html`<${AnyCard} card=${card} cardType="video" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
-        <video muted=${!card.videoHasSound} loop=${card.videoLoop} controls=${card.videoControls} playsinline="true" preload="true">
+        <video muted=${!card.videoHasSound} loop=${card.loop} controls=${card.videoControls} playsinline="true" preload="true">
             <source src=${card.videoUrl} type="video/${videoType}" />
         </video>
     </${AnyCard}>`;
@@ -148,6 +252,18 @@ function typeToCardClass(type){
     }
     if(type === 'image'){
         cardClass = ImageCard;
+    }
+    if(type === 'pan_down' || type === "pan-down"){
+        cardClass = PanDownCard;
+    }
+    if(type === 'pan_up' || type === "pan-up"){
+        cardClass = PanUpCard;
+    }
+    if(type === 'pan_left' || type === "pan-left"){
+        cardClass = PanLeftCard;
+    }
+    if(type === 'pan_right' || type === "pan-right"){
+        cardClass = PanRightCard;
     }
     if(type === 'video'){
         cardClass = VideoCard;

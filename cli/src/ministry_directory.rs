@@ -30,14 +30,16 @@ pub struct Card{
     pub extra_class: Vec<String>,
     pub video_url: Option<String>,
     pub video_has_sound: bool,
-    pub video_loop: bool,
+    pub is_loop: bool,
     pub video_controls: bool,
     pub title: Option<String>,
     pub pngs: Vec<String>,
     pub pngs_fps: Option<i64>,
-    pub pngs_loop: Option<bool>,
     pub fade_in: Option<i64>,
-    pub stack: Vec<Card>
+    pub stack: Vec<Card>,
+    pub duration: Option<i64>,
+    pub amount: Option<i64>,
+    pub easing: Option<String>,
 }
 
 pub struct MinistryDirectory{
@@ -260,13 +262,15 @@ impl MinistryDirectory{
             extra_class,
             video_url: doc["video"].as_str().map(|s| s.to_string()),
             video_has_sound: doc["video_has_sound"].as_bool().unwrap_or(false),
-            video_loop: doc["video_loop"].as_bool().unwrap_or(false),
+            is_loop: doc["loop"].as_bool().unwrap_or(false),
             video_controls: doc["video_controls"].as_bool().unwrap_or(false),
             pngs,
             pngs_fps: doc["pngs_fps"].as_i64(),
-            pngs_loop: doc["pngs_loop"].as_bool(),
             fade_in: doc["fade_in"].as_i64(),
             stack,
+            duration: doc["duration"].as_i64(),
+            amount: doc["amount"].as_i64(),
+            easing: doc["easing"].as_str().map(|s| s.to_string()),
         }
     }
 

@@ -152,7 +152,7 @@ class RealServer{
             imageUrl: card.image_url,
             videoUrl: card.video_url,
             videoHasSound: card.video_has_sound,
-            videoLoop: card.video_loop,
+            loop: card.is_loop,
             videoControls: card.video_controls,
             content: card.content,
             created_at: card.created_at || new Date(),
@@ -160,9 +160,11 @@ class RealServer{
             pngs: card.pngs,
             extraClass: card.extra_class,
             pngsFps: card.pngs_fps,
-            pngsLoop: card.pngs_loop,
             fadeIn: card.fade_in,
             stack: card.stack.map(this.cardTransform.bind(this)),
+            duration: card.duration,
+            amount: card.amount,
+            easing: card.easing,
         }
         return appCard;
     }
