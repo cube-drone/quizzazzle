@@ -5,7 +5,7 @@ version = "0.1.0"
 edition = "2021"
 license = "AGPL-3.0-or-later"
 categories = ["command-line-utilities"]
-exclude = ["/assets", "/example", ".ministry", "content.yml", "Makefile", "/temp_assets"]
+exclude = ["/assets", "/example", ".ministry", "Makefile", "/temp_assets"]
 badges = ["experimental"]
 repository = "https://github.com/cube-drone/ministry"
 

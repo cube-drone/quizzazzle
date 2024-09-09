@@ -20,8 +20,8 @@ use slugify::slugify;
 mod ministry_directory;
 mod file_modifiers;
 
-const APP_JS: &str = include_str!("../../js/build/feed.js");
-const APP_CSS: &str = include_str!("../../js/build/style.css");
+const APP_JS: &str = include_str!("js/feed.js");
+const APP_CSS: &str = include_str!("js/style.css");
 //const APP_FAVICON: &str = include_str!("../../target/logo.svg");
 
 ///
@@ -361,10 +361,10 @@ async fn launch_server(flags: Flags, config: Config) -> Rocket<Build> {
         default_assets,
     ]);
 
-    if std::env::var("ROCKET_ENV").unwrap_or("development".to_string()) == "development"{
+    if std::env::var("ROCKET_ENV").unwrap_or("production".to_string()) == "development"{
         // here we point to the JS and CSS build directories:
         // we only bother with this next bit if we're in dev mode: otherwise we should use include_str! to bundle the files directly into the binary
-        let dev_ui_location = std::env::var("JS_BUILD_LOCATION").unwrap_or("../js/build".to_string());
+        let dev_ui_location = std::env::var("JS_BUILD_LOCATION").unwrap_or("js".to_string());
         //if location exists:
         match Path::new(&dev_ui_location).exists(){
             true => {
