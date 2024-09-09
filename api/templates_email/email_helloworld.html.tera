@@ -1,7 +1,0 @@
-{% extends "email_base.html.tera" %}
-
-{% block content %}
-<h1> Hello, World! </h1>
-<p> This is mostly intended as a test of the automated emailification system. </p>
-<p> If you're reading this and you're not <em>me</em>, something has probably gone wrong. </p>
-{% endblock content %}

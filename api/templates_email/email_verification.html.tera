@@ -1,7 +1,0 @@
-{% extends "email_base.html.tera" %}
-
-{% block content %}
-<h1> You've Logged In to {{ site_name }} For the First Time</h1>
-<p> Please click <a href="{{ verification_link }}">here</a> to verify that you are... you! The owner of this email!</p>
-<p> (If you didn't just log in to {{ site_name }}, please disregard this email) </p>
-{% endblock content %}
