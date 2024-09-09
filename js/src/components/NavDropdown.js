@@ -42,11 +42,19 @@ export default function NavDropdown({onMenu, data}){
                     return html`<li><a href="${window.location.origin}${window.location.pathname}#${id}">${id}</a></li>`;
                 })}
             </ul>
+            <h3>Sitemap</h3>
+            <div>
+                <p>
+                    build me build me
+                </p>
+            </div>
+
             <pre>
                 <code>
                     ${JSON.stringify(index, null, 2)}
                 </code>
             </pre>
+
         </div>
     </nav>`;
 }
