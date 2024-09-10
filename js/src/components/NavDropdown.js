@@ -12,7 +12,7 @@ function thumbnailify(image_url, width){
     return url.toString();
 }
 
-export default function NavDropdown({onMenu, data}){
+export default function NavDropdown({onMenu, navigateTo, data}){
 
     let index = data.getIndex();
     let sitemap = data.getSitemap();
@@ -42,12 +42,19 @@ export default function NavDropdown({onMenu, data}){
             <p class="author">${index.author}</p>
             <p>${index.description}</p>
             <div style="clear:both;"></div>
-            <h3>Table of Contents</h3>
-            <ul>
-                ${index.contentIds.map((id) => {
-                    return html`<li><a href="${window.location.origin}${window.location.pathname}#${id}">${id}</a></li>`;
-                })}
-            </ul>
+            <div class="toc">
+                <h3>Table of Contents</h3>
+                <ul>
+                    ${index.toc.map(({title, id, depth}) => {
+                        if(depth < 0){
+                            return null;
+                        }
+                        let depthstyle = `margin-left: ${depth}em;`;
+                        return html`<li style=${depthstyle}><a onClick=${(evt)=>{evt.preventDefault(); navigateTo(id);}}
+                                        href="${window.location.origin}${window.location.pathname}#${id}">${title ?? id}</a></li>`;
+                    })}
+                </ul>
+            </div>
             <hr/>
             ${Object.keys(sitemap).length > 0 ? html`<h3>Sitemap</h3>` : ""}
             <div>

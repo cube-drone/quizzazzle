@@ -306,6 +306,13 @@ header.header-invisible {
   font-size: x-small;
   color: #555;
 }
+#full-nav .toc ul {
+  margin-left: 0;
+  padding-left: 0;
+}
+#full-nav .toc ul li {
+  list-style-type: square;
+}
 .sitemap-entry ul {
   margin-left: 0;
   padding-left: 0;

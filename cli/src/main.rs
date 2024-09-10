@@ -220,6 +220,7 @@ pub struct Index{
     id: String,
     metadata: ministry_directory::DeckMetadata,
     deck_ids: Vec<String>,
+    toc: Vec<ministry_directory::TableOfContentsEntry>,
 }
 
 fn get_index(directory: MinistryDirectory) -> Result<Index> {
@@ -228,7 +229,8 @@ fn get_index(directory: MinistryDirectory) -> Result<Index> {
     Ok(Index{
         id: format!("{}/{}", metadata.author_slug, metadata.slug),
         metadata,
-        deck_ids: deck.into_iter().map(|card| card.id).collect(),
+        deck_ids: deck.clone().into_iter().map(|card| card.id).collect(),
+        toc: deck.into_iter().map(|card| card.to_toc_entry()).collect(),
     })
 }
 

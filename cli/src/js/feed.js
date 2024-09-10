@@ -932,54 +932,6 @@
     }(s3)), r3), arguments, [])).length > 1 ? r3 : r3[0];
   }
 
-  // node_modules/uuid/dist/esm-browser/rng.js
-  var getRandomValues;
-  var rnds8 = new Uint8Array(16);
-  function rng() {
-    if (!getRandomValues) {
-      getRandomValues = typeof crypto !== "undefined" && crypto.getRandomValues && crypto.getRandomValues.bind(crypto);
-      if (!getRandomValues) {
-        throw new Error("crypto.getRandomValues() not supported. See https://github.com/uuidjs/uuid#getrandomvalues-not-supported");
-      }
-    }
-    return getRandomValues(rnds8);
-  }
-
-  // node_modules/uuid/dist/esm-browser/stringify.js
-  var byteToHex = [];
-  for (let i3 = 0; i3 < 256; ++i3) {
-    byteToHex.push((i3 + 256).toString(16).slice(1));
-  }
-  function unsafeStringify(arr, offset = 0) {
-    return byteToHex[arr[offset + 0]] + byteToHex[arr[offset + 1]] + byteToHex[arr[offset + 2]] + byteToHex[arr[offset + 3]] + "-" + byteToHex[arr[offset + 4]] + byteToHex[arr[offset + 5]] + "-" + byteToHex[arr[offset + 6]] + byteToHex[arr[offset + 7]] + "-" + byteToHex[arr[offset + 8]] + byteToHex[arr[offset + 9]] + "-" + byteToHex[arr[offset + 10]] + byteToHex[arr[offset + 11]] + byteToHex[arr[offset + 12]] + byteToHex[arr[offset + 13]] + byteToHex[arr[offset + 14]] + byteToHex[arr[offset + 15]];
-  }
-
-  // node_modules/uuid/dist/esm-browser/native.js
-  var randomUUID = typeof crypto !== "undefined" && crypto.randomUUID && crypto.randomUUID.bind(crypto);
-  var native_default = {
-    randomUUID
-  };
-
-  // node_modules/uuid/dist/esm-browser/v4.js
-  function v4(options2, buf, offset) {
-    if (native_default.randomUUID && !buf && !options2) {
-      return native_default.randomUUID();
-    }
-    options2 = options2 || {};
-    const rnds = options2.random || (options2.rng || rng)();
-    rnds[6] = rnds[6] & 15 | 64;
-    rnds[8] = rnds[8] & 63 | 128;
-    if (buf) {
-      offset = offset || 0;
-      for (let i3 = 0; i3 < 16; ++i3) {
-        buf[offset + i3] = rnds[i3];
-      }
-      return buf;
-    }
-    return unsafeStringify(rnds);
-  }
-  var v4_default = v4;
-
   // src/assert.js
   function assert(boolean, message) {
     if (!boolean) {
@@ -988,89 +940,7 @@
   }
 
   // src/data.js
-  var delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   var PAGE_SIZE = 100;
-  var StubServer = class {
-    constructor() {
-      this.stubContent = [];
-      this.stubContentById = {};
-      this.contentLength = 1e4;
-      for (let i3 = 0; i3 < this.contentLength; i3++) {
-        let randomNode = this._generateRandomNode(i3);
-        this.stubContentById[randomNode.id] = randomNode;
-        this.stubContent.push(randomNode);
-      }
-      this.index = {
-        id: v4_default(),
-        userSlug: "cubes",
-        contentSlug: "testyboy",
-        name: "Test Index",
-        description: "This is a test index.",
-        thumbnailImageUrl: "https://placekitten.com/330/400",
-        contentIds: this.stubContent.map((node) => node.id),
-        created_at: /* @__PURE__ */ new Date(),
-        updated_at: /* @__PURE__ */ new Date()
-      };
-    }
-    _generateRandomNode(order) {
-      let id = v4_default().slice(-8);
-      return {
-        id,
-        order,
-        type: "markdown",
-        content: `
-## Node ${order}
-_${id}_
-This is murkdown content!
-
-* I gaze upon the roast,
-* that is sliced and laid out
-* on my plate,
-* and over it
-* I spoon the juices
-* of carrot and onion.
-* And for once I do not regret
-* the passage of time.
-            `,
-        created_at: /* @__PURE__ */ new Date(),
-        updated_at: /* @__PURE__ */ new Date()
-      };
-    }
-    async getIndexId({ userSlug, contentSlug }) {
-      return this.index.id;
-    }
-    async getIndex({ indexId }) {
-      await delay(350);
-      return this.index;
-    }
-    async getRange({ indexId, startId, endId }) {
-      await delay(500);
-      let startIndex, endIndex;
-      if (startId) {
-        startIndex = this.stubContent.findIndex((node) => node.id === startId);
-      }
-      if (endId) {
-        endIndex = this.stubContent.findIndex((node) => node.id === endId);
-      }
-      if (startIndex && endIndex) {
-        return this.stubContent.slice(startIndex, endIndex);
-      } else if (startIndex) {
-        return this.stubContent.slice(startIndex, startIndex + PAGE_SIZE / 2);
-      } else if (endIndex) {
-        return this.stubContent.slice(endIndex - PAGE_SIZE / 2, endIndex);
-      } else {
-        return this.stubContent.slice(0, PAGE_SIZE);
-      }
-    }
-    async getContent({ indexId, contentId }) {
-      await delay(500);
-      return this.stubContentById[contentId];
-    }
-    async getContents({ indexId, contentIds }) {
-      await delay(500);
-      return contentIds.map((contentId) => this.stubContentById[contentId]);
-    }
-  };
   var RealServer = class {
     constructor({ serverUrl: serverUrl2 }) {
       this.serverUrl = serverUrl2;
@@ -1097,6 +967,7 @@ This is murkdown content!
         thumbnailImageUrl: serverIndex.metadata.image_url,
         locale: serverIndex.metadata.locale,
         contentIds: serverIndex.deck_ids || [],
+        toc: serverIndex.toc || [],
         created_at: serverIndex.metadata.created_at || /* @__PURE__ */ new Date(),
         updated_at: serverIndex.metadata.updated_at || /* @__PURE__ */ new Date()
       };
@@ -1352,12 +1223,7 @@ This is murkdown content!
     }
   };
   function initialize({ serverUrl: serverUrl2 } = {}) {
-    let server;
-    if (serverUrl2 == null) {
-      server = new StubServer();
-    } else {
-      server = new RealServer({ serverUrl: serverUrl2 });
-    }
+    let server = new RealServer({ serverUrl: serverUrl2 });
     return new Data({ server });
   }
 
@@ -5382,7 +5248,7 @@ ${content}</tr>
     url.searchParams.set("width", width);
     return url.toString();
   }
-  function NavDropdown({ onMenu, data }) {
+  function NavDropdown({ onMenu, navigateTo, data }) {
     let index = data.getIndex();
     let sitemap = data.getSitemap();
     let thumbnailImage = null;
@@ -5403,12 +5269,22 @@ ${content}</tr>
             <p class="author">${index.author}</p>
             <p>${index.description}</p>
             <div style="clear:both;"></div>
-            <h3>Table of Contents</h3>
-            <ul>
-                ${index.contentIds.map((id) => {
-      return html5`<li><a href="${window.location.origin}${window.location.pathname}#${id}">${id}</a></li>`;
+            <div class="toc">
+                <h3>Table of Contents</h3>
+                <ul>
+                    ${index.toc.map(({ title, id, depth }) => {
+      if (depth < 0) {
+        return null;
+      }
+      let depthstyle = `margin-left: ${depth}em;`;
+      return html5`<li style=${depthstyle}><a onClick=${(evt) => {
+        evt.preventDefault();
+        navigateTo(id);
+      }}
+                                        href="${window.location.origin}${window.location.pathname}#${id}">${title ?? id}</a></li>`;
     })}
-            </ul>
+                </ul>
+            </div>
             <hr/>
             ${Object.keys(sitemap).length > 0 ? html5`<h3>Sitemap</h3>` : ""}
             <div>
@@ -5453,7 +5329,6 @@ ${content}</tr>
       }, timeout);
     };
   }
-  var bootupTime = Date.now();
   var html6 = htm_module_default.bind(y);
   var App = class extends b {
     constructor(props) {
@@ -5470,6 +5345,7 @@ ${content}</tr>
         currentlySelected: null,
         currentlySelectedOrder: 0
       };
+      this.initialElement = props.initialElement;
     }
     componentDidMount() {
       let element = this.base;
@@ -5501,6 +5377,10 @@ ${content}</tr>
           this.goDownOne();
         }
       };
+      if (this.initialElement) {
+        console.warn("initial element is set: ", this.initialElement);
+        this.moveTo({ id: this.initialElement.replace("#", "") });
+      }
     }
     goToTop() {
       this.lastNavInteraction = Date.now();
@@ -5550,14 +5430,18 @@ ${content}</tr>
       history.replaceState(null, null, `#${id}`);
     }
     render() {
-      let justBooted = Date.now() - bootupTime < 5e3;
-      let justInteracted = Date.now() - this.lastNavInteraction < 5e3;
       let headerVisible = "header-visible";
       let disableTransparentIcons = this.lastScrollTop > 60 ? "disable-transparent-icons" : "";
       let fullNavExpandedClass = this.state.expandedMenu ? "expanded" : "";
       let onMenu = () => {
         this.setState({
           expandedMenu: !this.state.expandedMenu
+        });
+      };
+      let navigateTo = (id) => {
+        this.moveTo({ id });
+        this.setState({
+          expandedMenu: false
         });
       };
       let items = this.state.index.contentIds.map((id, n3) => {
@@ -5579,7 +5463,8 @@ ${content}</tr>
                 </header>
                 <header id="full-header" class="${fullNavExpandedClass} disable-transparent-icons">
                     <${NavDropdown}
-                        onMenu=${onMenu}
+                        onMenu=${onMenu.bind(this)}
+                        navigateTo=${navigateTo.bind(this)}
                         data=${this.data}
                     />
                 </header>
@@ -5609,7 +5494,7 @@ ${content}</tr>
       console.warn(`loading index for s/${userSlug}/${contentSlug}#${hash}`);
       await Data2.loadIndex({ userSlug, contentSlug, contentId: hash });
     }
-    let app = html6`<${App} data=${Data2} />`;
+    let app = html6`<${App} data=${Data2} initialElement=${window.location.hash} />`;
     B(app, document.getElementById("app"));
   }
   main();

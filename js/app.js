@@ -15,8 +15,6 @@ function debounce(func, timeout = 300){
     };
 }
 
-let bootupTime = Date.now();
-
 const html = htm.bind(h);
 
 class App extends Component {
@@ -37,6 +35,9 @@ class App extends Component {
             currentlySelected: null,
             currentlySelectedOrder: 0
         }
+
+        this.initialElement = props.initialElement;
+
     }
 
     componentDidMount(){
@@ -75,6 +76,11 @@ class App extends Component {
             if (key === 'ArrowDown' || key.toLowerCase() === "s") {
                 this.goDownOne();
             }
+        }
+
+        if(this.initialElement){
+            console.warn("initial element is set: ", this.initialElement);
+            this.moveTo({id: this.initialElement.replace("#", "")});
         }
     }
 
@@ -136,10 +142,10 @@ class App extends Component {
     }
 
     render(){
-        // we go to quite a lot of trouble to determine whether or not the header should be visible
+        /*
+        // we used to go to quite a lot of trouble to determine whether or not the header should be visible
         let justBooted = Date.now() - bootupTime < 5000;
         let justInteracted = Date.now() - this.lastNavInteraction < 5000;
-        /*
         let headerVisible = this.state.scrollDirection == "backward" ? "header-visible" : "header-invisible";
         if(justBooted || justInteracted){
             headerVisible = "header-visible";
@@ -154,6 +160,13 @@ class App extends Component {
         let onMenu = () => {
             this.setState({
                 expandedMenu: !this.state.expandedMenu
+            });
+        }
+
+        let navigateTo = (id) => {
+            this.moveTo({id});
+            this.setState({
+                expandedMenu: false
             });
         }
 
@@ -177,7 +190,8 @@ class App extends Component {
                 </header>
                 <header id="full-header" class="${fullNavExpandedClass} disable-transparent-icons">
                     <${NavDropdown}
-                        onMenu=${onMenu}
+                        onMenu=${onMenu.bind(this)}
+                        navigateTo=${navigateTo.bind(this)}
                         data=${this.data}
                     />
                 </header>
@@ -219,7 +233,7 @@ async function main(){
         console.warn(`loading index for s/${userSlug}/${contentSlug}#${hash}`);
         await Data.loadIndex({userSlug: userSlug, contentSlug: contentSlug, contentId: hash});
     }
-    let app = html`<${App} data=${Data} />`;
+    let app = html`<${App} data=${Data} initialElement=${window.location.hash} />`;
     render(app, document.getElementById('app'));
 }
 

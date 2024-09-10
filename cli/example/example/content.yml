@@ -11,9 +11,6 @@ extra_header: |
   <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&display=swap" rel="stylesheet">
   <style>
     h1, h2, h3, h4, h5, h6{
-      font-family: "Bebas Neue", sans-serif;
-      font-weight: 400;
-      font-style: normal;
     }
     .textboss{
       height: 100px;
@@ -38,6 +35,7 @@ pages:
     amount: 2
     id: cover
   - type: stack
+    title: Owen Says Hi
     id: owen-says-hi
     pages:
       - id: owen
@@ -56,6 +54,7 @@ pages:
     content: Just because the text is here doesn't mean it's important.
     id: animated-text
   - id: wow
+    depth: 2
     type: pan_down
     duration: 5000
     amount: 400
@@ -64,6 +63,7 @@ pages:
     loop: true
     image: assets/wow.png?tall
   - id: wow-2
+    depth: 2
     type: pan_up
     loop: true
     easing: easeInOutElastic
@@ -72,6 +72,7 @@ pages:
     amount: 400
     image: assets/wow.png?tall
   - id: wow-3
+    depth: 2
     type: pan_left
     easing: easeInOutElastic
     loop: true
@@ -80,6 +81,7 @@ pages:
     amount: 330
     image: assets/wow-across.png?wide
   - id: wow-4
+    depth: 2
     type: pan_right
     loop: true
     delay: 1500
@@ -98,6 +100,7 @@ pages:
 
       ![A bee](assets/bee.jpg?width=100)
   - id: stack
+    title: Stacked Images
     extra_class:
       - opaque
       - border
@@ -113,6 +116,7 @@ pages:
         fade_in: 2250
         image: assets/stacked/3.png
   - id: stack-2
+    depth: -1
     type: stack
     pages:
       - id: stacked-bg
@@ -134,12 +138,15 @@ pages:
   - image: assets/sample.png?color=111111
     id: sample-image
   - video: assets/test_mp4_video.mp4
+    depth: 2
     video_controls: true
     id: test-mp4
   - video: assets/test_webm_video.webm
+    depth: 2
     loop: true
     id: test-webm
   - title: Types of Bees
+    depth: 3
     id: bee-types
     content: |
       There are many types of bees, including honeybees, bumblebees, and solitary bees.

@@ -68,6 +68,24 @@ pub struct Card{
     pub amount: Option<i64>,
     pub delay: Option<i64>,
     pub easing: Option<String>,
+    pub toc_depth: Option<i64>,
+}
+
+impl Card{
+    pub fn to_toc_entry(&self) -> TableOfContentsEntry{
+        TableOfContentsEntry{
+            title: self.title.clone(),
+            id: self.id.clone(),
+            depth: self.toc_depth.unwrap_or(1),
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct TableOfContentsEntry{
+    pub title: Option<String>,
+    pub id: String,
+    pub depth: i64,
 }
 
 pub struct MinistryDirectory{
@@ -311,6 +329,7 @@ impl MinistryDirectory{
             amount: doc["amount"].as_i64(),
             delay: doc["delay"].as_i64(),
             easing: doc["easing"].as_str().map(|s| s.to_string()),
+            toc_depth: doc["depth"].as_i64(),
         }
     }
 

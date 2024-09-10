@@ -7,101 +7,6 @@ let delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 let PAGE_SIZE = 100;
 
-class StubServer{
-
-    constructor(){
-        this.stubContent = [];
-        this.stubContentById = {};
-        this.contentLength = 10000;
-
-        for(let i = 0; i < this.contentLength; i++){
-            let randomNode = this._generateRandomNode(i);
-            this.stubContentById[randomNode.id] = randomNode;
-            this.stubContent.push(randomNode);
-        }
-
-        this.index = {
-            id: uuid(),
-            userSlug: "cubes",
-            contentSlug: "testyboy",
-            name: 'Test Index',
-            description: "This is a test index.",
-            thumbnailImageUrl: "https://placekitten.com/330/400",
-            contentIds: this.stubContent.map(node => node.id),
-            created_at: new Date(),
-            updated_at: new Date(),
-        }
-    }
-
-    _generateRandomNode(order){
-        // TODO: generate random notes in a variety of types (once we know how to display a variety of types of node)
-        let id = uuid().slice(-8);
-        return {
-            id,
-            order,
-            type: 'markdown',
-            content: `
-## Node ${order}
-_${id}_
-This is murkdown content!
-
-* I gaze upon the roast,
-* that is sliced and laid out
-* on my plate,
-* and over it
-* I spoon the juices
-* of carrot and onion.
-* And for once I do not regret
-* the passage of time.
-            `,
-            created_at: new Date(),
-            updated_at: new Date(),
-        }
-    }
-
-    async getIndexId({userSlug, contentSlug}){
-        return this.index.id;
-    }
-
-    async getIndex({indexId}) {
-        await delay(350);
-        return this.index;
-    }
-
-    async getRange({indexId, startId, endId}){
-        await delay(500);
-        let startIndex, endIndex;
-        if(startId){
-            startIndex = this.stubContent.findIndex(node => node.id === startId);
-        }
-        if(endId){
-            endIndex = this.stubContent.findIndex(node => node.id === endId);
-        }
-        if(startIndex && endIndex){
-            return this.stubContent.slice(startIndex, endIndex);
-        }
-        else if(startIndex){
-            return this.stubContent.slice(startIndex, startIndex + PAGE_SIZE/2);
-        }
-        else if(endIndex){
-            return this.stubContent.slice(endIndex - PAGE_SIZE/2, endIndex);
-        }
-        else {
-            return this.stubContent.slice(0, PAGE_SIZE);
-        }
-    }
-
-    async getContent({indexId, contentId}){
-        await delay(500);
-        return this.stubContentById[contentId];
-    }
-
-    async getContents({indexId, contentIds}){
-        await delay(500);
-        return contentIds.map(contentId => this.stubContentById[contentId]);
-    }
-}
-
 class RealServer{
     constructor({serverUrl}){
         this.serverUrl = serverUrl;
@@ -130,6 +35,7 @@ class RealServer{
             thumbnailImageUrl: serverIndex.metadata.image_url,
             locale: serverIndex.metadata.locale,
             contentIds: serverIndex.deck_ids || [],
+            toc: serverIndex.toc || [],
             created_at: serverIndex.metadata.created_at || new Date(),
             updated_at: serverIndex.metadata.updated_at || new Date(),
         }
@@ -462,13 +368,7 @@ class Data{
 }
 
 export function initialize({serverUrl}={}){
-    let server;
-    if(serverUrl == null){
-        server = new StubServer()
-    }
-    else{
-        server = new RealServer({serverUrl})
-    }
+    let server = new RealServer({serverUrl})
 
     return new Data({server});
 }
