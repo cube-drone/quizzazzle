@@ -1019,10 +1019,11 @@
       return cards.map(this.cardTransform.bind(this));
     }
     async getContent({ indexId, contentId }) {
+      console.warn(`getting: ${indexId} / ${contentId}`);
       const response = await fetch(`${this.serverUrl}${indexId}/content/${contentId}`, {});
       let card = await response.json();
       console.dir(card);
-      return this.cardTransform(card).bind(this);
+      return this.cardTransform.bind(this)(card);
     }
     async getContents({ indexId, contentIds }) {
       let contents = [];
@@ -1049,6 +1050,7 @@
     constructor({ server }) {
       this.server = server;
       this.index = {};
+      this.indexId = null;
       this.fullyLoadedBakedPotato = false;
       this.content = {};
       this.currentLocation = 0;
@@ -1062,7 +1064,7 @@
       this.content[node.id] = node;
     }
     async _addItems(nodes) {
-      for (let node of nodes) {
+      for (let node of nodes.filter((node2) => node2 != null)) {
         this._addItem({ node });
       }
     }
@@ -1073,7 +1075,7 @@
         return;
       }
       let [firstNode, secondNode, penultimateNode, lastNode] = await this.server.getContents({
-        indexId: this.index.id,
+        indexId: this.indexId,
         contentIds: [
           firstNodeId,
           this.index.contentIds[1],
@@ -1106,8 +1108,11 @@
     async _loadIndexFromMiddle({ indexId, contentId }) {
       contentId = contentId.replace("#", "");
       let index = await this.server.getIndex({ indexId });
+      let indexOfContent = index.contentIds.indexOf(contentId);
+      let startOfPageIndex = Math.max(0, indexOfContent - PAGE_SIZE / 2);
+      let startId = index.contentIds[startOfPageIndex];
       let [beforeRange, afterRange] = await Promise.all([
-        this.server.getRange({ indexId, endId: contentId }),
+        this.server.getRange({ indexId, startId, endId: contentId }),
         this.server.getRange({ indexId, startId: contentId })
       ]);
       this.index = index;
@@ -1129,6 +1134,7 @@
     }
     async loadIndex({ userSlug, contentSlug, contentId }) {
       let indexId = await this.server.getIndexId({ userSlug, contentSlug });
+      this.indexId = indexId;
       console.warn(`got index id ${indexId}`);
       if (contentId == null || contentId == "") {
         return this._loadIndexFromBeginning({ indexId });
@@ -1137,8 +1143,12 @@
       }
     }
     async loadMoreContent({ user, indexId, contentId }) {
+      let index = await this.server.getIndex({ indexId });
+      let indexOfContent = index.contentIds.indexOf(contentId);
+      let startOfPageIndex = Math.max(0, indexOfContent - PAGE_SIZE / 2);
+      let startId = index.contentIds[startOfPageIndex];
       let [beforeRange, afterRange] = await Promise.all([
-        this.server.getRange({ user, indexId, endId: contentId }),
+        this.server.getRange({ user, indexId, startId, endId: contentId }),
         this.server.getRange({ user, indexId, startId: contentId })
       ]);
       this._addItems([...beforeRange, ...afterRange]);
@@ -1189,7 +1199,7 @@
       if (!range) {
         return;
       }
-      let freshContent = await this.server.getRange({ indexId: this.index.id, ...range });
+      let freshContent = await this.server.getRange({ indexId: this.indexId, ...range });
       this._addItems(...freshContent);
     }
     async ping() {
@@ -1201,7 +1211,7 @@
     }
     async getContent({ id }) {
       if (this.content[id] == null) {
-        await this.loadMoreContent({ indexId: this.index.id, contentId: id });
+        await this.loadMoreContent({ indexId: this.indexId, contentId: id });
       }
       let content = this.content[id];
       assert(content != null, `content ${id} not found`);

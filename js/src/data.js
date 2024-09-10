@@ -1,8 +1,4 @@
-import { v4 as uuid } from "uuid";
 import { assert } from "./assert.js";
-
-// TODO: add a random delay to the stub server so that we can see what it's like to load content
-let delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 
 let PAGE_SIZE = 100;
@@ -92,10 +88,11 @@ class RealServer{
     }
 
     async getContent({indexId, contentId}){
+        console.warn(`getting: ${indexId} / ${contentId}`)
         const response = await fetch(`${this.serverUrl}${indexId}/content/${contentId}`, {});
         let card = await response.json();
         console.dir(card);
-        return this.cardTransform(card).bind(this);
+        return this.cardTransform.bind(this)(card);
     }
 
     async getContents({indexId, contentIds}){
@@ -126,6 +123,7 @@ class Data{
     constructor({server}){
         this.server = server;
         this.index = {};
+        this.indexId = null;
         // this.index.contentIds is a list of every ID of a node in the index
 
         // fullyLoadedBakedPotato is set once we have _all_ of the content loaded. At this point there's a lot less work for Data to do.
@@ -153,7 +151,8 @@ class Data{
     }
 
     async _addItems(nodes){
-        for(let node of nodes){
+
+        for(let node of nodes.filter(node => node != null)){
             this._addItem({node});
         }
     }
@@ -167,7 +166,7 @@ class Data{
             return;
         }
         let [firstNode, secondNode, penultimateNode, lastNode] = await this.server.getContents({
-            indexId: this.index.id,
+            indexId: this.indexId,
             contentIds: [
                 firstNodeId,
                 this.index.contentIds[1],
@@ -210,8 +209,12 @@ class Data{
         contentId = contentId.replace("#", "");
         let index = await this.server.getIndex({indexId});
 
+        let indexOfContent = index.contentIds.indexOf(contentId);
+        let startOfPageIndex = Math.max(0, indexOfContent - PAGE_SIZE/2);
+        let startId = index.contentIds[startOfPageIndex];
+
         let [beforeRange, afterRange] = await Promise.all([
-            this.server.getRange({indexId, endId: contentId}),
+            this.server.getRange({indexId, startId, endId: contentId}),
             this.server.getRange({indexId, startId: contentId}),
         ]);
 
@@ -243,6 +246,7 @@ class Data{
         // so, for example, "cubes/testyboy" is an index that belongs to the user "cubes" and is called "testyboy"
         // the index describes the whole story, in order, it's like a table of contents
         let indexId = await this.server.getIndexId({userSlug, contentSlug});
+        this.indexId = indexId;
         console.warn(`got index id ${indexId}`);
 
         if(contentId == null || contentId == ""){
@@ -254,8 +258,15 @@ class Data{
     }
 
     async loadMoreContent({user, indexId, contentId}){
+
+        let index = await this.server.getIndex({indexId});
+        let indexOfContent = index.contentIds.indexOf(contentId);
+        let startOfPageIndex = Math.max(0, indexOfContent - PAGE_SIZE/2);
+        let startId = index.contentIds[startOfPageIndex];
+
+
         let [beforeRange, afterRange] = await Promise.all([
-            this.server.getRange({user, indexId, endId: contentId}),
+            this.server.getRange({user, indexId, startId, endId: contentId}),
             this.server.getRange({user, indexId, startId: contentId}),
         ]);
 
@@ -325,7 +336,7 @@ class Data{
             return;
         }
 
-        let freshContent = await this.server.getRange({indexId: this.index.id, ...range});
+        let freshContent = await this.server.getRange({indexId: this.indexId, ...range});
         this._addItems(...freshContent);
     }
 
@@ -340,7 +351,7 @@ class Data{
 
     async getContent({id}){
         if(this.content[id] == null){
-            await this.loadMoreContent({indexId: this.index.id, contentId: id});
+            await this.loadMoreContent({indexId: this.indexId, contentId: id});
         }
         let content = this.content[id];
         assert(content != null, `content ${id} not found`);

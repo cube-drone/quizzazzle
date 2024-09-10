@@ -123,11 +123,6 @@ impl MinistryDirectory{
         println!("✅ {}", content_path.to_str().unwrap_or_else(|| ""));
         std::fs::write(content_path, content_yml)?;
 
-        // create the .ministry file
-        let ministry_path = PathBuf::from(&self.directory_root).join(".ministry");
-        println!("✅ {}", ministry_path.to_str().unwrap_or_else(|| ""));
-        std::fs::write(ministry_path, "")?;
-
         // create the assets directory
         let assets_path = PathBuf::from(&self.directory_root).join("assets");
         println!("✅ {}", assets_path.to_str().unwrap_or_else(|| ""));
@@ -161,11 +156,6 @@ impl MinistryDirectory{
         let content_path_location = PathBuf::from(&directory_root).join("content.yml");
         let content_path = Path::new(&content_path_location);
         if !content_path.exists(){
-            return false
-        }
-        let ministry_path_location = PathBuf::from(&directory_root).join(".ministry");
-        let ministry_path = Path::new(&ministry_path_location);
-        if !ministry_path.exists(){
             return false
         }
         let assets_path_location = PathBuf::from(&directory_root).join("assets");
