@@ -3,6 +3,7 @@ extern crate rocket;
 
 use std::env;
 use std::path::Path;
+use std::collections::HashMap;
 use url::Url;
 use anyhow::{Result, anyhow};
 
@@ -204,7 +205,7 @@ fn home(config: &State<Config>) -> content::RawHtml<String> {
 }
 
 #[get("/s/<author_slug>/<deck_slug>")]
-fn deck_home(config: &State<Config>, author_slug: String, deck_slug: String) -> content::RawHtml<String> {
+fn deck_home(config: &State<Config>, author_slug: &str, deck_slug: &str) -> content::RawHtml<String> {
     let path = std::path::PathBuf::from(author_slug).join(deck_slug);
     let directory = ministry_directory::MinistryDirectory::new(path.to_str().unwrap_or_else(|| ".").to_string());
     let rendered = index_template(directory, config);
@@ -232,7 +233,7 @@ fn get_index(directory: MinistryDirectory) -> Result<Index> {
 }
 
 #[get("/s/<author_slug>/<deck_slug>/index")]
-fn deck_index(author_slug: String, deck_slug: String) -> Result<Json<Index>, Status> {
+fn deck_index(author_slug: &str, deck_slug: &str) -> Result<Json<Index>, Status> {
     let path = std::path::PathBuf::from(author_slug).join(deck_slug);
     let directory = ministry_directory::MinistryDirectory::new(path.to_str().unwrap_or_else(|| ".").to_string());
     match get_index(directory){
@@ -257,8 +258,8 @@ fn default_index() -> Result<Json<Index>, Status> {
 }
 
 #[get("/s/<author_slug>/<deck_slug>/range/<start_id>/<end_id>")]
-fn deck_range(author_slug: String, deck_slug: String, start_id: String, end_id: String) -> Result<Json<Vec<ministry_directory::Card>>, Status> {
-    let path = std::path::PathBuf::from(author_slug.clone()).join(deck_slug.clone());
+fn deck_range(author_slug: &str, deck_slug: &str, start_id: &str, end_id: &str) -> Result<Json<Vec<ministry_directory::Card>>, Status> {
+    let path = std::path::PathBuf::from(author_slug).join(deck_slug);
     let directory: MinistryDirectory;
     if author_slug == "default" && deck_slug == "default"{
         directory = ministry_directory::MinistryDirectory::new(".".to_string());
@@ -346,6 +347,56 @@ async fn default_assets(asset_path: std::path::PathBuf, file_directives: file_mo
     }
 }
 
+#[get("/sitemap")]
+async fn sitemap() -> Json<HashMap<String, Vec<ministry_directory::DeckSummary>>> {
+    // look at the current directory
+    let path = std::path::PathBuf::from(".");
+    let mut hash_map = HashMap::new();
+
+    // for each subdirectory...
+    let paths = std::fs::read_dir(path).unwrap();
+    for author_path in paths{
+        let author_path = author_path.unwrap().path();
+        let str_path = author_path.to_str().unwrap_or("");
+        if str_path == "." || str_path.ends_with(".") || str_path.ends_with(".git") || str_path.ends_with("temp_assets") ||
+                str_path.ends_with("node_modules") || str_path.ends_with("assets") || str_path.ends_with("src") || str_path.ends_with("target") {
+            continue;
+        }
+        if author_path.is_dir(){
+            // if it's a directory, that's a _user_ directory: so "author_slug" is the name of the directory
+            // for each subdirectory of that directory...
+            println!("Author path: {}", author_path.to_str().unwrap_or(""));
+            let more_paths = std::fs::read_dir(author_path.clone()).unwrap();
+            for deck_path in more_paths{
+                let deck_path = deck_path.unwrap().path();
+                let str_deck_path = deck_path.to_str().unwrap_or("");
+                if str_deck_path == "." || str_deck_path.ends_with(".") || str_deck_path.ends_with(".git") || str_deck_path.ends_with("temp_assets") ||
+                        str_deck_path.ends_with("node_modules") || str_deck_path.ends_with("assets") {
+                    continue;
+                }
+                if deck_path.is_dir(){
+                    // if it's a directory, that's a _deck_ directory: so "deck_slug" is the name of the directory
+                    // for each file in that directory...
+                    let deck = ministry_directory::MinistryDirectory::new(deck_path.to_str().unwrap_or("").to_string());
+                    if deck.exists(){
+                        let metadata = deck.get_metadata().unwrap();
+                        let author_slug = author_path.to_str().unwrap_or("").to_string().replace(".\\", "");
+
+                        if hash_map.contains_key(&author_slug){
+                            let decks: &mut Vec<ministry_directory::DeckSummary> = hash_map.get_mut(&author_slug).unwrap();
+                            decks.push(metadata.to_summary());
+                        }
+                        else{
+                            hash_map.insert(author_slug, vec![metadata.to_summary()]);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Json(hash_map)
+}
+
 async fn launch_server(flags: Flags, config: Config) -> Rocket<Build> {
 
     let mut app = rocket::build();
@@ -359,6 +410,7 @@ async fn launch_server(flags: Flags, config: Config) -> Rocket<Build> {
         deck_id,
         deck_assets,
         default_assets,
+        sitemap
     ]);
 
     if std::env::var("ROCKET_ENV").unwrap_or("production".to_string()) == "development"{

@@ -32,7 +32,6 @@ function AnyCard({card, cardType, stackIndex, primary, visible, children}){
                     translateX.push(i % 2 === 0 ? amount : -amount);
                 }
                 translateX.push(0);
-                console.warn(translateX);
                 anime({targets: el, translateX, duration, delay: card.delay ?? 0, easing, loop: card.loop});
             }
         }, [primary]);

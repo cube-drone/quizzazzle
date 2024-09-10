@@ -126,3 +126,24 @@ header.header-invisible{
     font-size: x-small;
     color: #555;
 }
+
+.sitemap-entry ul {
+    margin-left: 0;
+    padding-left: 0;
+}
+
+.sitemap-entry li{
+    min-height: 50px;
+    list-style-type: none;
+    padding-left: 5px;
+    border-left: 2px solid white;
+    margin-left: 5px;
+    font-size: small;
+}
+
+#full-nav .sitemap-entry img{
+    margin: 0 10px 0 0;
+    padding: 0;
+    width: 50px;
+    height: 50px;
+}

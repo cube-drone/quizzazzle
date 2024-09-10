@@ -6,9 +6,16 @@ import Icon from './Icon.js';
 
 const html = htm.bind(h);
 
+function thumbnailify(image_url, width){
+    let url = new URL(image_url);
+    url.searchParams.set('width', width);
+    return url.toString();
+}
+
 export default function NavDropdown({onMenu, data}){
 
     let index = data.getIndex();
+    let sitemap = data.getSitemap();
 
     /*
         This is the thing that appears when you click the hamburger button.
@@ -16,10 +23,9 @@ export default function NavDropdown({onMenu, data}){
         Credits? A link to the source code? A link to the user's profile?
         The world is our oyster.
     */
-    console.dir(index);
     let thumbnailImage = null;
     if(index.thumbnailImageUrl){
-        thumbnailImage = html`<img src="${index.thumbnailImageUrl}" alt="${index.name}" />`;
+        thumbnailImage = html`<img src="${thumbnailify(`${window.location.origin}${window.location.pathname}${index.thumbnailImageUrl}`, 100)}" alt="${index.name}" />`;
     }
 
     return html`<nav id="full-nav">
@@ -42,18 +48,38 @@ export default function NavDropdown({onMenu, data}){
                     return html`<li><a href="${window.location.origin}${window.location.pathname}#${id}">${id}</a></li>`;
                 })}
             </ul>
-            <h3>Sitemap</h3>
+            <hr/>
+            ${Object.keys(sitemap).length > 0 ? html`<h3>Sitemap</h3>` : ""}
             <div>
-                <p>
-                    build me build me
-                </p>
-            </div>
+                ${Object.entries(sitemap).map(([authorSlug, listOfDecks]) => {
+                    let author = listOfDecks[0].author;
 
-            <pre>
-                <code>
-                    ${JSON.stringify(index, null, 2)}
-                </code>
-            </pre>
+                    let countOfVisibleDecks = listOfDecks.filter((deck) => {
+                        return !deck.hidden;
+                    }).length;
+
+                    if(countOfVisibleDecks == 0){
+                        return null;
+                    }
+
+                    return html`<div class='sitemap-entry'>
+                        <h4>${author}</h4>
+                        <ul>
+                            ${listOfDecks.map((deck) => {
+                                if(deck.hidden){
+                                    return null;
+                                }
+                                let image_url = thumbnailify(`${window.location.origin}/s/${deck.author_slug}/${deck.slug}/${deck.image_url}`, 50);
+                                return html`<li>
+                                    <img src="${image_url}" alt="${deck.title}" />
+                                    <a href="${window.location.origin}/s/${deck.author_slug}/${deck.slug}" title="${deck.description}">${deck.title}</a>
+                                    <p>${deck.description}</p>
+                                </li>`;
+                            })}
+                        </ul>
+                    </div>`;
+                })}
+            </div>
 
         </div>
     </nav>`;

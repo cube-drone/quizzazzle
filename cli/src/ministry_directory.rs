@@ -19,6 +19,32 @@ pub struct DeckMetadata{
     pub image_url: Option<String>,
     pub locale: Option<String>,
     pub extra_header: Option<String>,
+    pub hidden: bool,
+}
+
+impl DeckMetadata{
+    pub fn to_summary(&self) -> DeckSummary{
+        DeckSummary{
+            title: self.title.clone(),
+            slug: self.slug.clone(),
+            author: self.author.clone(),
+            author_slug: self.author_slug.clone(),
+            image_url: self.image_url.clone(),
+            description: self.description.clone(),
+            hidden: self.hidden,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct DeckSummary{
+    pub title: String,
+    pub slug: String,
+    pub author: String,
+    pub author_slug: String,
+    pub image_url: Option<String>,
+    pub description: Option<String>,
+    pub hidden: bool,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -172,16 +198,29 @@ impl MinistryDirectory{
             None => None,
         };
 
+        let slug = slugify!(name_or_title);
+        let author_slug = slugify!(author);
+
+        if !(self.directory_root.to_string().ends_with(&slug)) && !(self.directory_root.to_string() == ".") {
+            println!("Directory root does not match slug: {} != {}", self.directory_root, slug);
+            return Err(anyhow!("Directory root does not match slug - please move the directory to the correct location: {}", slug));
+        }
+        if !(self.directory_root.to_string().contains(&author_slug)) && !(self.directory_root.to_string() == ".") {
+            println!("Directory root does not match slug: {} != {}", self.directory_root, author_slug);
+            return Err(anyhow!("Directory root does not match slug - please move the directory to the correct location: {}", author_slug));
+        }
+
         let dm = DeckMetadata{
             title: name_or_title.to_string(),
-            slug: slugify!(name_or_title),
+            slug,
             author: author.to_string(),
-            author_slug: slugify!(author),
+            author_slug,
             author_link: doc["author_link"].as_str().map(|s| s.to_string()),
             description: doc["description"].as_str().map(|s| s.to_string()),
             image_url: image_url,
             locale: doc["locale"].as_str().map(|s| s.to_string()),
             extra_header: doc["extra_header"].as_str().map(|s| s.to_string()),
+            hidden: doc["hidden"].as_bool().unwrap_or(false),
         };
         Ok(dm)
     }
@@ -276,7 +315,6 @@ impl MinistryDirectory{
     }
 
     pub fn get_deck(&self) -> Result<Vec<Card>>{
-        // what's an Index?
         let content_string = self._get_content()?;
         let yaml = YamlLoader::load_from_str(&content_string)?;
         let doc = &yaml[0];

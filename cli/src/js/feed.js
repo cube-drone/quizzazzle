@@ -363,8 +363,8 @@
           if (questionmark !== -1 && colon > questionmark) {
             return true;
           }
-          var hash2 = text.indexOf("#");
-          if (hash2 !== -1 && colon > hash2) {
+          var hash = text.indexOf("#");
+          if (hash !== -1 && colon > hash) {
             return true;
           }
           return o3.allowedSchemes.some(matches);
@@ -1036,7 +1036,7 @@ This is murkdown content!
         updated_at: /* @__PURE__ */ new Date()
       };
     }
-    async getIndexId({ userSlug: userSlug2, contentSlug: contentSlug2 }) {
+    async getIndexId({ userSlug, contentSlug }) {
       return this.index.id;
     }
     async getIndex({ indexId }) {
@@ -1076,14 +1076,14 @@ This is murkdown content!
       this.serverUrl = serverUrl2;
       this.index = null;
     }
-    async getIndexId({ userSlug: userSlug2, contentSlug: contentSlug2 }) {
-      console.warn(`getting index id for ${userSlug2}/${contentSlug2}`);
-      if (userSlug2 == null || contentSlug2 == null) {
+    async getIndexId({ userSlug, contentSlug }) {
+      console.warn(`getting index id for ${userSlug}/${contentSlug}`);
+      if (userSlug == null || contentSlug == null) {
         const response = await fetch(`${this.serverUrl}/index`, {});
         this.index = await response.json();
         return `/s/default/default`;
       }
-      return `/s/${userSlug2}/${contentSlug2}`;
+      return `/s/${userSlug}/${contentSlug}`;
     }
     indexTransform(serverIndex) {
       let appIndex = {
@@ -1161,6 +1161,10 @@ This is murkdown content!
       }
       return contents;
     }
+    async getSitemap() {
+      let response = await fetch(`${this.serverUrl}/sitemap`, {});
+      return await response.json();
+    }
   };
   var Data = class {
     /*
@@ -1179,6 +1183,9 @@ This is murkdown content!
       this.currentLocation = 0;
       this.currentId = null;
       setTimeout(this.ping.bind(this), 2e3);
+      this.server.getSitemap().then((sitemap) => {
+        this.sitemap = sitemap;
+      });
     }
     async _addItem({ node }) {
       this.content[node.id] = node;
@@ -1249,8 +1256,8 @@ This is murkdown content!
       }
       this.currentId = contentId;
     }
-    async loadIndex({ userSlug: userSlug2, contentSlug: contentSlug2, contentId }) {
-      let indexId = await this.server.getIndexId({ userSlug: userSlug2, contentSlug: contentSlug2 });
+    async loadIndex({ userSlug, contentSlug, contentId }) {
+      let indexId = await this.server.getIndexId({ userSlug, contentSlug });
       console.warn(`got index id ${indexId}`);
       if (contentId == null || contentId == "") {
         return this._loadIndexFromBeginning({ indexId });
@@ -1339,6 +1346,9 @@ This is murkdown content!
     }
     getPreviousContentId() {
       return this.index.contentIds[this.currentLocation - 1];
+    }
+    getSitemap() {
+      return this.sitemap;
     }
   };
   function initialize({ serverUrl: serverUrl2 } = {}) {
@@ -2007,8 +2017,8 @@ This is murkdown content!
       vH: viewBox[3]
     };
   }
-  function getPath(path2, percent) {
-    var pathEl = is.str(path2) ? selectString(path2)[0] : path2;
+  function getPath(path, percent) {
+    var pathEl = is.str(path) ? selectString(path)[0] : path;
     var p3 = percent || 100;
     return function(property) {
       return {
@@ -2019,20 +2029,20 @@ This is murkdown content!
       };
     };
   }
-  function getPathProgress(path2, progress, isPathTargetInsideSVG) {
+  function getPathProgress(path, progress, isPathTargetInsideSVG) {
     function point(offset) {
       if (offset === void 0)
         offset = 0;
       var l3 = progress + offset >= 1 ? progress + offset : 0;
-      return path2.el.getPointAtLength(l3);
+      return path.el.getPointAtLength(l3);
     }
-    var svg = getParentSvg(path2.el, path2.svg);
+    var svg = getParentSvg(path.el, path.svg);
     var p3 = point();
     var p0 = point(-1);
     var p1 = point(1);
     var scaleX = isPathTargetInsideSVG ? 1 : svg.w / svg.vW;
     var scaleY = isPathTargetInsideSVG ? 1 : svg.h / svg.vH;
-    switch (path2.property) {
+    switch (path.property) {
       case "x":
         return (p3.x - svg.x) * scaleX;
       case "y":
@@ -4756,7 +4766,6 @@ ${content}</tr>
             translateX.push(i3 % 2 === 0 ? amount : -amount);
           }
           translateX.push(0);
-          console.warn(translateX);
           anime_es_default({ targets: el, translateX, duration, delay: card.delay ?? 0, easing, loop: card.loop });
         }
       }, [primary]);
@@ -5368,12 +5377,17 @@ ${content}</tr>
 
   // src/components/NavDropdown.js
   var html5 = htm_module_default.bind(y);
+  function thumbnailify(image_url, width) {
+    let url = new URL(image_url);
+    url.searchParams.set("width", width);
+    return url.toString();
+  }
   function NavDropdown({ onMenu, data }) {
     let index = data.getIndex();
-    console.dir(index);
+    let sitemap = data.getSitemap();
     let thumbnailImage = null;
     if (index.thumbnailImageUrl) {
-      thumbnailImage = html5`<img src="${index.thumbnailImageUrl}" alt="${index.name}" />`;
+      thumbnailImage = html5`<img src="${thumbnailify(`${window.location.origin}${window.location.pathname}${index.thumbnailImageUrl}`, 100)}" alt="${index.name}" />`;
     }
     return html5`<nav id="full-nav">
         <ul class="navbar">
@@ -5395,18 +5409,35 @@ ${content}</tr>
       return html5`<li><a href="${window.location.origin}${window.location.pathname}#${id}">${id}</a></li>`;
     })}
             </ul>
-            <h3>Sitemap</h3>
+            <hr/>
+            ${Object.keys(sitemap).length > 0 ? html5`<h3>Sitemap</h3>` : ""}
             <div>
-                <p>
-                    build me build me
-                </p>
+                ${Object.entries(sitemap).map(([authorSlug, listOfDecks]) => {
+      let author = listOfDecks[0].author;
+      let countOfVisibleDecks = listOfDecks.filter((deck) => {
+        return !deck.hidden;
+      }).length;
+      if (countOfVisibleDecks == 0) {
+        return null;
+      }
+      return html5`<div class='sitemap-entry'>
+                        <h4>${author}</h4>
+                        <ul>
+                            ${listOfDecks.map((deck) => {
+        if (deck.hidden) {
+          return null;
+        }
+        let image_url = thumbnailify(`${window.location.origin}/s/${deck.author_slug}/${deck.slug}/${deck.image_url}`, 50);
+        return html5`<li>
+                                    <img src="${image_url}" alt="${deck.title}" />
+                                    <a href="${window.location.origin}/s/${deck.author_slug}/${deck.slug}" title="${deck.description}">${deck.title}</a>
+                                    <p>${deck.description}</p>
+                                </li>`;
+      })}
+                        </ul>
+                    </div>`;
+    })}
             </div>
-
-            <pre>
-                <code>
-                    ${JSON.stringify(index, null, 2)}
-                </code>
-            </pre>
 
         </div>
     </nav>`;
@@ -5563,22 +5594,20 @@ ${content}</tr>
   };
   var serverUrl = window.location.origin;
   var Data2 = initialize({ serverUrl });
-  var userSlug = null;
-  var contentSlug = null;
-  var path = window.location.pathname;
-  var hash = window.location.hash;
-  var pathParts = path.split("/");
+  if (!window.location.pathname.endsWith("/")) {
+    window.location = `${window.location.origin}${window.location.pathname}/${window.location.hash}`;
+  }
   async function main() {
     if (window.location.pathname == "/") {
-      let hash2 = window.location.hash;
-      await Data2.loadIndex({ userSlug: null, contentSlug: null, contentId: hash2 });
+      let hash = window.location.hash;
+      await Data2.loadIndex({ userSlug: null, contentSlug: null, contentId: hash });
     } else {
       let parts = window.location.pathname.split("/");
-      userSlug = parts[2];
-      contentSlug = parts[3];
-      let hash2 = window.location.hash;
-      console.warn(`loading index for s/${userSlug}/${contentSlug}#${hash2}`);
-      await Data2.loadIndex({ userSlug, contentSlug, contentId: hash2 });
+      let userSlug = parts[2];
+      let contentSlug = parts[3];
+      let hash = window.location.hash;
+      console.warn(`loading index for s/${userSlug}/${contentSlug}#${hash}`);
+      await Data2.loadIndex({ userSlug, contentSlug, contentId: hash });
     }
     let app = html6`<${App} data=${Data2} />`;
     B(app, document.getElementById("app"));

@@ -1,8 +1,9 @@
 name: Example
 author: Example
+hidden: false
 authorlink: https://example.com
 description: Whoa, look at all of these bees!
-image: bee.jpg
+image: assets/bee.jpg
 extra_header: |
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

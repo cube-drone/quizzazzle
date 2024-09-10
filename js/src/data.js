@@ -200,6 +200,12 @@ class RealServer{
         }
         return contents;
     }
+
+    async getSitemap(){
+        let response = await fetch(`${this.serverUrl}/sitemap`, {});
+        return await response.json();
+    }
+
 }
 
 class Data{
@@ -230,6 +236,10 @@ class Data{
 
         // while you're staring at the page, we keep loading content in the background
         setTimeout(this.ping.bind(this), 2000);
+
+        this.server.getSitemap().then(sitemap => {
+            this.sitemap = sitemap;
+        });
     }
 
     async _addItem({node}){
@@ -443,6 +453,10 @@ class Data{
 
     getPreviousContentId(){
         return this.index.contentIds[this.currentLocation - 1];
+    }
+
+    getSitemap(){
+        return this.sitemap;
     }
 
 }

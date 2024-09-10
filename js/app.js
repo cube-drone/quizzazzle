@@ -201,13 +201,9 @@ let Data = initialize({serverUrl});
 //   https://example.com/userSlug/contentSlug#contentId
 // so we can get the userSlug and contentSlug from the URL
 
-let userSlug = null;
-let contentSlug = null;
-let contentId = null;
-let path = window.location.pathname;
-let hash = window.location.hash;
-
-let pathParts = path.split('/');
+if(!window.location.pathname.endsWith('/')){
+    window.location = `${window.location.origin}${window.location.pathname}/${window.location.hash}`;
+}
 
 async function main(){
     if(window.location.pathname == "/"){
@@ -217,8 +213,8 @@ async function main(){
     else{
         // we're at /s/userSlug/contentSlug
         let parts = window.location.pathname.split('/');
-        userSlug = parts[2];
-        contentSlug = parts[3];
+        let userSlug = parts[2];
+        let contentSlug = parts[3];
         let hash = window.location.hash;
         console.warn(`loading index for s/${userSlug}/${contentSlug}#${hash}`);
         await Data.loadIndex({userSlug: userSlug, contentSlug: contentSlug, contentId: hash});
