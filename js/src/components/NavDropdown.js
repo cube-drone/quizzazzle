@@ -28,6 +28,12 @@ export default function NavDropdown({onMenu, navigateTo, data}){
         thumbnailImage = html`<img src="${thumbnailify(`${window.location.origin}${window.location.pathname}${index.thumbnailImageUrl}`, 100)}" alt="${index.name}" />`;
     }
 
+    let extraHardReload = (evt) => {
+        evt.preventDefault();
+        localStorage.clear();
+        window.location.reload(true);
+    }
+
     return html`<nav id="full-nav">
         <ul class="navbar">
             <li>
@@ -78,14 +84,23 @@ export default function NavDropdown({onMenu, navigateTo, data}){
                                 }
                                 let image_url = thumbnailify(`${window.location.origin}/s/${deck.author_slug}/${deck.slug}/${deck.image_url}`, 50);
                                 return html`<li>
-                                    <img src="${image_url}" alt="${deck.title}" />
-                                    <a href="${window.location.origin}/s/${deck.author_slug}/${deck.slug}" title="${deck.description}">${deck.title}</a>
+                                    <a href="${window.location.origin}/s/${deck.author_slug}/${deck.slug}" title="${deck.description}">
+                                        <img src="${image_url}" alt="${deck.title}" />
+
+                                        ${deck.title}
+                                    </a>
                                     <p>${deck.description}</p>
                                 </li>`;
                             })}
                         </ul>
                     </div>`;
                 })}
+            </div>
+            <hr/>
+
+            <div class="button-panel">
+                <a class="pushbutton red" onClick=${extraHardReload} href="#">Hard Reload</a>
+
             </div>
 
         </div>

@@ -78,9 +78,14 @@ class App extends Component {
             }
         }
 
+
         if(this.initialElement){
             console.warn("initial element is set: ", this.initialElement);
             this.moveTo({id: this.initialElement.replace("#", "")});
+            window.onload = () => {
+                console.warn("initial element is set: ", this.initialElement);
+                this.moveTo({id: this.initialElement.replace("#", "")});
+            }
         }
     }
 

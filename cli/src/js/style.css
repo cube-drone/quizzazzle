@@ -313,6 +313,21 @@ header.header-invisible {
 #full-nav .toc ul li {
   list-style-type: square;
 }
+#full-nav .toc ul li a {
+  display: block;
+  height: 25px;
+  padding: 10px;
+  border: 1px dotted #444;
+  border-radius: 5px;
+  margin: 5px;
+}
+#full-nav .toc ul li a:hover {
+  background-color: #444;
+}
+#full-nav .toc ul li a:active {
+  transform: scale(1.1);
+  transition: transform 100ms ease 0ms;
+}
 .sitemap-entry ul {
   margin-left: 0;
   padding-left: 0;
@@ -323,6 +338,7 @@ header.header-invisible {
   padding-left: 5px;
   border-left: 2px solid white;
   margin-left: 5px;
+  margin-bottom: 10px;
   font-size: small;
 }
 #full-nav .sitemap-entry img {
@@ -330,6 +346,20 @@ header.header-invisible {
   padding: 0;
   width: 50px;
   height: 50px;
+}
+#full-nav .sitemap-entry a:hover {
+  background-color: #444;
+}
+#full-nav .sitemap-entry a:active {
+  transform: scale(1.1);
+  transition: transform 100ms ease 0ms;
+}
+#full-nav .button-panel {
+  height: 100px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 20px;
+  background-color: #CCC;
 }
 
 /* css/form.css */

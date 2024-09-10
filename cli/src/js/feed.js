@@ -1015,14 +1015,12 @@
       }
       const response = await fetch(`${this.serverUrl}${indexId}/range/${startId}/${endId}`, {});
       let cards = await response.json();
-      console.dir(cards);
       return cards.map(this.cardTransform.bind(this));
     }
     async getContent({ indexId, contentId }) {
       console.warn(`getting: ${indexId} / ${contentId}`);
       const response = await fetch(`${this.serverUrl}${indexId}/content/${contentId}`, {});
       let card = await response.json();
-      console.dir(card);
       return this.cardTransform.bind(this)(card);
     }
     async getContents({ indexId, contentIds }) {
@@ -1049,21 +1047,30 @@
     */
     constructor({ server }) {
       this.server = server;
-      this.index = {};
+      this.index = null;
       this.indexId = null;
       this.fullyLoadedBakedPotato = false;
       this.content = {};
       this.currentLocation = 0;
       this.currentId = null;
       setTimeout(this.ping.bind(this), 2e3);
-      this.server.getSitemap().then((sitemap) => {
-        this.sitemap = sitemap;
-      });
+      let sitemap = localStorage.getItem("sitemap");
+      if (sitemap) {
+        console.log("loading sitemap from cache");
+        this.sitemap = JSON.parse(sitemap);
+      } else {
+        this.server.getSitemap().then((sitemap2) => {
+          this.sitemap = sitemap2;
+          localStorage.setItem("sitemap", JSON.stringify(sitemap2));
+        });
+      }
     }
     async _addItem({ node }) {
       this.content[node.id] = node;
     }
     async _addItems(nodes) {
+      console.log("adding items");
+      console.dir(nodes);
       for (let node of nodes.filter((node2) => node2 != null)) {
         this._addItem({ node });
       }
@@ -1089,25 +1096,39 @@
       assert(this.index.contentIds[0] == this.content[firstNodeId].id);
     }
     async _loadIndexFromBeginning({ indexId }) {
-      let [index, afterRange] = await Promise.all([
-        this.server.getIndex({ indexId }),
-        this.server.getRange({ indexId })
-      ]);
+      let index = this.index;
+      let flbp = localStorage.getItem(`${indexId}-flbp`);
+      if (flbp) {
+        this.content = JSON.parse(flbp);
+        console.log("fully loaded baked potato loaded from cache");
+        this.fullyLoadedBakedPotato = true;
+        return;
+      }
+      let afterRange = await this.server.getRange({ indexId });
       if (index == null) {
         throw new Error(`Index ${indexId} not found`);
       }
       this.index = index;
+      localStorage.setItem(indexId, JSON.stringify(index));
       this.fullyLoadedBakedPotato = false;
       this._addItems([...afterRange]);
       if (index.count < PAGE_SIZE) {
-        this.fullyLoadedBakedPotato = true;
+        console.log("index is small enough to load all at once");
+        this.bakePotato();
       } else {
         await this._loadEndCapItems();
       }
     }
     async _loadIndexFromMiddle({ indexId, contentId }) {
       contentId = contentId.replace("#", "");
-      let index = await this.server.getIndex({ indexId });
+      let flbp = localStorage.getItem(`${indexId}-flbp`);
+      if (flbp) {
+        console.log("fully loaded baked potato loaded from cache");
+        this.content = JSON.parse(flbp);
+        this.fullyLoadedBakedPotato = true;
+        return;
+      }
+      let index = this.index;
       let indexOfContent = index.contentIds.indexOf(contentId);
       let startOfPageIndex = Math.max(0, indexOfContent - PAGE_SIZE / 2);
       let startId = index.contentIds[startOfPageIndex];
@@ -1116,6 +1137,7 @@
         this.server.getRange({ indexId, startId: contentId })
       ]);
       this.index = index;
+      localStorage.setItem(indexId, JSON.stringify(index));
       this.fullyLoadedBakedPotato = false;
       this._addItems([...beforeRange, ...afterRange]);
       if (this.index.count < PAGE_SIZE / 2) {
@@ -1136,6 +1158,15 @@
       let indexId = await this.server.getIndexId({ userSlug, contentSlug });
       this.indexId = indexId;
       console.warn(`got index id ${indexId}`);
+      let index = localStorage.getItem(indexId);
+      if (index) {
+        console.warn(`loading index from cache`);
+        this.index = JSON.parse(index);
+      } else {
+        console.warn(`loading index from server`);
+        this.index = await this.server.getIndex({ indexId });
+        localStorage.setItem(indexId, JSON.stringify(this.index));
+      }
       if (contentId == null || contentId == "") {
         return this._loadIndexFromBeginning({ indexId });
       } else {
@@ -1143,7 +1174,10 @@
       }
     }
     async loadMoreContent({ user, indexId, contentId }) {
-      let index = await this.server.getIndex({ indexId });
+      if (this.fullyLoadedBakedPotato) {
+        return;
+      }
+      let index = this.index;
       let indexOfContent = index.contentIds.indexOf(contentId);
       let startOfPageIndex = Math.max(0, indexOfContent - PAGE_SIZE / 2);
       let startId = index.contentIds[startOfPageIndex];
@@ -1160,53 +1194,34 @@
     async getCurrentLocation() {
       return this.currentLocation ?? 0;
     }
-    async _findEmptyRange() {
-      if (this.index == null) {
-        return false;
-      }
-      if (this.fullyLoadedBakedPotato) {
-        return false;
-      }
-      let lookingAtBackward = this.currentLocation;
-      let lookingAtForward = this.currentLocation;
-      let counter = 0;
-      while (lookingAtBackward > 0 && lookingAtForward < this.index?.count) {
-        if (lookingAtForward < this.index?.count && this.content[lookingAtForward] == null) {
-          return {
-            startId: this.content[lookingAtForward - 1]?.id
-          };
-        }
-        if (lookingAtBackward > 0 && this.content[lookingAtBackward] == null) {
-          return {
-            endId: this.content[lookingAtBackward + 1]?.id
-          };
-        }
-        lookingAtForward++;
-        if (counter > 5) {
-          lookingAtBackward--;
-        } else {
-          counter++;
-        }
-      }
+    bakePotato() {
       this.fullyLoadedBakedPotato = true;
-      return false;
+      console.log("baking the potato");
+      localStorage.setItem(`${this.indexId}-flbp`, JSON.stringify(this.content));
     }
     async loadSomeNearbyContent() {
       if (this.fullyLoadedBakedPotato) {
         return;
       }
-      let range = await this._findEmptyRange();
-      if (!range) {
-        return;
+      for (let i3 = 0; i3 < this.index.contentIds.length; i3++) {
+        let id = this.index.contentIds[i3];
+        if (this.content[id] == null) {
+          console.log(`loading content ${id}`);
+          await this.loadMoreContent({ indexId: this.indexId, contentId: id });
+          return;
+        }
       }
-      let freshContent = await this.server.getRange({ indexId: this.indexId, ...range });
-      this._addItems(...freshContent);
+      console.log("there's no more content to load");
+      this.bakePotato();
     }
     async ping() {
       await this.loadSomeNearbyContent();
       setTimeout(this.ping.bind(this), 2e3);
     }
     getIndex() {
+      if (this.index == null) {
+        throw new Error("Index not loaded");
+      }
       return this.index;
     }
     async getContent({ id }) {
@@ -5265,6 +5280,11 @@ ${content}</tr>
     if (index.thumbnailImageUrl) {
       thumbnailImage = html5`<img src="${thumbnailify(`${window.location.origin}${window.location.pathname}${index.thumbnailImageUrl}`, 100)}" alt="${index.name}" />`;
     }
+    let extraHardReload = (evt) => {
+      evt.preventDefault();
+      localStorage.clear();
+      window.location.reload(true);
+    };
     return html5`<nav id="full-nav">
         <ul class="navbar">
             <li>
@@ -5315,14 +5335,23 @@ ${content}</tr>
         }
         let image_url = thumbnailify(`${window.location.origin}/s/${deck.author_slug}/${deck.slug}/${deck.image_url}`, 50);
         return html5`<li>
-                                    <img src="${image_url}" alt="${deck.title}" />
-                                    <a href="${window.location.origin}/s/${deck.author_slug}/${deck.slug}" title="${deck.description}">${deck.title}</a>
+                                    <a href="${window.location.origin}/s/${deck.author_slug}/${deck.slug}" title="${deck.description}">
+                                        <img src="${image_url}" alt="${deck.title}" />
+
+                                        ${deck.title}
+                                    </a>
                                     <p>${deck.description}</p>
                                 </li>`;
       })}
                         </ul>
                     </div>`;
     })}
+            </div>
+            <hr/>
+
+            <div class="button-panel">
+                <a class="pushbutton red" onClick=${extraHardReload} href="#">Hard Reload</a>
+
             </div>
 
         </div>
@@ -5390,6 +5419,10 @@ ${content}</tr>
       if (this.initialElement) {
         console.warn("initial element is set: ", this.initialElement);
         this.moveTo({ id: this.initialElement.replace("#", "") });
+        window.onload = () => {
+          console.warn("initial element is set: ", this.initialElement);
+          this.moveTo({ id: this.initialElement.replace("#", "") });
+        };
       }
     }
     goToTop() {

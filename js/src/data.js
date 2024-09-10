@@ -83,7 +83,6 @@ class RealServer{
         }
         const response = await fetch(`${this.serverUrl}${indexId}/range/${startId}/${endId}`, {});
         let cards = await response.json();
-        console.dir(cards);
         return cards.map(this.cardTransform.bind(this));
     }
 
@@ -91,7 +90,6 @@ class RealServer{
         console.warn(`getting: ${indexId} / ${contentId}`)
         const response = await fetch(`${this.serverUrl}${indexId}/content/${contentId}`, {});
         let card = await response.json();
-        console.dir(card);
         return this.cardTransform.bind(this)(card);
     }
 
@@ -122,7 +120,7 @@ class Data{
     */
     constructor({server}){
         this.server = server;
-        this.index = {};
+        this.index = null;
         this.indexId = null;
         // this.index.contentIds is a list of every ID of a node in the index
 
@@ -141,9 +139,19 @@ class Data{
         // while you're staring at the page, we keep loading content in the background
         setTimeout(this.ping.bind(this), 2000);
 
-        this.server.getSitemap().then(sitemap => {
-            this.sitemap = sitemap;
-        });
+        let sitemap = localStorage.getItem("sitemap");
+
+        if(sitemap){
+            console.log("loading sitemap from cache");
+            this.sitemap = JSON.parse(sitemap);
+        }
+        else{
+            this.server.getSitemap().then(sitemap => {
+                this.sitemap = sitemap;
+                localStorage.setItem("sitemap", JSON.stringify(sitemap));
+            });
+        }
+
     }
 
     async _addItem({node}){
@@ -151,7 +159,8 @@ class Data{
     }
 
     async _addItems(nodes){
-
+        console.log("adding items");
+        console.dir(nodes);
         for(let node of nodes.filter(node => node != null)){
             this._addItem({node});
         }
@@ -184,21 +193,33 @@ class Data{
     }
 
     async _loadIndexFromBeginning({indexId}){
-        let [index, afterRange] = await Promise.all([
-            this.server.getIndex({indexId}),
-            this.server.getRange({indexId}),
-        ]);
+
+        let index = this.index;
+
+        let flbp = localStorage.getItem(`${indexId}-flbp`);
+        if(flbp){
+            // we've already loaded the whole thing
+            this.content = JSON.parse(flbp);
+            console.log("fully loaded baked potato loaded from cache");
+            this.fullyLoadedBakedPotato = true;
+            return;
+        }
+
+        let afterRange = await this.server.getRange({indexId});
 
         if(index == null){
             throw new Error(`Index ${indexId} not found`);
         }
         this.index = index;
+        localStorage.setItem(indexId, JSON.stringify(index));
+
         this.fullyLoadedBakedPotato = false;
         this._addItems([...afterRange]);
 
         if(index.count < PAGE_SIZE){
             // if the index is small enough, we could absolutely have loaded the whole thing in one go
-            this.fullyLoadedBakedPotato = true;
+            console.log("index is small enough to load all at once");
+            this.bakePotato();
         }
         else{
             await this._loadEndCapItems();
@@ -207,8 +228,17 @@ class Data{
 
     async _loadIndexFromMiddle({indexId, contentId}){
         contentId = contentId.replace("#", "");
-        let index = await this.server.getIndex({indexId});
 
+        let flbp = localStorage.getItem(`${indexId}-flbp`);
+        if(flbp){
+            // we've already loaded the whole thing
+            console.log("fully loaded baked potato loaded from cache");
+            this.content = JSON.parse(flbp);
+            this.fullyLoadedBakedPotato = true;
+            return;
+        }
+
+        let index = this.index;
         let indexOfContent = index.contentIds.indexOf(contentId);
         let startOfPageIndex = Math.max(0, indexOfContent - PAGE_SIZE/2);
         let startId = index.contentIds[startOfPageIndex];
@@ -219,6 +249,8 @@ class Data{
         ]);
 
         this.index = index;
+        localStorage.setItem(indexId, JSON.stringify(index));
+
         this.fullyLoadedBakedPotato = false;
         this._addItems([...beforeRange, ...afterRange]);
 
@@ -245,9 +277,21 @@ class Data{
         // userSlug+contentSlug are a pair of strings that identify the index that we're looking at
         // so, for example, "cubes/testyboy" is an index that belongs to the user "cubes" and is called "testyboy"
         // the index describes the whole story, in order, it's like a table of contents
+
         let indexId = await this.server.getIndexId({userSlug, contentSlug});
         this.indexId = indexId;
         console.warn(`got index id ${indexId}`);
+
+        let index = localStorage.getItem(indexId);
+        if(index){
+            console.warn(`loading index from cache`);
+            this.index = JSON.parse(index);
+        }
+        else{
+            console.warn(`loading index from server`);
+            this.index = await this.server.getIndex({indexId});
+            localStorage.setItem(indexId, JSON.stringify(this.index));
+        }
 
         if(contentId == null || contentId == ""){
             return this._loadIndexFromBeginning({indexId});
@@ -259,11 +303,14 @@ class Data{
 
     async loadMoreContent({user, indexId, contentId}){
 
-        let index = await this.server.getIndex({indexId});
+        if(this.fullyLoadedBakedPotato){
+            return;
+        }
+
+        let index = this.index;
         let indexOfContent = index.contentIds.indexOf(contentId);
         let startOfPageIndex = Math.max(0, indexOfContent - PAGE_SIZE/2);
         let startId = index.contentIds[startOfPageIndex];
-
 
         let [beforeRange, afterRange] = await Promise.all([
             this.server.getRange({user, indexId, startId, endId: contentId}),
@@ -284,45 +331,10 @@ class Data{
         return this.currentLocation ?? 0;
     }
 
-    async _findEmptyRange(){
-        // find a range of content that we don't have
-
-        if(this.index == null){
-            return false;
-        }
-        if(this.fullyLoadedBakedPotato){
-            return false;
-        }
-
-        // starting from "currentLocation" find the closest content that we don't have loaded yet
-        let lookingAtBackward = this.currentLocation;
-        let lookingAtForward = this.currentLocation;
-        let counter = 0;
-
-        while(lookingAtBackward > 0 && lookingAtForward < this.index?.count){
-            if(lookingAtForward < this.index?.count && this.content[lookingAtForward] == null){
-                return {
-                    startId: this.content[lookingAtForward - 1]?.id,
-                }
-            }
-            if(lookingAtBackward > 0 && this.content[lookingAtBackward] == null){
-                return {
-                    endId: this.content[lookingAtBackward + 1]?.id,
-                }
-            }
-
-            lookingAtForward++;
-            // implement a gentle bias towards looking forward in a very stupid way
-            if(counter > 5){
-                lookingAtBackward--;
-            }
-            else{
-                counter++;
-            }
-        }
-        // it's safe to assume at this point that we've loaded literally all of the content
+    bakePotato(){
         this.fullyLoadedBakedPotato = true;
-        return false;
+        console.log("baking the potato");
+        localStorage.setItem(`${this.indexId}-flbp`, JSON.stringify(this.content));
     }
 
     async loadSomeNearbyContent(){
@@ -331,13 +343,19 @@ class Data{
             return;
         }
 
-        let range = await this._findEmptyRange();
-        if(!range){
-            return;
+        for(let i = 0; i < this.index.contentIds.length; i++){
+            let id = this.index.contentIds[i];
+            if(this.content[id] == null){
+                // we haven't loaded this content yet!
+                console.log(`loading content ${id}`);
+                await this.loadMoreContent({indexId: this.indexId, contentId: id});
+                return;
+            }
         }
 
-        let freshContent = await this.server.getRange({indexId: this.indexId, ...range});
-        this._addItems(...freshContent);
+        // if we've gotten here, we've loaded all of the content
+        console.log("there's no more content to load");
+        this.bakePotato();
     }
 
     async ping(){
@@ -346,6 +364,9 @@ class Data{
     }
 
     getIndex(){
+        if(this.index == null){
+            throw new Error("Index not loaded");
+        }
         return this.index;
     }
 
