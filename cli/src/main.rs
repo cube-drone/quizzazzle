@@ -140,6 +140,10 @@ fn index_template(directory: MinistryDirectory, config: &State<Config>) -> Resul
         Some(description) => description,
         None => "".to_string(),
     };
+    let favicon = match deck_metadata.favicon {
+        Some(favicon_url) => favicon_url,
+        None => "/assets/favicon.png".to_string(),
+    };
     let server_url = config.server_url.as_str();
     let url = format!("{}/{}/{}", server_url, deck_metadata.author_slug, deck_metadata.slug);
     let image = match deck_metadata.image_url {
@@ -156,6 +160,7 @@ fn index_template(directory: MinistryDirectory, config: &State<Config>) -> Resul
     <!DOCTYPE html>
     <html>
         <head>
+            <link rel="icon" type="image/png" href="{}" sizes="any"/>
             <meta charset="UTF-8">
             <title>{}</title>
             <meta name="viewport" content="width=device-width">
@@ -167,7 +172,6 @@ fn index_template(directory: MinistryDirectory, config: &State<Config>) -> Resul
             <meta property="og:locale" content="{}" />
             <meta property="og:image" content="{}" />
             <link rel="stylesheet" href="/js/style.css">
-            <link rel="icon" type="image/png" href="assets/favicon.png" sizes="any"/>
             {}
         </head>
         <body>
@@ -175,7 +179,7 @@ fn index_template(directory: MinistryDirectory, config: &State<Config>) -> Resul
             <script src="/js/feed.js"></script>
         </body>
     </html>
-    "#), title, title, description, author, url, site_name, locale, image, extra_header));
+    "#), favicon, title, title, description, author, url, site_name, locale, image, extra_header));
 }
 
 fn error_template(message: &str) -> String {
