@@ -225,6 +225,7 @@ if(!window.location.pathname.endsWith('/')){
 }
 
 async function main(){
+
     if(window.location.pathname == "/"){
         let hash = window.location.hash;
         await Data.loadIndex({userSlug: null, contentSlug: null, contentId: hash});

@@ -98,10 +98,12 @@ export default function NavDropdown({onMenu, navigateTo, data}){
             </div>
             <hr/>
 
+            <!--
             <div class="button-panel">
                 <a class="pushbutton red" onClick=${extraHardReload} href="#">Hard Reload</a>
 
             </div>
+            -->
 
         </div>
     </nav>`;

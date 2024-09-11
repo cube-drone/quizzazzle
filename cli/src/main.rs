@@ -23,7 +23,6 @@ mod file_modifiers;
 
 const APP_JS: &str = include_str!("js/feed.js");
 const APP_CSS: &str = include_str!("js/style.css");
-//const APP_FAVICON: &str = include_str!("../../target/logo.svg");
 
 ///
 /// Initialize a new deck in the current directory
@@ -53,7 +52,7 @@ fn new(flags: Flags){
     std::fs::create_dir_all(directory_root.clone()).expect("Failed to create directory.");
 
     let directory = ministry_directory::MinistryDirectory::new(directory_root.to_str().unwrap_or_else(|| ".").to_string());
-    directory.init(flags.force).expect("Failed to initialize directory.");
+    directory.init_with_name(flags.force, title, author).expect("Failed to initialize directory.");
 }
 
 fn status(_flags: Flags){
@@ -99,6 +98,7 @@ impl Flags{
 
 #[derive(Clone)]
 pub struct Config{
+    dev: bool,
     server_url: Url,
     site_name: String,
     default_locale: String,
@@ -110,11 +110,13 @@ pub struct Config{
 
 impl Config{
     fn from_env() -> Config{
+        let dev = std::env::var("ROCKET_ENV").unwrap_or("production".to_string()) == "development";
         let server_url = std::env::var("ROCKET_SERVER_URL").unwrap_or("http://localhost:8000".to_string());
         let site_name = std::env::var("ROCKET_SITE_NAME").unwrap_or("Ministry".to_string());
         let default_locale = std::env::var("ROCKET_DEFAULT_LOCALE").unwrap_or("en_US".to_string());
         let temporary_asset_directory = std::env::var("ROCKET_TEMPORARY_ASSET_DIRECTORY").unwrap_or("./temp_assets".to_string());
         Config{
+            dev,
             server_url: Url::parse(&server_url).unwrap(),
             site_name,
             default_locale,
@@ -165,7 +167,7 @@ fn index_template(directory: MinistryDirectory, config: &State<Config>) -> Resul
             <meta property="og:locale" content="{}" />
             <meta property="og:image" content="{}" />
             <link rel="stylesheet" href="/js/style.css">
-            <link rel="icon" type="image/svg+xml" href="/favicon.svg" sizes="any"/>
+            <link rel="icon" type="image/png" href="assets/favicon.png" sizes="any"/>
             {}
         </head>
         <body>

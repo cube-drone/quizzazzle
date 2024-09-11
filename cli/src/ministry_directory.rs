@@ -92,6 +92,9 @@ pub struct MinistryDirectory{
     directory_root: String,
 }
 
+// the default content.yml file
+const CONTENT_YML: &str = include_str!("content.yml");
+
 impl MinistryDirectory{
     pub fn new(directory_root: String) -> MinistryDirectory{
         MinistryDirectory{
@@ -116,11 +119,57 @@ impl MinistryDirectory{
     fn create(&self) -> Result<()>{
         println!("Creating a new deck...");
 
-        // the default content.yml file
-        let content_yml: &str = include_str!("content.yml");
         // write content_yml to the directory root
         let content_path = PathBuf::from(&self.directory_root).join("content.yml");
         println!("✅ {}", content_path.to_str().unwrap_or_else(|| ""));
+        std::fs::write(content_path, CONTENT_YML)?;
+
+        // create the assets directory
+        let assets_path = PathBuf::from(&self.directory_root).join("assets");
+        println!("✅ {}", assets_path.to_str().unwrap_or_else(|| ""));
+        if Path::new(&assets_path).exists(){
+        }
+        else{
+            std::fs::create_dir(assets_path)?;
+        }
+
+        // the default bee.jpg file
+        let content_bee = include_bytes!("bee.jpg");
+        let bee_path = PathBuf::from(&self.directory_root).join("assets/bee.jpg");
+        println!("✅ {}", bee_path.to_str().unwrap_or_else(|| ""));
+        std::fs::write(bee_path, content_bee)?;
+
+        // the default favicon.png
+        let content_favicon = include_bytes!("favicon.png");
+        let favicon_path = PathBuf::from(&self.directory_root).join("assets/favicon.png");
+        println!("✅ {}", favicon_path.to_str().unwrap_or_else(|| ""));
+        std::fs::write(favicon_path, content_favicon)?;
+
+        Ok(())
+    }
+
+    pub fn init_with_name(&self, force: bool, name: String, author: String) -> Result<()>{
+        if self.exists() {
+            println!("This directory already contains a deck!");
+            if force {
+                println!("Forcing re-initialization...");
+                return self.create_with_name(name, author);
+            }
+            return Ok(());
+        }
+        else{
+            return self.create_with_name(name, author);
+        }
+    }
+
+    fn create_with_name(&self, name: String, author: String) -> Result<()>{
+        println!("Creating a new deck...");
+
+        // write content_yml to the directory root
+        let content_path = PathBuf::from(&self.directory_root).join("content.yml");
+        println!("✅ {}", content_path.to_str().unwrap_or_else(|| ""));
+        let content_yml = CONTENT_YML.replace("NAMENAMENAME", &name).replace("AUTHORAUTHORAUTHOR", &author);
+        println!("{}", content_yml);
         std::fs::write(content_path, content_yml)?;
 
         // create the assets directory
@@ -134,10 +183,15 @@ impl MinistryDirectory{
 
         // the default bee.jpg file
         let content_bee = include_bytes!("bee.jpg");
-        // write content_yml to the directory root
         let bee_path = PathBuf::from(&self.directory_root).join("assets/bee.jpg");
         println!("✅ {}", bee_path.to_str().unwrap_or_else(|| ""));
         std::fs::write(bee_path, content_bee)?;
+
+        // the default favicon.png
+        let content_favicon = include_bytes!("favicon.png");
+        let favicon_path = PathBuf::from(&self.directory_root).join("assets/favicon.png");
+        println!("✅ {}", favicon_path.to_str().unwrap_or_else(|| ""));
+        std::fs::write(favicon_path, content_favicon)?;
 
         Ok(())
     }

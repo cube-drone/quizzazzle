@@ -1054,14 +1054,13 @@
       this.currentLocation = 0;
       this.currentId = null;
       setTimeout(this.ping.bind(this), 2e3);
-      let sitemap = localStorage.getItem("sitemap");
+      let sitemap;
       if (sitemap) {
         console.log("loading sitemap from cache");
         this.sitemap = JSON.parse(sitemap);
       } else {
         this.server.getSitemap().then((sitemap2) => {
           this.sitemap = sitemap2;
-          localStorage.setItem("sitemap", JSON.stringify(sitemap2));
         });
       }
     }
@@ -1097,7 +1096,7 @@
     }
     async _loadIndexFromBeginning({ indexId }) {
       let index = this.index;
-      let flbp = localStorage.getItem(`${indexId}-flbp`);
+      let flbp = null;
       if (flbp) {
         this.content = JSON.parse(flbp);
         console.log("fully loaded baked potato loaded from cache");
@@ -1109,7 +1108,6 @@
         throw new Error(`Index ${indexId} not found`);
       }
       this.index = index;
-      localStorage.setItem(indexId, JSON.stringify(index));
       this.fullyLoadedBakedPotato = false;
       this._addItems([...afterRange]);
       if (index.count < PAGE_SIZE) {
@@ -1121,7 +1119,7 @@
     }
     async _loadIndexFromMiddle({ indexId, contentId }) {
       contentId = contentId.replace("#", "");
-      let flbp = localStorage.getItem(`${indexId}-flbp`);
+      let flbp = null;
       if (flbp) {
         console.log("fully loaded baked potato loaded from cache");
         this.content = JSON.parse(flbp);
@@ -1137,7 +1135,6 @@
         this.server.getRange({ indexId, startId: contentId })
       ]);
       this.index = index;
-      localStorage.setItem(indexId, JSON.stringify(index));
       this.fullyLoadedBakedPotato = false;
       this._addItems([...beforeRange, ...afterRange]);
       if (this.index.count < PAGE_SIZE / 2) {
@@ -1158,14 +1155,13 @@
       let indexId = await this.server.getIndexId({ userSlug, contentSlug });
       this.indexId = indexId;
       console.warn(`got index id ${indexId}`);
-      let index = localStorage.getItem(indexId);
+      let index;
       if (index) {
         console.warn(`loading index from cache`);
         this.index = JSON.parse(index);
       } else {
         console.warn(`loading index from server`);
         this.index = await this.server.getIndex({ indexId });
-        localStorage.setItem(indexId, JSON.stringify(this.index));
       }
       if (contentId == null || contentId == "") {
         return this._loadIndexFromBeginning({ indexId });
@@ -1197,7 +1193,6 @@
     bakePotato() {
       this.fullyLoadedBakedPotato = true;
       console.log("baking the potato");
-      localStorage.setItem(`${this.indexId}-flbp`, JSON.stringify(this.content));
     }
     async loadSomeNearbyContent() {
       if (this.fullyLoadedBakedPotato) {
@@ -5349,10 +5344,12 @@ ${content}</tr>
             </div>
             <hr/>
 
+            <!--
             <div class="button-panel">
                 <a class="pushbutton red" onClick=${extraHardReload} href="#">Hard Reload</a>
 
             </div>
+            -->
 
         </div>
     </nav>`;
