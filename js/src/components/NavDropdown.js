@@ -54,9 +54,9 @@ export default function NavDropdown({onMenu, navigateTo, data}){
                 ${thumbnailImage}
                 <p class="author">${authorText}</p>
                 <p class="description">${index.description}</p>
+                <div style="clear:both;"></div>
             </div>
 
-            <div style="clear:both;"></div>
 
             <div class="toc">
                 <h3>Table of Contents</h3>
