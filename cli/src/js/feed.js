@@ -4632,11 +4632,15 @@ ${content}</tr>
   var html = htm_module_default.bind(y);
   function AnyCard({ card, cardType, stackIndex, primary, visible, children }) {
     let easing = card.easing ?? "easeInOutQuad";
+    let duration = card.duration ?? 500;
     if (card.fadeIn) {
       p2(() => {
         if (primary) {
           let el = this.base;
-          anime_es_default({ targets: el, opacity: [0, 1], duration: 500, delay: card.delay ?? card.fadeIn ?? 0, easing });
+          anime_es_default({ targets: el, opacity: [0, 1], duration, delay: card.delay ?? card.fadeIn ?? 0, easing });
+        } else {
+          let el = this.base;
+          anime_es_default({ targets: el, opacity: [1, 0], duration, delay: 0, easing });
         }
       }, [primary]);
     }
@@ -4644,15 +4648,15 @@ ${content}</tr>
       p2(() => {
         if (primary) {
           let el = this.base;
-          let duration = card.shake ?? card.duration ?? 500;
+          let duration2 = card.shake ?? card.duration ?? 500;
           let amount = card.amount ?? 5;
           let translateX = [];
           translateX.push(0);
-          for (let i3 = 0; i3 < duration / 100; i3++) {
+          for (let i3 = 0; i3 < duration2 / 100; i3++) {
             translateX.push(i3 % 2 === 0 ? amount : -amount);
           }
           translateX.push(0);
-          anime_es_default({ targets: el, translateX, duration, delay: card.delay ?? 0, easing, loop: card.loop });
+          anime_es_default({ targets: el, translateX, duration: duration2, delay: card.delay ?? 0, easing, loop: card.loop });
         }
       }, [primary]);
     }
