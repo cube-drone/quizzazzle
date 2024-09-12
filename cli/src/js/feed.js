@@ -4656,7 +4656,7 @@ ${content}</tr>
         }
       }, [primary]);
     }
-    let z3 = stackIndex != null ? `z-index:${stackIndex};color:pink;` : "";
+    let z3 = stackIndex != null ? `z-index:${stackIndex};` : "";
     return html`<div style=${z3} class="card ${cardType}-card any-card ${stackIndex ? "stacked" : ""} ${card.extraClass.join(" ")}">
         ${children}
     </div>`;
