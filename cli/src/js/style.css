@@ -294,8 +294,8 @@ header.header-invisible {
   overflow-y: scroll;
 }
 #full-nav .nav-dropdown img {
-  width: 100px;
-  height: 100px;
+  width: 80px;
+  height: 80px;
   float: left;
   margin: 10px;
 }
@@ -305,6 +305,22 @@ header.header-invisible {
 #full-nav pre {
   font-size: x-small;
   color: #555;
+}
+#full-nav .the-current-presentation {
+  border: 1px solid white;
+  padding: 5px 10px;
+  margin: 10px 5px;
+}
+#full-nav .the-current-presentation h2 {
+  margin: 0;
+  padding: 0;
+}
+#full-nav .the-current-presentation img {
+  margin-left: 0;
+}
+#full-nav .the-current-presentation p {
+  margin-top: 10px;
+  font-size: small;
 }
 #full-nav .toc ul {
   margin-left: 0;
@@ -360,6 +376,9 @@ header.header-invisible {
   box-sizing: border-box;
   padding: 20px;
   background-color: #CCC;
+}
+#full-nav .credits {
+  font-size: x-small;
 }
 
 /* css/form.css */

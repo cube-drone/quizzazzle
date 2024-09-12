@@ -1,8 +1,10 @@
 name: Example
 author: Example
 hidden: false
-authorlink: https://example.com
-description: Whoa, look at all of these bees!
+author_link: https://example.com
+description: |
+  Whoa, look at all of these bees!
+  There sure are a lot of them! Great big **giant** bees! HUGE BEES! As far as the eye can sees!
 image: assets/bee.jpg
 extra_header: |
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,6 +28,11 @@ extra_header: |
       margin-top: 300px;
       border-radius: 2px;
     }
+    .primary-card {
+        background: linear-gradient(221deg, #6171e8, #4250b8, #ad935a);
+        background-size: 300% 300%;
+    }
+
   </style>
 pages:
   - title: A Presentation about Bees

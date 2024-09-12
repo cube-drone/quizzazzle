@@ -5280,6 +5280,10 @@ ${content}</tr>
       localStorage.clear();
       window.location.reload(true);
     };
+    let authorText = index.author;
+    if (index.authorLink) {
+      authorText = html5`<a href="${index.authorLink}">${index.author}</a>`;
+    }
     return html5`<nav id="full-nav">
         <ul class="navbar">
             <li>
@@ -5289,11 +5293,16 @@ ${content}</tr>
             </li>
         </ul>
         <div class="nav-dropdown">
-            <h2>${index.name}</h2>
-            ${thumbnailImage}
-            <p class="author">${index.author}</p>
-            <p>${index.description}</p>
+
+            <div class="the-current-presentation">
+                <h2>${index.name}</h2>
+                ${thumbnailImage}
+                <p class="author">${authorText}</p>
+                <p class="description">${index.description}</p>
+            </div>
+
             <div style="clear:both;"></div>
+
             <div class="toc">
                 <h3>Table of Contents</h3>
                 <ul>
@@ -5343,6 +5352,15 @@ ${content}</tr>
     })}
             </div>
             <hr/>
+
+            <div class="credits">
+                <p>
+                    <a href="https://github.com/cube-drone/ministry/">CardChapter</a> is a lightweight,
+                        open-source, web-based card presentation system
+                        by <a href="https://cube-drone.com">cube drone</a>.
+                </p>
+
+            </div>
 
             <!--
             <div class="button-panel">
