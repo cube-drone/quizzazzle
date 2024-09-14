@@ -20,9 +20,11 @@ class RealServer{
     }
 
     indexTransform(serverIndex){
+        console.dir(serverIndex);
         let appIndex = {
             id: serverIndex.id,
-            userSlug: serverIndex.metadata.authorSlug,
+            userSlug: serverIndex.metadata.author_slug,
+            authorSlug: serverIndex.metadata.author_slug,
             contentSlug: serverIndex.metadata.slug,
             author: serverIndex.metadata.author,
             authorLink: serverIndex.metadata.author_link,
@@ -32,9 +34,10 @@ class RealServer{
             locale: serverIndex.metadata.locale,
             contentIds: serverIndex.deck_ids || [],
             toc: serverIndex.toc || [],
-            created_at: serverIndex.metadata.created_at || new Date(),
-            updated_at: serverIndex.metadata.updated_at || new Date(),
+            updatedAt: new Date(serverIndex?.metadata?.last_update_time?.secs_since_epoch * 1000),
+            updatedAtTimestamp: serverIndex?.metadata?.last_update_time?.secs_since_epoch,
         }
+        console.dir(appIndex);
         return appIndex;
     }
 
@@ -58,8 +61,6 @@ class RealServer{
             loop: card.is_loop,
             videoControls: card.video_controls,
             content: card.content,
-            created_at: card.created_at || new Date(),
-            updated_at: card.updated_at || new Date(),
             pngs: card.pngs,
             extraClass: card.extra_class,
             pngsFps: card.pngs_fps,
@@ -139,7 +140,6 @@ class Data{
         // while you're staring at the page, we keep loading content in the background
         setTimeout(this.ping.bind(this), 2000);
 
-        //let sitemap = localStorage.getItem("sitemap");
         let sitemap;
 
         if(sitemap){
@@ -149,7 +149,6 @@ class Data{
         else{
             this.server.getSitemap().then(sitemap => {
                 this.sitemap = sitemap;
-                //localStorage.setItem("sitemap", JSON.stringify(sitemap));
             });
         }
 
@@ -197,8 +196,7 @@ class Data{
 
         let index = this.index;
 
-        //let flbp = localStorage.getItem(`${indexId}-flbp`);
-        let flbp = null;
+        let flbp = localStorage.getItem(`${indexId}-flbp`);
         if(flbp){
             // we've already loaded the whole thing
             this.content = JSON.parse(flbp);
@@ -213,7 +211,6 @@ class Data{
             throw new Error(`Index ${indexId} not found`);
         }
         this.index = index;
-        //localStorage.setItem(indexId, JSON.stringify(index));
 
         this.fullyLoadedBakedPotato = false;
         this._addItems([...afterRange]);
@@ -231,8 +228,7 @@ class Data{
     async _loadIndexFromMiddle({indexId, contentId}){
         contentId = contentId.replace("#", "");
 
-        //let flbp = localStorage.getItem(`${indexId}-flbp`);
-        let flbp = null;
+        let flbp = localStorage.getItem(`${indexId}-flbp`);
         if(flbp){
             // we've already loaded the whole thing
             console.log("fully loaded baked potato loaded from cache");
@@ -250,9 +246,6 @@ class Data{
             this.server.getRange({indexId, startId, endId: contentId}),
             this.server.getRange({indexId, startId: contentId}),
         ]);
-
-        this.index = index;
-        //localStorage.setItem(indexId, JSON.stringify(index));
 
         this.fullyLoadedBakedPotato = false;
         this._addItems([...beforeRange, ...afterRange]);
@@ -285,16 +278,20 @@ class Data{
         this.indexId = indexId;
         console.warn(`got index id ${indexId}`);
 
-        //let index = localStorage.getItem(indexId);
-        let index;
-        if(index){
-            console.warn(`loading index from cache`);
-            this.index = JSON.parse(index);
+        console.warn(`loading index from server`);
+        this.index = await this.server.getIndex({indexId});
+        let cachedIndex = localStorage.getItem(`${indexId}-index`);
+        if( cachedIndex ){
+            cachedIndex = JSON.parse(cachedIndex);
+        }
+        if(!cachedIndex || cachedIndex.updatedAtTimestamp != this.index.updatedAtTimestamp){
+            console.warn(`cachedIndex: ${cachedIndex?.updatedAtTimestamp} != ${this.index?.updatedAtTimestamp}`);
+            console.warn("index is out of date or missing");
+            localStorage.clear();
+            localStorage.setItem(`${indexId}-index`, JSON.stringify(this.index));
         }
         else{
-            console.warn(`loading index from server`);
-            this.index = await this.server.getIndex({indexId});
-            //localStorage.setItem(indexId, JSON.stringify(this.index));
+            console.warn("index is up to date, loading from cache");
         }
 
         if(contentId == null || contentId == ""){
@@ -338,7 +335,7 @@ class Data{
     bakePotato(){
         this.fullyLoadedBakedPotato = true;
         console.log("baking the potato");
-        //localStorage.setItem(`${this.indexId}-flbp`, JSON.stringify(this.content));
+        localStorage.setItem(`${this.indexId}-flbp`, JSON.stringify(this.content));
     }
 
     async loadSomeNearbyContent(){

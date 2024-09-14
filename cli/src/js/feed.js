@@ -956,9 +956,11 @@
       return `/s/${userSlug}/${contentSlug}`;
     }
     indexTransform(serverIndex) {
+      console.dir(serverIndex);
       let appIndex = {
         id: serverIndex.id,
-        userSlug: serverIndex.metadata.authorSlug,
+        userSlug: serverIndex.metadata.author_slug,
+        authorSlug: serverIndex.metadata.author_slug,
         contentSlug: serverIndex.metadata.slug,
         author: serverIndex.metadata.author,
         authorLink: serverIndex.metadata.author_link,
@@ -968,9 +970,10 @@
         locale: serverIndex.metadata.locale,
         contentIds: serverIndex.deck_ids || [],
         toc: serverIndex.toc || [],
-        created_at: serverIndex.metadata.created_at || /* @__PURE__ */ new Date(),
-        updated_at: serverIndex.metadata.updated_at || /* @__PURE__ */ new Date()
+        updatedAt: new Date(serverIndex?.metadata?.last_update_time?.secs_since_epoch * 1e3),
+        updatedAtTimestamp: serverIndex?.metadata?.last_update_time?.secs_since_epoch
       };
+      console.dir(appIndex);
       return appIndex;
     }
     async getIndex({ indexId }) {
@@ -991,8 +994,6 @@
         loop: card.is_loop,
         videoControls: card.video_controls,
         content: card.content,
-        created_at: card.created_at || /* @__PURE__ */ new Date(),
-        updated_at: card.updated_at || /* @__PURE__ */ new Date(),
         pngs: card.pngs,
         extraClass: card.extra_class,
         pngsFps: card.pngs_fps,
@@ -1096,7 +1097,7 @@
     }
     async _loadIndexFromBeginning({ indexId }) {
       let index = this.index;
-      let flbp = null;
+      let flbp = localStorage.getItem(`${indexId}-flbp`);
       if (flbp) {
         this.content = JSON.parse(flbp);
         console.log("fully loaded baked potato loaded from cache");
@@ -1119,7 +1120,7 @@
     }
     async _loadIndexFromMiddle({ indexId, contentId }) {
       contentId = contentId.replace("#", "");
-      let flbp = null;
+      let flbp = localStorage.getItem(`${indexId}-flbp`);
       if (flbp) {
         console.log("fully loaded baked potato loaded from cache");
         this.content = JSON.parse(flbp);
@@ -1134,7 +1135,6 @@
         this.server.getRange({ indexId, startId, endId: contentId }),
         this.server.getRange({ indexId, startId: contentId })
       ]);
-      this.index = index;
       this.fullyLoadedBakedPotato = false;
       this._addItems([...beforeRange, ...afterRange]);
       if (this.index.count < PAGE_SIZE / 2) {
@@ -1155,13 +1155,19 @@
       let indexId = await this.server.getIndexId({ userSlug, contentSlug });
       this.indexId = indexId;
       console.warn(`got index id ${indexId}`);
-      let index;
-      if (index) {
-        console.warn(`loading index from cache`);
-        this.index = JSON.parse(index);
+      console.warn(`loading index from server`);
+      this.index = await this.server.getIndex({ indexId });
+      let cachedIndex = localStorage.getItem(`${indexId}-index`);
+      if (cachedIndex) {
+        cachedIndex = JSON.parse(cachedIndex);
+      }
+      if (!cachedIndex || cachedIndex.updatedAtTimestamp != this.index.updatedAtTimestamp) {
+        console.warn(`cachedIndex: ${cachedIndex?.updatedAtTimestamp} != ${this.index?.updatedAtTimestamp}`);
+        console.warn("index is out of date or missing");
+        localStorage.clear();
+        localStorage.setItem(`${indexId}-index`, JSON.stringify(this.index));
       } else {
-        console.warn(`loading index from server`);
-        this.index = await this.server.getIndex({ indexId });
+        console.warn("index is up to date, loading from cache");
       }
       if (contentId == null || contentId == "") {
         return this._loadIndexFromBeginning({ indexId });
@@ -1193,6 +1199,7 @@
     bakePotato() {
       this.fullyLoadedBakedPotato = true;
       console.log("baking the potato");
+      localStorage.setItem(`${this.indexId}-flbp`, JSON.stringify(this.content));
     }
     async loadSomeNearbyContent() {
       if (this.fullyLoadedBakedPotato) {
@@ -5288,6 +5295,7 @@ ${content}</tr>
     if (index.authorLink) {
       authorText = html5`<a href="${index.authorLink}">${index.author}</a>`;
     }
+    let updatedDate = index.updatedAt.toLocaleString();
     return html5`<nav id="full-nav">
         <ul class="navbar">
             <li>
@@ -5299,6 +5307,7 @@ ${content}</tr>
         <div class="nav-dropdown">
 
             <div class="the-current-presentation">
+                <p class="last-updated">${updatedDate}</p>
                 <h2>${index.name}</h2>
                 ${thumbnailImage}
                 <p class="author">${authorText}</p>

@@ -175,7 +175,25 @@ fn index_template(directory: MinistryDirectory, config: &State<Config>) -> Resul
             {}
         </head>
         <body>
-            <div id="app"/>
+            <div id="app">
+
+                <div class="primary-card">
+                    <div class="content">
+                        <header id="primary-header">
+                        </header>
+                    </header>
+                <div class="everything-feed">
+                    <div class="frames">
+                        <div class="loader-wrapper">
+                            <div class="loader">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>`
+
+            </div>
             <script src="/js/feed.js"></script>
         </body>
     </html>

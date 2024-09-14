@@ -39,6 +39,8 @@ export default function NavDropdown({onMenu, navigateTo, data}){
         authorText = html`<a href="${index.authorLink}">${index.author}</a>`;
     }
 
+    let updatedDate = index.updatedAt.toLocaleString();
+
     return html`<nav id="full-nav">
         <ul class="navbar">
             <li>
@@ -50,6 +52,7 @@ export default function NavDropdown({onMenu, navigateTo, data}){
         <div class="nav-dropdown">
 
             <div class="the-current-presentation">
+                <p class="last-updated">${updatedDate}</p>
                 <h2>${index.name}</h2>
                 ${thumbnailImage}
                 <p class="author">${authorText}</p>
