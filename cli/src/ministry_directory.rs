@@ -21,6 +21,7 @@ pub struct DeckMetadata{
     pub locale: Option<String>,
     pub extra_header: Option<String>,
     pub hidden: bool,
+    pub last_update_time: std::time::SystemTime,
 }
 
 impl DeckMetadata{
@@ -273,6 +274,8 @@ impl MinistryDirectory{
             return Err(anyhow!("Directory root does not match slug - please move the directory to the correct location: {}", author_slug));
         }
 
+        let last_update_time = self.get_last_update_time()?;
+
         let dm = DeckMetadata{
             title: name_or_title.to_string(),
             slug,
@@ -285,8 +288,16 @@ impl MinistryDirectory{
             locale: doc["locale"].as_str().map(|s| s.to_string()),
             extra_header: doc["extra_header"].as_str().map(|s| s.to_string()),
             hidden: doc["hidden"].as_bool().unwrap_or(false),
+            last_update_time
         };
         Ok(dm)
+    }
+
+    fn get_last_update_time(&self) -> Result<std::time::SystemTime>{
+        let content_path = PathBuf::from(&self.directory_root).join("content.yml");
+        let metadata = std::fs::metadata(content_path)?;
+        let modified = metadata.modified()?;
+        Ok(modified)
     }
 
     fn parse_card(&self, doc: &yaml_rust2::Yaml, default_id: String) -> Card{
@@ -303,6 +314,15 @@ impl MinistryDirectory{
             else if doc["video"].as_str().is_some(){
                 card_type = "video".to_string();
             }
+            else if doc["pngs"].as_str().is_some(){
+                card_type = "pngs".to_string();
+            }
+            else if doc["stack"].as_vec().is_some(){
+                card_type = "stack".to_string();
+            }
+            else if doc["pages"].as_vec().is_some(){
+                card_type = "stack".to_string();
+            }
             else{
                 // this is our defaultiest default
                 card_type = "title".to_string();
@@ -313,8 +333,19 @@ impl MinistryDirectory{
         if card_type == "stack"{
 
             // the card has multiple cards in it
+            let mut counter = 0;
             doc["pages"].as_vec().map(|list| {
-                let mut counter = 0;
+                for item in list
+                {
+                    let counter_string = counter.to_string();
+                    let id = format!("{}-{}", id, counter_string);
+                    stack.push(
+                        self.parse_card(&item, id)
+                    );
+                    counter += 1;
+                }
+            });
+            doc["stack"].as_vec().map(|list| {
                 for item in list
                 {
                     let counter_string = counter.to_string();
@@ -424,8 +455,23 @@ impl MinistryDirectory{
 
             let lossless = filename.ends_with(".png");
 
+            let mut regenerate = false;
+            if Path::new(&webp_path).exists(){
+                // check if the file has been modified since the last conversion
+                let webp_modified = std::fs::metadata(&webp_path)?.modified()?;
+                let asset_modified = std::fs::metadata(&asset_path)?.modified()?;
+
+                if asset_modified > webp_modified{
+                    // the asset has been modified since the last conversion
+                    regenerate = true;
+                    // also: delete the existing file
+                    std::fs::remove_file(&webp_path)?;
+                }
+
+            }
+
             // if the file already exists, return it
-            if !Path::new(&webp_path).exists(){
+            if !Path::new(&webp_path).exists() || regenerate{
                 println!("Converting {} to {}", asset_path.to_str().unwrap_or(""), webp_path);
                 let mut img = ImageReader::open(asset_path)?.decode()?;
                 // create the temp directory if it doesn't exist
