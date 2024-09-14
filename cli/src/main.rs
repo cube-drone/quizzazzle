@@ -23,6 +23,7 @@ mod file_modifiers;
 
 const APP_JS: &str = include_str!("js/feed.js");
 const APP_CSS: &str = include_str!("js/style.css");
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 ///
 /// Initialize a new deck in the current directory
@@ -245,6 +246,7 @@ pub struct Index{
     metadata: ministry_directory::DeckMetadata,
     deck_ids: Vec<String>,
     toc: Vec<ministry_directory::TableOfContentsEntry>,
+    version: String,
 }
 
 fn get_index(directory: MinistryDirectory) -> Result<Index> {
@@ -255,6 +257,7 @@ fn get_index(directory: MinistryDirectory) -> Result<Index> {
         metadata,
         deck_ids: deck.clone().into_iter().map(|card| card.id).collect(),
         toc: deck.into_iter().map(|card| card.to_toc_entry()).collect(),
+        version: VERSION.to_string(),
     })
 }
 
@@ -499,6 +502,7 @@ async fn rocket() -> Rocket<Build> {
 
     if args.len() == 1{
         println!("Help:");
+        println!("  version:    Print the version");
         println!("  init:       Create a new deck in the current directory");
         println!("  new:        Create a new deck in a specified directory");
         println!("  serve:      Start the server");
@@ -508,6 +512,10 @@ async fn rocket() -> Rocket<Build> {
         let flags = Flags::from_args(args.clone());
 
         let arg = &args[1];
+        if arg == "version"{
+            println!("{}", VERSION);
+            std::process::exit(0);
+        }
         if arg == "init"{
             init(flags);
             std::process::exit(0);
@@ -534,6 +542,7 @@ async fn rocket() -> Rocket<Build> {
             std::process::exit(0);
         }
         if arg == "serve"{
+            println!("CardChapter Ministry {}", VERSION);
             println!("Serving...");
         }
     }
