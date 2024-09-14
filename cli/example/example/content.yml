@@ -22,10 +22,9 @@ extra_header: |
       padding: 10px;
       box-sizing: border-box;
       border: 3px solid white;
-      bottom: 2px;
       background-color: black;
       color: white !important;
-      margin-top: 300px;
+      margin-top: 298px;
       border-radius: 2px;
     }
     .primary-card {
@@ -36,7 +35,8 @@ extra_header: |
   </style>
 pages:
   - title: A Presentation about Bees
-    extra_class: border
+    animate_container: true
+    container_class: border
     fade_in: 1000
     shake: 5000
     amount: 2
@@ -52,51 +52,79 @@ pages:
         type: animated-text
         fade_in: 1500
         delay: 1800
-        extra_class:
+        class:
           - textboss
         content: Hi, I'm Owen! I'm here to help you learn about BEEEEEEEES.
+  - title: Owen Gets Close
+    id: owen-gets-close
+    pages:
+      - title: Dolly In
+        id: dolly-in
+        image: assets/owen.png
+        dolly_in: 1.5
+        duration: 2000
+        delay: 200
+      - id: says-bees
+        type: animated-text
+        fade_in: 2000
+        animate_container: true
+        class:
+          - textboss
+        content: Bees are really important.
+  - title: Dolly Out
+    id: dolly-out
+    image: assets/owen.png
+    dolly_out: 0.1
+    shake: 2000
+    delay: 200
+  - title: Brotate
+    id: brotate
+    image: assets/owen.png
+    spin_clockwise: -360
+    dolly_in: 2
+    duration: 5000
+    delay: 200
   - type: animated-text
-    extra_class:
+    class:
       - textboss
     content: Just because the text is here doesn't mean it's important.
+    pan_up: 200
+    shake: 100
+    duration: 5000
     id: animated-text
   - id: wow
     depth: 2
-    type: pan_down
+    pan_down: 400
     duration: 5000
-    amount: 400
     delay: 1500
     easing: easeInOutCubic
     loop: true
     image: assets/wow.png?tall
   - id: wow-2
     depth: 2
-    type: pan_up
     loop: true
     easing: easeInOutElastic
     duration: 10000
     delay: 1500
-    amount: 400
+    pan_up: 400
     image: assets/wow.png?tall
   - id: wow-3
     depth: 2
-    type: pan_left
     easing: easeInOutElastic
     loop: true
     delay: 1500
     duration: 3000
-    amount: 330
+    pan_left: 330
     image: assets/wow-across.png?wide
   - id: wow-4
     depth: 2
-    type: pan_right
     loop: true
     delay: 1500
     duration: 3000
-    amount: 330
+    pan_right: 330
     image: assets/wow-across.png?wide
   - title: Introduction
-    extra_class:
+    container_class:
       - opaque
       - border
     id: intro
@@ -108,7 +136,7 @@ pages:
       ![A bee](assets/bee.jpg?width=100)
   - id: stack
     title: Stacked Images
-    extra_class:
+    container_class:
       - opaque
       - border
     type: stack

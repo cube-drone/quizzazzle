@@ -23,6 +23,10 @@
     border: 1px dashed black;
 }
 
+.stack-card .card{
+    border: none;
+}
+
 .frame-primary{
     opacity: 1;
     transition: opacity 0.2s;
@@ -60,6 +64,15 @@
     font-size: small;
 }
 
+.restrict-max-height img{
+    max-height: var(--frame-height);
+}
+
+.restrict-max-width img{
+    max-width: var(--frame-width);
+}
+
+/*
 .image-card img, .animated-image-card img{
     max-width: var(--frame-width);
     max-height: var(--frame-height);
@@ -72,6 +85,7 @@
 .pan-left-card img, .pan-right-card img {
     max-height: var(--frame-height);
 }
+*/
 
 .video-card video{
     max-width: var(--frame-width);

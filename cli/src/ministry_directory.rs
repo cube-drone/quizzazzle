@@ -52,24 +52,52 @@ pub struct DeckSummary{
 #[derive(Debug, Serialize, Clone)]
 pub struct Card{
     pub id: String,
+    pub title: Option<String>,
     pub card_type: String,
-    pub content: Option<String>,
-    pub image_url: Option<String>,
+    pub container_class: Vec<String>,
     pub extra_class: Vec<String>,
+
+    // markdown
+    pub content: Option<String>,
+
+    // image
+    pub image_url: Option<String>,
+
+    // video
     pub video_url: Option<String>,
     pub video_has_sound: bool,
-    pub is_loop: bool,
     pub video_controls: bool,
-    pub title: Option<String>,
+
+    // is_loop applies to videos, animated pngs, AND animations (wow, so versatile!)
+    pub is_loop: bool,
+
+    // animated pngs
     pub pngs: Vec<String>,
     pub pngs_fps: Option<i64>,
+
+    // animations
     pub fade_in: Option<i64>,
+    pub fade_out: Option<i64>,
     pub shake: Option<i64>,
-    pub stack: Vec<Card>,
+    pub pan_left: Option<i64>,
+    pub pan_right: Option<i64>,
+    pub pan_up: Option<i64>,
+    pub pan_down: Option<i64>,
+    pub dolly_in: Option<f64>,
+    pub dolly_out: Option<f64>,
+    pub spin_clockwise: Option<i64>,
+
+    // animation control options
     pub duration: Option<i64>,
     pub amount: Option<i64>,
     pub delay: Option<i64>,
     pub easing: Option<String>,
+    pub animate_container: Option<bool>,
+
+    // meta-card
+    pub stack: Vec<Card>,
+
+    // how deep in the table of contents should this card be?
     pub toc_depth: Option<i64>,
 }
 
@@ -377,35 +405,79 @@ impl MinistryDirectory{
 
         let mut extra_class = Vec::new();
         let default_vec = Vec::new();
-        if doc["extra_class"].as_str().is_some(){
-            extra_class.push(doc["extra_class"].as_str().unwrap().to_string());
+        if doc["class"].as_str().is_some(){
+            extra_class.push(doc["class"].as_str().unwrap().to_string());
         }
-        for item in doc["extra_class"].as_vec().unwrap_or_else(|| &default_vec){
+        for item in doc["class"].as_vec().unwrap_or_else(|| &default_vec){
             if item.as_str().is_some(){
                 extra_class.push(item.as_str().unwrap().to_string());
             }
         }
 
+        let mut container_class = Vec::new();
+        if doc["container_class"].as_str().is_some(){
+            container_class.push(doc["container_class"].as_str().unwrap().to_string());
+        }
+        for item in doc["container_class"].as_vec().unwrap_or_else(|| &default_vec){
+            if item.as_str().is_some(){
+                container_class.push(item.as_str().unwrap().to_string());
+            }
+        }
+
+        let dolly_in: Option<f64>;
+        if doc["dolly_in"].as_i64().is_some(){
+            dolly_in = Some(doc["dolly_in"].as_i64().unwrap() as f64);
+        }
+        else{
+            dolly_in = doc["dolly_in"].as_f64();
+        }
+        let dolly_out: Option<f64>;
+        if doc["dolly_out"].as_i64().is_some(){
+            dolly_out = Some(doc["dolly_out"].as_i64().unwrap() as f64);
+        }
+        else{
+            dolly_out = doc["dolly_out"].as_f64();
+        }
+
         Card{
             id,
-            card_type,
             title: doc["title"].as_str().map(|s| s.to_string()),
-            content: doc["content"].as_str().map(|s| s.to_string()),
-            image_url: doc["image"].as_str().map(|s| s.to_string()),
+            card_type,
             extra_class,
+            container_class,
+
+            content: doc["content"].as_str().map(|s| s.to_string()),
+
+            image_url: doc["image"].as_str().map(|s| s.to_string()),
+
             video_url: doc["video"].as_str().map(|s| s.to_string()),
             video_has_sound: doc["video_has_sound"].as_bool().unwrap_or(false),
-            is_loop: doc["loop"].as_bool().unwrap_or(false),
             video_controls: doc["video_controls"].as_bool().unwrap_or(false),
+
+            is_loop: doc["loop"].as_bool().unwrap_or(false),
+
             pngs,
             pngs_fps: doc["pngs_fps"].as_i64(),
+
             fade_in: doc["fade_in"].as_i64(),
+            fade_out: doc["fade_out"].as_i64(),
             shake: doc["shake"].as_i64(),
-            stack,
+            pan_left: doc["pan_left"].as_i64(),
+            pan_right: doc["pan_right"].as_i64(),
+            pan_up: doc["pan_up"].as_i64(),
+            pan_down: doc["pan_down"].as_i64(),
+            dolly_in,
+            dolly_out,
+            spin_clockwise: doc["spin_clockwise"].as_i64(),
+
             duration: doc["duration"].as_i64(),
             amount: doc["amount"].as_i64(),
             delay: doc["delay"].as_i64(),
             easing: doc["easing"].as_str().map(|s| s.to_string()),
+            animate_container: doc["animate_container"].as_bool(),
+
+            stack,
+
             toc_depth: doc["depth"].as_i64(),
         }
     }

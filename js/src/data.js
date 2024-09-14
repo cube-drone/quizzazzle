@@ -55,22 +55,41 @@ class RealServer{
             id: card.id,
             title: card.title,
             type: card.card_type || "title",
+            extraClass: card.extra_class,
+            containerClass: card.container_class,
+
+            content: card.content,
+
             imageUrl: card.image_url,
+
             videoUrl: card.video_url,
             videoHasSound: card.video_has_sound,
-            loop: card.is_loop,
             videoControls: card.video_controls,
-            content: card.content,
+
+            loop: card.is_loop,
+
             pngs: card.pngs,
-            extraClass: card.extra_class,
             pngsFps: card.pngs_fps,
+
             fadeIn: card.fade_in,
+            fadeOut: card.fade_out,
             shake: card.shake,
-            stack: card.stack.map(this.cardTransform.bind(this)),
+            panLeft: card.pan_left,
+            panRight: card.pan_right,
+            panUp: card.pan_up,
+            panDown: card.pan_down,
+            dollyIn: card.dolly_in,
+            dollyOut: card.dolly_out,
+            spinClockwise: card.spin_clockwise,
+
             duration: card.duration,
             amount: card.amount,
-            easing: card.easing,
             delay: card.delay,
+            easing: card.easing,
+            animateContainer: card.animate_container,
+
+            stack: card.stack.map(this.cardTransform.bind(this)),
+            tocDepth: card.toc_depth,
         }
         return appCard;
     }

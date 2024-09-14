@@ -11,39 +11,165 @@ const html = htm.bind(h);
 
 
 function AnyCard({card, cardType, stackIndex, primary, visible, children}){
+
+    let [animation, setAnimation] = useState(null);
+
+    let style = stackIndex != '' ? `z-index:${stackIndex};` : "";
+
+    // animation stuffs
+    let isAnimation = false;
+    if(card.fadeIn || card.shake){
+        animation = true;
+    }
+    let opacity = null;
+    let translateX = null;
+    let translateY = null;
+    let rotation = null;
+    let scale = null;
     let easing = card.easing ?? 'easeInOutQuad';
     let duration = card.duration ?? 500;
+    let delay = card.delay ?? 0;
+    let restrictMaxWidth = true;
+    let restrictMaxHeight = true;
+    let animStyle = [];
+
     if(card.fadeIn){
-        useEffect(() => {
-            if(primary){
-                let el = this.base;
-                anime({targets: el, opacity: [0, 1], duration, delay: card.delay ?? card.fadeIn ?? 0, easing});
-            }
-            else{
-                let el = this.base;
-                anime({targets: el, opacity: [1, 0], duration, delay: 0, easing});
-            }
-        }, [primary]);
+        isAnimation = true;
+        if(!isNaN(card.fadeIn)){
+            delay = card.fadeIn;
+        }
+        animStyle.push(`opacity: 0;`);
+        opacity = [0, 1];
+    }
+    if(card.fadeOut){
+        isAnimation = true;
+        if(!isNaN(card.fadeOut)){
+            delay = card.fadeOut;
+        }
+        animStyle.push(`opacity: 1;`);
+        opacity = [1, 0];
     }
     if(card.shake){
+        isAnimation = true;
+        if(!isNaN(card.shake)){
+            duration = card.shake;
+        }
+        let amount = card.amount ?? 5;
+        translateX = [];
+        translateX.push(0);
+        for(let i = 0; i < duration / 100; i++){
+            translateX.push(i % 2 === 0 ? amount : -amount);
+        }
+        translateX.push(0);
+    }
+    if(card.panLeft){
+        isAnimation = true;
+        translateX = -card.panLeft;
+        duration = card.duration ?? 5000;
+        restrictMaxWidth = false;
+    }
+    if(card.panRight){
+        isAnimation = true;
+        translateX = 0;
+        duration = card.duration ?? 5000;
+        amount = card.panRight ?? 300;
+        animStyle.push(`transform: translateX(-${amount}px);`);
+        restrictMaxWidth = false;
+    }
+    if(card.panDown){
+        isAnimation = true;
+        translateY = -card.panDown;
+        duration = card.duration ?? 5000;
+        restrictMaxHeight = false;
+    }
+    if(card.panUp){
+        isAnimation = true;
+        translateY = 0;
+        duration = card.duration ?? 5000;
+        amount = card.panUp ?? 400;
+        animStyle.push(`${style} transform: translateY(-${amount}px);`);
+        restrictMaxHeight = false;
+    }
+    if(card.dollyIn){
+        isAnimation = true;
+        scale = card.dollyIn;
+    }
+    if(card.dollyOut){
+        isAnimation = true;
+        scale = card.dollyOut;
+    }
+    if(card.spinClockwise){
+        isAnimation = true;
+        rotation = card.spinClockwise;
+        animStyle.push(`${style} transform: rotate(${rotation});`);
+    }
+
+    if(isAnimation){
         useEffect(() => {
             if(primary){
-                let el = this.base;
-                let duration = card.shake ?? card.duration ?? 500;
-                let amount = card.amount ?? 5;
-                let translateX = [];
-                translateX.push(0);
-                for(let i = 0; i < duration / 100; i++){
-                    translateX.push(i % 2 === 0 ? amount : -amount);
+                //console.dir(card);
+                // el is not this.base, but the child of this.base
+                let el;
+                if(card.animateContainer){
+                    el = this.base;
                 }
-                translateX.push(0);
-                anime({targets: el, translateX, duration, delay: card.delay ?? 0, easing, loop: card.loop});
+                else{
+                    el = this.base.querySelector('.animation-frame');
+                }
+
+                if(animation && animation.remove != null){
+                    animation?.remove(el);
+                }
+                let anim = {targets: el, duration, delay, easing};
+                if(opacity != null){
+                    anim.opacity = opacity;
+                }
+                if(translateX != null){
+                    anim.translateX = translateX;
+                }
+                if(translateY != null){
+                    anim.translateY = translateY;
+                }
+                if(scale != null){
+                    anim.scale = scale;
+                }
+                if(rotation != null){
+                    anim.rotate = rotation;
+                }
+
+                console.dir(anim);
+
+                let createdAnimation = anime(anim);
+                setAnimation(createdAnimation);
+                createdAnimation?.play();
+            }
+            else{
+                if(animation && animation.restart != null && animation.pause != null){
+                    animation?.restart();
+                    animation?.pause();
+                }
             }
         }, [primary]);
     }
-    let z = stackIndex != null ? `z-index:${stackIndex};` : "";
-    return html `<div style=${z} class="card ${cardType}-card any-card ${stackIndex ? "stacked" : ""} ${card.extraClass.join(" ")}">
+
+    let restrictions = [];
+
+    if(restrictMaxWidth){
+        restrictions.push("restrict-max-width");
+    }
+    if(restrictMaxHeight){
+        restrictions.push("restrict-max-height");
+    }
+
+    if(card.animateContainer){
+        style = style.concat(animStyle);
+        animStyle = [];
+    }
+
+    return html `<div style=${style} class="card ${cardType}-card any-card ${stackIndex ? "stacked" : ""} ${card.containerClass.join(" ")} ${restrictions.join(" ")}">
+        <div style=${animStyle.join(" ")} class="animation-frame ${card.extraClass.join(" ")}">
         ${children}
+        </div>
     </div>`;
 }
 
@@ -70,109 +196,6 @@ function ImageCard({card, stackIndex, primary, visible}){
         <img src=${card.imageUrl} alt=${card.alt} title=${card.title}/>
     </${AnyCard}>`;
 }
-
-function PanDownCard({card, stackIndex, primary, visible}){
-    let [animation, setAnimation] = useState(null);
-    let easing = card.easing ?? 'easeInOutQuad';
-    useEffect(() => {
-        let el = this.base.querySelector('img');
-        if(primary){
-            if(!animation){
-                let y = card.amount ?? 400;
-                let duration = card.duration ?? 5000;
-                let animation = anime({targets: el, translateY: -y, duration, easing, loop: card.loop, delay: card.delay ?? 0});
-                setAnimation(animation);
-            }
-            animation?.play();
-        }
-        else{
-            animation?.restart();
-            animation?.pause();
-        }
-    }, [primary]);
-
-    return html`<${AnyCard} card=${card} cardType="pan-down" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
-        <img src=${card.imageUrl} alt=${card.alt} title=${card.title}/>
-    </${AnyCard}>`;
-}
-
-function PanLeftCard({card, stackIndex, primary, visible}){
-    let [animation, setAnimation] = useState(null);
-    let easing = card.easing ?? 'easeInOutQuad';
-    useEffect(() => {
-        let el = this.base.querySelector('img');
-        if(primary){
-            if(!animation){
-                let x = card.amount ?? 330;
-                let duration = card.duration ?? 5000;
-                let animation = anime({targets: el, translateX: -x, duration, easing, loop: card.loop, delay: card.delay ?? 0});
-                setAnimation(animation);
-            }
-            animation?.play();
-        }
-        else{
-            animation?.restart();
-            animation?.pause();
-        }
-    }, [primary]);
-
-    return html`<${AnyCard} card=${card} cardType="pan-left" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
-        <img src=${card.imageUrl} alt=${card.alt} title=${card.title}/>
-    </${AnyCard}>`;
-}
-
-function PanUpCard({card, stackIndex, primary, visible}){
-    let [animation, setAnimation] = useState(null);
-    let easing = card.easing ?? 'easeInOutQuad';
-    useEffect(() => {
-        let el = this.base.querySelector('img');
-        if(primary){
-            if(!animation){
-                let duration = card.duration ?? 5000;
-                let animation = anime({targets: el, translateY: 0, duration, easing, loop: card.loop, delay: card.delay ?? 0});
-                setAnimation(animation);
-            }
-            animation?.play();
-        }
-        else{
-            animation?.restart();
-            animation?.pause();
-        }
-    }, [primary]);
-
-    let initialStyle = `transform: translateY(-${card.amount ?? 400}px);`;
-
-    return html`<${AnyCard} card=${card} cardType="pan-up" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
-        <img style=${initialStyle} src=${card.imageUrl} alt=${card.alt} title=${card.title}/>
-    </${AnyCard}>`;
-}
-
-function PanRightCard({card, stackIndex, primary, visible}){
-    let [animation, setAnimation] = useState(null);
-    let easing = card.easing ?? 'easeInOutQuad';
-    useEffect(() => {
-        let el = this.base.querySelector('img');
-        if(primary){
-            if(!animation){
-                let duration = card.duration ?? 5000;
-                let animation = anime({targets: el, translateX: 0, duration, easing, loop: card.loop, delay: card.delay ?? 0});
-                setAnimation(animation);
-            }
-            animation?.play();
-        }
-        else{
-            animation?.restart();
-            animation?.pause();
-        }
-    }, [primary]);
-
-    let initialStyle = `transform: translateX(-${card.amount ?? 300}px);`;
-
-    return html`<${AnyCard} card=${card} cardType="pan-right" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
-        <img style=${initialStyle} src=${card.imageUrl} alt=${card.alt} title=${card.title}/>
-    </${AnyCard}>`;
-}
-
 
 function AnimatedImageCard({card, primary, visible, stackIndex}){
     let [animatedImageInterval, setAnimatedImageInterval] = useState(null);
@@ -325,18 +348,6 @@ function typeToCardClass(type){
     }
     if(type === 'image'){
         cardClass = ImageCard;
-    }
-    if(type === 'pan_down' || type === "pan-down"){
-        cardClass = PanDownCard;
-    }
-    if(type === 'pan_up' || type === "pan-up"){
-        cardClass = PanUpCard;
-    }
-    if(type === 'pan_left' || type === "pan-left"){
-        cardClass = PanLeftCard;
-    }
-    if(type === 'pan_right' || type === "pan-right"){
-        cardClass = PanRightCard;
     }
     if(type === "animated_text" || type === "animated-text"){
         cardClass = AnimatedTextCard;
