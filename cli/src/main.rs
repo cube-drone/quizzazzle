@@ -99,7 +99,6 @@ impl Flags{
 
 #[derive(Clone)]
 pub struct Config{
-    dev: bool,
     server_url: Url,
     site_name: String,
     default_locale: String,
@@ -111,13 +110,12 @@ pub struct Config{
 
 impl Config{
     fn from_env() -> Config{
-        let dev = std::env::var("ROCKET_ENV").unwrap_or("production".to_string()) == "development";
+        let _dev = std::env::var("ROCKET_ENV").unwrap_or("production".to_string()) == "development";
         let server_url = std::env::var("ROCKET_SERVER_URL").unwrap_or("http://localhost:8000".to_string());
         let site_name = std::env::var("ROCKET_SITE_NAME").unwrap_or("Ministry".to_string());
         let default_locale = std::env::var("ROCKET_DEFAULT_LOCALE").unwrap_or("en_US".to_string());
         let temporary_asset_directory = std::env::var("ROCKET_TEMPORARY_ASSET_DIRECTORY").unwrap_or("./temp_assets".to_string());
         Config{
-            dev,
             server_url: Url::parse(&server_url).unwrap(),
             site_name,
             default_locale,
@@ -161,6 +159,7 @@ fn index_template(directory: MinistryDirectory, config: &State<Config>) -> Resul
     <!DOCTYPE html>
     <html>
         <head>
+            <!-- CardChapter Ministry Version: {} -->
             <link rel="icon" type="image/png" href="{}" sizes="any"/>
             <meta charset="UTF-8">
             <title>{}</title>
@@ -198,7 +197,7 @@ fn index_template(directory: MinistryDirectory, config: &State<Config>) -> Resul
             <script src="/js/feed.js"></script>
         </body>
     </html>
-    "#), favicon, title, title, description, author, url, site_name, locale, image, extra_header));
+    "#), VERSION, favicon, title, title, description, author, url, site_name, locale, image, extra_header));
 }
 
 fn error_template(message: &str) -> String {

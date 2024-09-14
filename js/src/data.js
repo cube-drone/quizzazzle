@@ -196,15 +196,6 @@ class Data{
 
         let index = this.index;
 
-        let flbp = localStorage.getItem(`${indexId}-flbp`);
-        if(flbp){
-            // we've already loaded the whole thing
-            this.content = JSON.parse(flbp);
-            console.log("fully loaded baked potato loaded from cache");
-            this.fullyLoadedBakedPotato = true;
-            return;
-        }
-
         let afterRange = await this.server.getRange({indexId});
 
         if(index == null){
@@ -227,15 +218,6 @@ class Data{
 
     async _loadIndexFromMiddle({indexId, contentId}){
         contentId = contentId.replace("#", "");
-
-        let flbp = localStorage.getItem(`${indexId}-flbp`);
-        if(flbp){
-            // we've already loaded the whole thing
-            console.log("fully loaded baked potato loaded from cache");
-            this.content = JSON.parse(flbp);
-            this.fullyLoadedBakedPotato = true;
-            return;
-        }
 
         let index = this.index;
         let indexOfContent = index.contentIds.indexOf(contentId);
@@ -280,19 +262,6 @@ class Data{
 
         console.warn(`loading index from server`);
         this.index = await this.server.getIndex({indexId});
-        let cachedIndex = localStorage.getItem(`${indexId}-index`);
-        if( cachedIndex ){
-            cachedIndex = JSON.parse(cachedIndex);
-        }
-        if(!cachedIndex || cachedIndex.updatedAtTimestamp != this.index.updatedAtTimestamp){
-            console.warn(`cachedIndex: ${cachedIndex?.updatedAtTimestamp} != ${this.index?.updatedAtTimestamp}`);
-            console.warn("index is out of date or missing");
-            localStorage.clear();
-            localStorage.setItem(`${indexId}-index`, JSON.stringify(this.index));
-        }
-        else{
-            console.warn("index is up to date, loading from cache");
-        }
 
         if(contentId == null || contentId == ""){
             return this._loadIndexFromBeginning({indexId});
@@ -335,7 +304,6 @@ class Data{
     bakePotato(){
         this.fullyLoadedBakedPotato = true;
         console.log("baking the potato");
-        localStorage.setItem(`${this.indexId}-flbp`, JSON.stringify(this.content));
     }
 
     async loadSomeNearbyContent(){
