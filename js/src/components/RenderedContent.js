@@ -12,11 +12,16 @@ const html = htm.bind(h);
 
 function AnyCard({card, cardType, stackIndex, primary, visible, children}){
     let easing = card.easing ?? 'easeInOutQuad';
+    let duration = card.duration ?? 500;
     if(card.fadeIn){
         useEffect(() => {
             if(primary){
                 let el = this.base;
-                anime({targets: el, opacity: [0, 1], duration: 500, delay: card.delay ?? card.fadeIn ?? 0, easing});
+                anime({targets: el, opacity: [0, 1], duration, delay: card.delay ?? card.fadeIn ?? 0, easing});
+            }
+            else{
+                let el = this.base;
+                anime({targets: el, opacity: [1, 0], duration, delay: 0, easing});
             }
         }, [primary]);
     }
@@ -36,7 +41,7 @@ function AnyCard({card, cardType, stackIndex, primary, visible, children}){
             }
         }, [primary]);
     }
-    let z = stackIndex != null ? `z-index:${stackIndex};color:pink;` : "";
+    let z = stackIndex != null ? `z-index:${stackIndex};` : "";
     return html `<div style=${z} class="card ${cardType}-card any-card ${stackIndex ? "stacked" : ""} ${card.extraClass.join(" ")}">
         ${children}
     </div>`;
