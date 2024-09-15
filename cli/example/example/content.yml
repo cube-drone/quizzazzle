@@ -40,7 +40,7 @@ pages:
     fade_in: 1000
     shake: 5000
     amount: 2
-    id: cover
+    id: title-card
   - type: stack
     title: Owen Says Hi
     id: owen-says-hi
@@ -169,7 +169,6 @@ pages:
     pngs: assets/florb
     pngs_fps: 12
     loop: true
-    overlay_animated_text:
   - image: assets/sample.png?color=111111
     id: sample-image
   - video: assets/test_mp4_video.mp4

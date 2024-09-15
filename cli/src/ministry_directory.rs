@@ -330,6 +330,7 @@ impl MinistryDirectory{
 
     fn parse_card(&self, doc: &yaml_rust2::Yaml, default_id: String) -> Card{
         let id = doc["id"].as_str().unwrap_or_else(|| &default_id).to_string();
+        let id = slugify!(&id);
         let mut card_type = doc["type"].as_str().unwrap_or_else(|| "").to_string();
 
         if card_type == "" {
@@ -397,7 +398,9 @@ impl MinistryDirectory{
                     let path = path.unwrap().path();
                     let path = path.to_str().unwrap_or_else(|| "");
                     if path.ends_with(".png") {
-                        pngs.push(path.replacen(&self.directory_root, "", 1).replace("\\", "/").to_string());
+                        let png = path.replacen(&self.directory_root, "", 1).replace("\\", "/").to_string();
+                        let png = png.trim_start_matches("/").to_string();
+                        pngs.push(png);
                     }
                 }
             }
