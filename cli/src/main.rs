@@ -63,12 +63,16 @@ fn status(_flags: Flags){
     println!("Deck: {}", metadata.title);
 }
 
-#[get("/js/feed.js")]
-async fn js_app() -> content::RawJavaScript<&'static str> {
+#[get("/js/<_version>/feed.js")]
+async fn js_app(_version: String) -> content::RawJavaScript<&'static str> {
+    // we include the version, even though it's not used, so that when the browser caches the file
+    //  a new version will be requested when the version changes
     content::RawJavaScript(APP_JS)
 }
-#[get("/js/style.css")]
-async fn js_css() -> content::RawCss<&'static str> {
+#[get("/js/<_version>/style.css")]
+async fn js_css(_version: String) -> content::RawCss<&'static str> {
+    // we include the version, even though it's not used, so that when the browser caches the file
+    //  a new version will be requested when the version changes
     content::RawCss(APP_CSS)
 }
 
@@ -99,6 +103,7 @@ impl Flags{
 
 #[derive(Clone)]
 pub struct Config{
+    dev: bool,
     server_url: Url,
     site_name: String,
     default_locale: String,
@@ -110,12 +115,13 @@ pub struct Config{
 
 impl Config{
     fn from_env() -> Config{
-        let _dev = std::env::var("ROCKET_ENV").unwrap_or("production".to_string()) == "development";
+        let dev = std::env::var("ROCKET_ENV").unwrap_or("production".to_string()) == "development";
         let server_url = std::env::var("ROCKET_SERVER_URL").unwrap_or("http://localhost:8000".to_string());
         let site_name = std::env::var("ROCKET_SITE_NAME").unwrap_or("Ministry".to_string());
         let default_locale = std::env::var("ROCKET_DEFAULT_LOCALE").unwrap_or("en_US".to_string());
         let temporary_asset_directory = std::env::var("ROCKET_TEMPORARY_ASSET_DIRECTORY").unwrap_or("./temp_assets".to_string());
         Config{
+            dev,
             server_url: Url::parse(&server_url).unwrap(),
             site_name,
             default_locale,
@@ -155,11 +161,23 @@ fn index_template(directory: MinistryDirectory, config: &State<Config>) -> Resul
         None => config.default_locale.clone(),
     };
     let extra_header = deck_metadata.extra_header.clone().unwrap_or("".to_string());
+
+    let js_location = match config.dev {
+        true => "/js/feed.js",
+        false => &format!("/js/{}/feed.js", VERSION),
+    };
+
+    let css_location = match config.dev {
+        true => "/js/style.css",
+        false => &format!("/js/{}/style.css", VERSION),
+    };
+
     return Ok(format!(indoc!(r#"
     <!DOCTYPE html>
     <html>
         <head>
             <!-- CardChapter Ministry Version: {} -->
+            <link rel="stylesheet" href="{}">
             <link rel="icon" type="image/png" href="{}" sizes="any"/>
             <meta charset="UTF-8">
             <title>{}</title>
@@ -171,7 +189,6 @@ fn index_template(directory: MinistryDirectory, config: &State<Config>) -> Resul
             <meta property="og:site_name" content="{}" />
             <meta property="og:locale" content="{}" />
             <meta property="og:image" content="{}" />
-            <link rel="stylesheet" href="/js/style.css">
             {}
         </head>
         <body>
@@ -194,10 +211,10 @@ fn index_template(directory: MinistryDirectory, config: &State<Config>) -> Resul
         </div>`
 
             </div>
-            <script src="/js/feed.js"></script>
+            <script src="{}"></script>
         </body>
     </html>
-    "#), VERSION, favicon, title, title, description, author, url, site_name, locale, image, extra_header));
+    "#), VERSION, css_location, favicon, title, title, description, author, url, site_name, locale, image, extra_header, js_location));
 }
 
 fn error_template(message: &str) -> String {
