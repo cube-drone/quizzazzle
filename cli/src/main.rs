@@ -78,6 +78,30 @@ async fn js_css(_version: String) -> content::RawCss<&'static str> {
     content::RawCss(APP_CSS)
 }
 
+#[get("/robots.txt")]
+fn robots() -> &'static str {
+    indoc!(r#"
+    User-agent: Bingbot
+    Disallow:
+    User-agent: DuckDuckBot
+    Disallow:
+    User-agent: BingPreview
+    Disallow:
+    User-agent: MicrosoftPreview
+    Disallow:
+    User-agent: Googlebot
+    Disallow:
+    User-agent: Googlebot Smartphone
+    Disallow:
+    User-agent: Googlebot Desktop
+    Disallow:
+    User-agent: Google-InspectionTool
+    Disallow:
+    User-agent: *
+    Disallow: /
+    "#)
+}
+
 #[derive(Clone)]
 pub struct Flags{
     force: bool,
@@ -478,7 +502,8 @@ async fn launch_server(flags: Flags, config: Config) -> Rocket<Build> {
         deck_assets,
         default_assets,
         sitemap,
-        qr
+        qr,
+        robots,
     ]);
 
     if std::env::var("ROCKET_ENV").unwrap_or("production".to_string()) == "development"{
