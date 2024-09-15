@@ -54,8 +54,8 @@
       function escapeHtml(text) {
         return text == null ? "" : String(text).replace(runescaped, escapeHtmlChar);
       }
-      function unescapeHtml(html7) {
-        return html7 == null ? "" : String(html7).replace(rescaped, unescapeHtmlChar);
+      function unescapeHtml(html8) {
+        return html8 == null ? "" : String(html8).replace(rescaped, unescapeHtmlChar);
       }
       escapeHtml.options = unescapeHtml.options = {};
       module.exports = {
@@ -164,48 +164,48 @@
         };
         return stack;
       }
-      function parser2(html7, handler) {
+      function parser2(html8, handler) {
         var stack = createStack();
-        var last = html7;
+        var last = html8;
         var chars;
-        while (html7) {
+        while (html8) {
           parsePart();
         }
         parseEndTag();
         function parsePart() {
           chars = true;
           parseTag();
-          var same = html7 === last;
-          last = html7;
+          var same = html8 === last;
+          last = html8;
           if (same) {
-            html7 = "";
+            html8 = "";
           }
         }
         function parseTag() {
-          if (html7.substr(0, 4) === "<!--") {
+          if (html8.substr(0, 4) === "<!--") {
             parseComment();
-          } else if (rtagend.test(html7)) {
+          } else if (rtagend.test(html8)) {
             parseEdge(rend, parseEndTag);
-          } else if (rtag.test(html7)) {
+          } else if (rtag.test(html8)) {
             parseEdge(rstart, parseStartTag);
           }
           parseTagDecode();
         }
         function parseEdge(regex, parser3) {
-          var match = html7.match(regex);
+          var match = html8.match(regex);
           if (match) {
-            html7 = html7.substring(match[0].length);
+            html8 = html8.substring(match[0].length);
             match[0].replace(regex, parser3);
             chars = false;
           }
         }
         function parseComment() {
-          var index = html7.indexOf("-->");
+          var index = html8.indexOf("-->");
           if (index >= 0) {
             if (handler.comment) {
-              handler.comment(html7.substring(4, index));
+              handler.comment(html8.substring(4, index));
             }
-            html7 = html7.substring(index + 3);
+            html8 = html8.substring(index + 3);
             chars = false;
           }
         }
@@ -214,13 +214,13 @@
             return;
           }
           var text;
-          var index = html7.indexOf("<");
+          var index = html8.indexOf("<");
           if (index >= 0) {
-            text = html7.substring(0, index);
-            html7 = html7.substring(index);
+            text = html8.substring(0, index);
+            html8 = html8.substring(index);
           } else {
-            text = html7;
-            html7 = "";
+            text = html8;
+            html8 = "";
           }
           if (handler.chars) {
             handler.chars(text);
@@ -475,11 +475,11 @@
       var parser2 = require_parser();
       var sanitizer = require_sanitizer();
       var defaults = require_defaults();
-      function insane2(html7, options2, strict) {
+      function insane2(html8, options2, strict) {
         var buffer = [];
         var configuration = strict === true ? options2 : assign({}, defaults, options2);
         var handler = sanitizer(buffer, configuration);
-        parser2(html7, handler);
+        parser2(html8, handler);
         return buffer.join("");
       }
       insane2.defaults = defaults;
@@ -2665,21 +2665,21 @@
     "'": "&#39;"
   };
   var getEscapeReplacement = (ch) => escapeReplacements[ch];
-  function escape(html7, encode) {
+  function escape(html8, encode) {
     if (encode) {
-      if (escapeTest.test(html7)) {
-        return html7.replace(escapeReplace, getEscapeReplacement);
+      if (escapeTest.test(html8)) {
+        return html8.replace(escapeReplace, getEscapeReplacement);
       }
     } else {
-      if (escapeTestNoEncode.test(html7)) {
-        return html7.replace(escapeReplaceNoEncode, getEscapeReplacement);
+      if (escapeTestNoEncode.test(html8)) {
+        return html8.replace(escapeReplaceNoEncode, getEscapeReplacement);
       }
     }
-    return html7;
+    return html8;
   }
   var unescapeTest = /&(#(?:\d+)|(?:#x[0-9A-Fa-f]+)|(?:\w+));?/ig;
-  function unescape(html7) {
-    return html7.replace(unescapeTest, (_, n3) => {
+  function unescape(html8) {
+    return html8.replace(unescapeTest, (_, n3) => {
       n3 = n3.toLowerCase();
       if (n3 === "colon")
         return ":";
@@ -3957,8 +3957,8 @@
 ${quote}</blockquote>
 `;
     }
-    html(html7, block2) {
-      return html7;
+    html(html8, block2) {
+      return html8;
     }
     heading(text, level, raw) {
       return `<h${level}>${text}</h${level}>
@@ -4326,8 +4326,8 @@ ${content}</tr>
     /**
      * Process HTML after marked is finished
      */
-    postprocess(html7) {
-      return html7;
+    postprocess(html8) {
+      return html8;
     }
   };
   var Marked = class {
@@ -4542,7 +4542,7 @@ ${content}</tr>
           opt.hooks.options = opt;
         }
         if (opt.async) {
-          return Promise.resolve(opt.hooks ? opt.hooks.preprocess(src) : src).then((src2) => lexer2(src2, opt)).then((tokens) => opt.walkTokens ? Promise.all(this.walkTokens(tokens, opt.walkTokens)).then(() => tokens) : tokens).then((tokens) => parser2(tokens, opt)).then((html7) => opt.hooks ? opt.hooks.postprocess(html7) : html7).catch(throwError);
+          return Promise.resolve(opt.hooks ? opt.hooks.preprocess(src) : src).then((src2) => lexer2(src2, opt)).then((tokens) => opt.walkTokens ? Promise.all(this.walkTokens(tokens, opt.walkTokens)).then(() => tokens) : tokens).then((tokens) => parser2(tokens, opt)).then((html8) => opt.hooks ? opt.hooks.postprocess(html8) : html8).catch(throwError);
         }
         try {
           if (opt.hooks) {
@@ -4552,11 +4552,11 @@ ${content}</tr>
           if (opt.walkTokens) {
             this.walkTokens(tokens, opt.walkTokens);
           }
-          let html7 = parser2(tokens, opt);
+          let html8 = parser2(tokens, opt);
           if (opt.hooks) {
-            html7 = opt.hooks.postprocess(html7);
+            html8 = opt.hooks.postprocess(html8);
           }
-          return html7;
+          return html8;
         } catch (e3) {
           return throwError(e3);
         }
@@ -5266,31 +5266,69 @@ ${content}</tr>
         </nav>`;
   }
 
-  // src/components/NavDropdown.js
-  var html5 = htm_module_default.bind(y);
-  function thumbnailify(image_url, width) {
-    let url = new URL(image_url);
+  // src/thumbnailify.js
+  function thumbnailify({ imageUrl, height, width }) {
+    let url = new URL(imageUrl);
     url.searchParams.set("width", width);
+    url.searchParams.set("height", height);
     return url.toString();
   }
-  function NavDropdown({ onMenu, navigateTo, data }) {
-    let index = data.getIndex();
-    let sitemap = data.getSitemap();
+
+  // src/components/TitleCard.js
+  var html5 = htm_module_default.bind(y);
+  function TitleCard2({ index }) {
+    let updatedDate = index.updatedAt.toLocaleString();
     let thumbnailImage = null;
     if (index.thumbnailImageUrl) {
-      thumbnailImage = html5`<img src="${thumbnailify(`${window.location.origin}${window.location.pathname}${index.thumbnailImageUrl}`, 100)}" alt="${index.name}" />`;
+      thumbnailImage = html5`<img class="thumbnail"
+                                    src="${thumbnailify({
+        imageUrl: `${window.location.origin}${window.location.pathname}${index.thumbnailImageUrl}`,
+        height: 250,
+        width: 300
+      })}"
+                                    alt="${index.name}" />`;
     }
-    let extraHardReload = (evt) => {
-      evt.preventDefault();
-      localStorage.clear();
-      window.location.reload(true);
-    };
     let authorText = index.author;
     if (index.authorLink) {
       authorText = html5`<a href="${index.authorLink}">${index.author}</a>`;
     }
-    let updatedDate = index.updatedAt.toLocaleString();
-    return html5`<nav id="full-nav">
+    return html5`
+        <div class="title-card">
+            <div class="title-row">
+                <h2>${index.name}</h2>
+            </div>
+
+            <div class="title-row">
+                ${thumbnailImage}
+                <a class="qrlink" href="/qr?link=${window.location.origin}${window.location.pathname}">
+                    <img src="/qr?link=${window.location.origin}${window.location.pathname}" alt="QR Code" />
+                </a>
+            </div>
+
+            <div class="title-row">
+                <h4> ${authorText} - <small>${updatedDate}</small></h4>
+                <p class="description">${index.description}</p>
+            </div>
+        </div>
+    `;
+  }
+
+  // src/components/NavDropdown.js
+  var html6 = htm_module_default.bind(y);
+  function NavDropdown({ onMenu, navigateTo, data }) {
+    let index = data.getIndex();
+    let sitemap = data.getSitemap();
+    let entries = Object.entries(sitemap);
+    entries.sort((a3, b3) => {
+      let newestA = a3[1].reduce((acc, deck) => {
+        return Math.max(acc, deck.last_update_time.secs_since_epoch);
+      }, 0);
+      let newestB = b3[1].reduce((acc, deck) => {
+        return Math.max(acc, deck.last_update_time.secs_since_epoch);
+      }, 0);
+      return newestB - newestA;
+    });
+    return html6`<nav id="full-nav">
         <ul class="navbar">
             <li>
                 <a onClick=${onMenu} title="Menu">
@@ -5300,15 +5338,7 @@ ${content}</tr>
         </ul>
         <div class="nav-dropdown">
 
-            <div class="the-current-presentation">
-                <p class="last-updated">${updatedDate}</p>
-                <h2>${index.name}</h2>
-                ${thumbnailImage}
-                <p class="author">${authorText}</p>
-                <p class="description">${index.description}</p>
-                <div style="clear:both;"></div>
-            </div>
-
+            <${TitleCard2} index=${index} />
 
             <div class="toc">
                 <h3>Table of Contents</h3>
@@ -5318,7 +5348,7 @@ ${content}</tr>
         return null;
       }
       let depthstyle = `margin-left: ${depth}em;`;
-      return html5`<li style=${depthstyle}><a onClick=${(evt) => {
+      return html6`<li style=${depthstyle}><a onClick=${(evt) => {
         evt.preventDefault();
         navigateTo(id);
       }}
@@ -5327,31 +5357,43 @@ ${content}</tr>
                 </ul>
             </div>
             <hr/>
-            ${Object.keys(sitemap).length > 0 ? html5`<h3>Sitemap</h3>` : ""}
+            ${entries.length > 0 ? html6`<h3>Sitemap</h3>` : ""}
             <div>
-                ${Object.entries(sitemap).map(([authorSlug, listOfDecks]) => {
+                ${entries.map(([authorSlug, listOfDecks]) => {
       let author = listOfDecks[0].author;
       let countOfVisibleDecks = listOfDecks.filter((deck) => {
         return !deck.hidden;
       }).length;
+      listOfDecks.sort((a3, b3) => {
+        return b3.last_update_time.secs_since_epoch - a3.last_update_time.secs_since_epoch;
+      });
       if (countOfVisibleDecks == 0) {
         return null;
       }
-      return html5`<div class='sitemap-entry'>
+      return html6`<div class='sitemap-author'>
                         <h4>${author}</h4>
                         <ul>
                             ${listOfDecks.map((deck) => {
         if (deck.hidden) {
           return null;
         }
-        let image_url = thumbnailify(`${window.location.origin}/s/${deck.author_slug}/${deck.slug}/${deck.image_url}`, 50);
-        return html5`<li>
-                                    <a href="${window.location.origin}/s/${deck.author_slug}/${deck.slug}" title="${deck.description}">
-                                        <img src="${image_url}" alt="${deck.title}" />
-
-                                        ${deck.title}
+        let image_url = thumbnailify({
+          imageUrl: `${window.location.origin}/s/${deck.author_slug}/${deck.slug}/${deck.image_url}`,
+          height: 100,
+          width: 120
+        });
+        let updatedDate = new Date(deck.last_update_time.secs_since_epoch * 1e3).toLocaleString();
+        return html6`<li>
+                                    <a class="sitemap-entry" href="${window.location.origin}/s/${deck.author_slug}/${deck.slug}" title="${deck.title}">
+                                        <div class="panel-left">
+                                            <h4>${deck.title}</h4>
+                                            <p><small>${updatedDate}</small></p>
+                                            <p>${deck.description}</p>
+                                        </div>
+                                        <div class="panel-right">
+                                            <img src="${image_url}" alt="${deck.title}" />
+                                        </div>
                                     </a>
-                                    <p>${deck.description}</p>
                                 </li>`;
       })}
                         </ul>
@@ -5368,14 +5410,6 @@ ${content}</tr>
                 </p>
 
             </div>
-
-            <!--
-            <div class="button-panel">
-                <a class="pushbutton red" onClick=${extraHardReload} href="#">Hard Reload</a>
-
-            </div>
-            -->
-
         </div>
     </nav>`;
   }
@@ -5390,7 +5424,7 @@ ${content}</tr>
       }, timeout);
     };
   }
-  var html6 = htm_module_default.bind(y);
+  var html7 = htm_module_default.bind(y);
   var App = class extends b {
     constructor(props) {
       super(props);
@@ -5513,9 +5547,9 @@ ${content}</tr>
         let select = () => {
           this.setCurrentlySelected(id, n3);
         };
-        return html6`<${VisibilityTriggerFrame} data=${this.data} order=${n3} id=${id} onPrimary=${select}/>`;
+        return html7`<${VisibilityTriggerFrame} data=${this.data} order=${n3} id=${id} onPrimary=${select}/>`;
       });
-      return html6`<div class="primary-card">
+      return html7`<div class="primary-card">
             <div class="content">
                 <header id="primary-header" class="${headerVisible} ${disableTransparentIcons}">
                     <${Nav}
@@ -5559,7 +5593,7 @@ ${content}</tr>
       console.warn(`loading index for s/${userSlug}/${contentSlug}#${hash}`);
       await Data2.loadIndex({ userSlug, contentSlug, contentId: hash });
     }
-    let app = html6`<${App} data=${Data2} initialElement=${window.location.hash} />`;
+    let app = html7`<${App} data=${Data2} initialElement=${window.location.hash} />`;
     B(app, document.getElementById("app"));
   }
   main();

@@ -34,6 +34,7 @@ impl DeckMetadata{
             image_url: self.image_url.clone(),
             description: self.description.clone(),
             hidden: self.hidden,
+            last_update_time: self.last_update_time,
         }
     }
 }
@@ -47,6 +48,7 @@ pub struct DeckSummary{
     pub image_url: Option<String>,
     pub description: Option<String>,
     pub hidden: bool,
+    pub last_update_time: std::time::SystemTime,
 }
 
 #[derive(Debug, Serialize, Clone)]

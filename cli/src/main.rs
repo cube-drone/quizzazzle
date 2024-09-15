@@ -17,6 +17,8 @@ use rocket::serde::json::Json;
 use indoc::indoc; // this is a macro that allows us to write multi-line strings in a more readable way
 use serde::Serialize;
 use slugify::slugify;
+use qrcode::QrCode;
+use qrcode::render::svg;
 
 mod ministry_directory;
 mod file_modifiers;
@@ -442,6 +444,26 @@ async fn sitemap() -> Json<HashMap<String, Vec<ministry_directory::DeckSummary>>
     Json(hash_map)
 }
 
+#[derive(Responder)]
+#[response(content_type = "image/svg+xml")]
+struct QrCodeResponse(String);
+
+#[get("/qr?<link>")]
+async fn qr(
+    link: String,
+) -> Result<QrCodeResponse, Status> {
+
+    let code = QrCode::new(link).unwrap();
+
+    let image = code.render::<svg::Color>()
+        .min_dimensions(200, 200)
+        .dark_color(svg::Color("black"))
+        .light_color(svg::Color("white"))
+        .build();
+
+    Ok(QrCodeResponse(image))
+}
+
 async fn launch_server(flags: Flags, config: Config) -> Rocket<Build> {
 
     let mut app = rocket::build();
@@ -455,7 +477,8 @@ async fn launch_server(flags: Flags, config: Config) -> Rocket<Build> {
         deck_id,
         deck_assets,
         default_assets,
-        sitemap
+        sitemap,
+        qr
     ]);
 
     if std::env::var("ROCKET_ENV").unwrap_or("production".to_string()) == "development"{

@@ -101,21 +101,14 @@ header.header-invisible{
 }
 
 #full-nav .nav-dropdown{
-    padding: 10px 20px;
+    padding: 5px;
     width: 100%;
     margin-top: 5px;
     height: 550px;
-    border: 2px dashed white;
+    border: 1px solid #111;
     box-sizing: border-box;
     text-align: left;
     overflow-y: scroll;
-}
-
-#full-nav .nav-dropdown img{
-    width: 80px;
-    height: 80px;
-    float: left;
-    margin: 10px;
 }
 
 #full-nav .nav-dropdown a{
@@ -125,26 +118,6 @@ header.header-invisible{
 #full-nav pre{
     font-size: x-small;
     color: #555;
-}
-
-#full-nav .the-current-presentation {
-    border: 1px solid white;
-    padding: 5px 10px;
-    margin: 10px 5px;
-}
-
-#full-nav .the-current-presentation h2{
-    margin: 0;
-    padding: 0;
-}
-
-#full-nav .the-current-presentation img{
-    margin-left: 0;
-}
-
-#full-nav .the-current-presentation p{
-    margin-top: 10px;
-    font-size: small;
 }
 
 #full-nav .toc ul{
@@ -167,18 +140,20 @@ header.header-invisible{
 
 #full-nav .toc ul li a:hover{
     background-color: #444;
+    transform: scale(1.03);
+    transition: transform 100ms ease 0ms;
 }
 #full-nav .toc ul li a:active{
     transform: scale(1.1);
     transition: transform 100ms ease 0ms;
 }
 
-.sitemap-entry ul {
+.sitemap-author ul {
     margin-left: 0;
     padding-left: 0;
 }
 
-.sitemap-entry li{
+.sitemap-author li{
     min-height: 50px;
     list-style-type: none;
     padding-left: 5px;
@@ -188,28 +163,38 @@ header.header-invisible{
     font-size: small;
 }
 
-#full-nav .sitemap-entry img{
-    margin: 0 10px 0 0;
+.sitemap-entry{
+    width: 325px;
+    padding: 5px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    text-decoration: none;
+    align-items: stretch;
+    align-content: space-between;
+}
+
+.sitemap-entry h4{
+    margin-top: 0;
+    padding-top: 0;
+}
+
+.sitemap-entry img{
+    margin: 10px;
     padding: 0;
-    width: 50px;
-    height: 50px;
+    width: 120px;
+    max-height: 100px;
 }
 
-#full-nav .sitemap-entry a:hover{
+.sitemap-entry:hover{
     background-color: #444;
-}
-
-#full-nav .sitemap-entry a:active{
-    transform: scale(1.1);
+    transform: scale(1.03);
     transition: transform 100ms ease 0ms;
 }
 
-#full-nav .button-panel{
-    height: 100px;
-    width: 100%;
-    box-sizing: border-box;
-    padding: 20px;
-    background-color: #CCC;
+.sitemap-entry:active{
+    transform: scale(1.05);
+    transition: transform 100ms ease 0ms;
 }
 
 #full-nav .credits{
