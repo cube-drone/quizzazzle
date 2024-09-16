@@ -147,7 +147,7 @@ impl Config{
     fn from_env() -> Config{
         let dev = std::env::var("ROCKET_ENV").unwrap_or("production".to_string()) == "development";
         let server_url = std::env::var("ROCKET_SERVER_URL").unwrap_or("http://localhost:8000".to_string());
-        let site_name = std::env::var("ROCKET_SITE_NAME").unwrap_or("Ministry".to_string());
+        let site_name = std::env::var("ROCKET_SITE_NAME").unwrap_or("CardChapter".to_string());
         let default_locale = std::env::var("ROCKET_DEFAULT_LOCALE").unwrap_or("en_US".to_string());
         let temporary_asset_directory = std::env::var("ROCKET_TEMPORARY_ASSET_DIRECTORY").unwrap_or("./temp_assets".to_string());
         Config{
@@ -175,7 +175,7 @@ impl Services{
     }
 }
 
-fn index_template(deck_metadata: DeckMetadata, config: &State<Config>) -> Result<String> {
+fn index_template(deck_metadata: DeckMetadata, config: &State<Config>, is_home: bool) -> Result<String> {
     let title = deck_metadata.title;
     let author = deck_metadata.author;
     let description = match deck_metadata.description {
@@ -187,10 +187,14 @@ fn index_template(deck_metadata: DeckMetadata, config: &State<Config>) -> Result
         None => "/assets/favicon.png".to_string(),
     };
     let server_url = config.server_url.as_str();
-    let url = format!("{}/{}/{}", server_url, deck_metadata.author_slug, deck_metadata.slug);
-    let image = match deck_metadata.image_url {
-        Some(image_url) => format!("{}/{}/{}/{}", server_url, deck_metadata.author_slug, deck_metadata.slug, image_url),
-        None => "".to_string(),
+    let url = match is_home{
+        false => format!("{}s/{}/{}", server_url, deck_metadata.author_slug, deck_metadata.slug),
+        true => server_url.to_string(),
+    };
+    let image = match (is_home, deck_metadata.image_url) {
+        (false, Some(image_url)) => format!("{}s/{}/{}/{}", server_url, deck_metadata.author_slug, deck_metadata.slug, image_url),
+        (true, Some(image_url)) => format!("{}{}", server_url, image_url),
+        _ => "".to_string(),
     };
     let site_name = config.site_name.clone();
     let locale = match deck_metadata.locale {
@@ -277,7 +281,7 @@ async fn home(config: &State<Config>, services: &State<Services>) -> content::Ra
 
     match metadata{
         Ok(deck_metadata) => {
-            let rendered = index_template(deck_metadata, config);
+            let rendered = index_template(deck_metadata, config, true);
 
             match rendered{
                 Ok(html) => content::RawHtml(html),
@@ -294,7 +298,7 @@ async fn deck_home(config: &State<Config>, services: &State<Services>, author_sl
     let metadata = services.cache.get_metadata(path.to_str().unwrap_or_else(|| ".")).await;
     match metadata{
         Ok(deck_metadata) => {
-            let rendered = index_template(deck_metadata, config);
+            let rendered = index_template(deck_metadata, config, false);
 
             match rendered{
                 Ok(html) => content::RawHtml(html),
