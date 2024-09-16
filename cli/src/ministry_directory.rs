@@ -7,7 +7,7 @@ use webp::Encoder;
 
 use slugify::slugify;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct DeckMetadata{
     // title & author are non-optional
     pub title: String,
@@ -39,7 +39,7 @@ impl DeckMetadata{
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct DeckSummary{
     pub title: String,
     pub slug: String,
@@ -58,6 +58,7 @@ pub struct Card{
     pub card_type: String,
     pub container_class: Vec<String>,
     pub extra_class: Vec<String>,
+    pub document_class: Vec<String>,
 
     // markdown
     pub content: Option<String>,
@@ -113,7 +114,7 @@ impl Card{
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct TableOfContentsEntry{
     pub title: Option<String>,
     pub id: String,
@@ -323,7 +324,7 @@ impl MinistryDirectory{
         Ok(dm)
     }
 
-    fn get_last_update_time(&self) -> Result<std::time::SystemTime>{
+    pub fn get_last_update_time(&self) -> Result<std::time::SystemTime>{
         let content_path = PathBuf::from(&self.directory_root).join("content.yml");
         let metadata = std::fs::metadata(content_path)?;
         let modified = metadata.modified()?;
@@ -429,6 +430,16 @@ impl MinistryDirectory{
             }
         }
 
+        let mut document_class = Vec::new();
+        if doc["document_class"].as_str().is_some(){
+            document_class.push(doc["document_class"].as_str().unwrap().to_string());
+        }
+        for item in doc["document_class"].as_vec().unwrap_or_else(|| &default_vec){
+            if item.as_str().is_some(){
+                document_class.push(item.as_str().unwrap().to_string());
+            }
+        }
+
         let dolly_in: Option<f64>;
         if doc["dolly_in"].as_i64().is_some(){
             dolly_in = Some(doc["dolly_in"].as_i64().unwrap() as f64);
@@ -450,6 +461,7 @@ impl MinistryDirectory{
             card_type,
             extra_class,
             container_class,
+            document_class,
 
             content: doc["content"].as_str().map(|s| s.to_string()),
 

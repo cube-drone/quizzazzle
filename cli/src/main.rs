@@ -5,7 +5,7 @@ use std::env;
 use std::path::Path;
 use std::collections::HashMap;
 use url::Url;
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 
 use ministry_directory::MinistryDirectory;
 use rocket::{Build, Rocket};
@@ -20,7 +20,11 @@ use slugify::slugify;
 use qrcode::QrCode;
 use qrcode::render::svg;
 
+use ministry_directory::{DeckMetadata, DeckSummary};
+use ministry_directory_cache::MinistryDirectoryCache;
+
 mod ministry_directory;
+mod ministry_directory_cache;
 mod file_modifiers;
 
 const APP_JS: &str = include_str!("js/feed.js");
@@ -159,12 +163,19 @@ impl Config{
     }
 }
 
-fn index_template(directory: MinistryDirectory, config: &State<Config>) -> Result<String> {
-    if !directory.exists(){
-        return Err(anyhow!("Directory does not exist"));
-    }
-    let deck_metadata = directory.get_metadata()?;
+pub struct Services{
+    pub cache: MinistryDirectoryCache,
+}
 
+impl Services{
+    pub fn new() -> Services{
+        Services{
+            cache: MinistryDirectoryCache::new(),
+        }
+    }
+}
+
+fn index_template(deck_metadata: DeckMetadata, config: &State<Config>) -> Result<String> {
     let title = deck_metadata.title;
     let author = deck_metadata.author;
     let description = match deck_metadata.description {
@@ -261,23 +272,36 @@ fn error_template(message: &str) -> String {
 }
 
 #[get("/")]
-fn home(config: &State<Config>) -> content::RawHtml<String> {
+async fn home(config: &State<Config>, services: &State<Services>) -> content::RawHtml<String> {
     let directory_root = ".";
-    let directory = ministry_directory::MinistryDirectory::new(directory_root.to_string());
-    let rendered = index_template(directory, config);
-    match rendered{
-        Ok(html) => content::RawHtml(html),
+    let metadata = services.cache.get_metadata(directory_root).await;
+
+    match metadata{
+        Ok(deck_metadata) => {
+            let rendered = index_template(deck_metadata, config);
+
+            match rendered{
+                Ok(html) => content::RawHtml(html),
+                Err(e) => content::RawHtml(error_template(&e.to_string())),
+            }
+        },
         Err(e) => content::RawHtml(error_template(&e.to_string())),
     }
 }
 
 #[get("/s/<author_slug>/<deck_slug>")]
-fn deck_home(config: &State<Config>, author_slug: &str, deck_slug: &str) -> content::RawHtml<String> {
+async fn deck_home(config: &State<Config>, services: &State<Services>, author_slug: &str, deck_slug: &str) -> content::RawHtml<String> {
     let path = std::path::PathBuf::from(author_slug).join(deck_slug);
-    let directory = ministry_directory::MinistryDirectory::new(path.to_str().unwrap_or_else(|| ".").to_string());
-    let rendered = index_template(directory, config);
-    match rendered{
-        Ok(html) => content::RawHtml(html),
+    let metadata = services.cache.get_metadata(path.to_str().unwrap_or_else(|| ".")).await;
+    match metadata{
+        Ok(deck_metadata) => {
+            let rendered = index_template(deck_metadata, config);
+
+            match rendered{
+                Ok(html) => content::RawHtml(html),
+                Err(e) => content::RawHtml(error_template(&e.to_string())),
+            }
+        },
         Err(e) => content::RawHtml(error_template(&e.to_string())),
     }
 }
@@ -285,15 +309,15 @@ fn deck_home(config: &State<Config>, author_slug: &str, deck_slug: &str) -> cont
 #[derive(Serialize)]
 pub struct Index{
     id: String,
-    metadata: ministry_directory::DeckMetadata,
+    metadata: DeckMetadata,
     deck_ids: Vec<String>,
     toc: Vec<ministry_directory::TableOfContentsEntry>,
     version: String,
 }
 
-fn get_index(directory: MinistryDirectory) -> Result<Index> {
-    let metadata = directory.get_metadata()?;
-    let deck = directory.get_deck()?;
+async fn get_index(services: &State<Services>, directory_path: &str) -> Result<Index> {
+    let metadata = services.cache.get_metadata(directory_path).await?;
+    let deck = services.cache.get_deck(directory_path).await?;
     Ok(Index{
         id: format!("{}/{}", metadata.author_slug, metadata.slug),
         metadata,
@@ -304,10 +328,9 @@ fn get_index(directory: MinistryDirectory) -> Result<Index> {
 }
 
 #[get("/s/<author_slug>/<deck_slug>/index")]
-fn deck_index(author_slug: &str, deck_slug: &str) -> Result<Json<Index>, Status> {
+async fn deck_index(services: &State<Services>, author_slug: &str, deck_slug: &str) -> Result<Json<Index>, Status> {
     let path = std::path::PathBuf::from(author_slug).join(deck_slug);
-    let directory = ministry_directory::MinistryDirectory::new(path.to_str().unwrap_or_else(|| ".").to_string());
-    match get_index(directory){
+    match get_index(services, path.to_str().unwrap_or_else(|| ".")).await{
         Ok(index) => Ok(Json(index)),
         Err(err) => {
             println!("Error getting index: {}", err);
@@ -316,10 +339,8 @@ fn deck_index(author_slug: &str, deck_slug: &str) -> Result<Json<Index>, Status>
     }
 }
 #[get("/index")]
-fn default_index() -> Result<Json<Index>, Status> {
-    let directory: MinistryDirectory;
-    directory = ministry_directory::MinistryDirectory::new(".".to_string());
-    match get_index(directory){
+async fn default_index(services: &State<Services>) -> Result<Json<Index>, Status> {
+    match get_index(services, ".").await{
         Ok(index) => Ok(Json(index)),
         Err(err) => {
             println!("Error getting index: {}", err);
@@ -329,16 +350,16 @@ fn default_index() -> Result<Json<Index>, Status> {
 }
 
 #[get("/s/<author_slug>/<deck_slug>/range/<start_id>/<end_id>")]
-fn deck_range(author_slug: &str, deck_slug: &str, start_id: &str, end_id: &str) -> Result<Json<Vec<ministry_directory::Card>>, Status> {
+async fn deck_range(services: &State<Services>, author_slug: &str, deck_slug: &str, start_id: &str, end_id: &str) -> Result<Json<Vec<ministry_directory::Card>>, Status> {
     let path = std::path::PathBuf::from(author_slug).join(deck_slug);
-    let directory: MinistryDirectory;
+    let directory_path;
     if author_slug == "default" && deck_slug == "default"{
-        directory = ministry_directory::MinistryDirectory::new(".".to_string());
+        directory_path = ".".to_string();
     }
     else{
-        directory = ministry_directory::MinistryDirectory::new(path.to_str().unwrap_or_else(|| ".").to_string());
+        directory_path = path.to_str().unwrap_or_else(|| ".").to_string();
     }
-    let deck = directory.get_deck();
+    let deck = services.cache.get_deck(&directory_path).await;
     match deck {
         Ok(deck) => {
             // find the start and end indices
@@ -373,10 +394,9 @@ fn deck_range(author_slug: &str, deck_slug: &str, start_id: &str, end_id: &str) 
 }
 
 #[get("/s/<author_slug>/<deck_slug>/content/<content_id>")]
-fn deck_id(author_slug: &str, deck_slug: &str, content_id: &str) -> Result<Json<ministry_directory::Card>, Status> {
+async fn deck_id(services: &State<Services>, author_slug: &str, deck_slug: &str, content_id: &str) -> Result<Json<ministry_directory::Card>, Status> {
     let path = std::path::PathBuf::from(author_slug).join(deck_slug);
-    let directory = ministry_directory::MinistryDirectory::new(path.to_str().unwrap_or_else(|| ".").to_string());
-    let deck = directory.get_deck();
+    let deck = services.cache.get_deck(path.to_str().unwrap_or_else(|| ".")).await;
     match deck {
         Ok(deck) => {
             //find the matching card
@@ -419,7 +439,7 @@ async fn default_assets(asset_path: std::path::PathBuf, file_directives: file_mo
 }
 
 #[get("/sitemap")]
-async fn sitemap() -> Json<HashMap<String, Vec<ministry_directory::DeckSummary>>> {
+async fn sitemap(services: &State<Services>) -> Json<HashMap<String, Vec<DeckSummary>>> {
     // look at the current directory
     let path = std::path::PathBuf::from(".");
     let mut hash_map = HashMap::new();
@@ -436,7 +456,7 @@ async fn sitemap() -> Json<HashMap<String, Vec<ministry_directory::DeckSummary>>
         if author_path.is_dir(){
             // if it's a directory, that's a _user_ directory: so "author_slug" is the name of the directory
             // for each subdirectory of that directory...
-            println!("Author path: {}", author_path.to_str().unwrap_or(""));
+            // println!("Author path: {}", author_path.to_str().unwrap_or(""));
             let more_paths = std::fs::read_dir(author_path.clone()).unwrap();
             for deck_path in more_paths{
                 let deck_path = deck_path.unwrap().path();
@@ -450,11 +470,11 @@ async fn sitemap() -> Json<HashMap<String, Vec<ministry_directory::DeckSummary>>
                     // for each file in that directory...
                     let deck = ministry_directory::MinistryDirectory::new(deck_path.to_str().unwrap_or("").to_string());
                     if deck.exists(){
-                        let metadata = deck.get_metadata().unwrap();
+                        let metadata = services.cache.get_metadata(deck_path.to_str().unwrap_or("")).await.unwrap();
                         let author_slug = author_path.to_str().unwrap_or("").to_string().replace(".\\", "");
 
                         if hash_map.contains_key(&author_slug){
-                            let decks: &mut Vec<ministry_directory::DeckSummary> = hash_map.get_mut(&author_slug).unwrap();
+                            let decks: &mut Vec<DeckSummary> = hash_map.get_mut(&author_slug).unwrap();
                             decks.push(metadata.to_summary());
                         }
                         else{
@@ -528,8 +548,11 @@ async fn launch_server(flags: Flags, config: Config) -> Rocket<Build> {
         app = app.mount("/", routes![js_app, js_css]);
     }
 
+    let services = Services::new();
+
     app = app.manage(flags);
     app = app.manage(config);
+    app = app.manage(services);
 
     // if _multi is false, we are running in single-deck mode
     // the only goal here is to serve the deck in the current directory
@@ -563,6 +586,7 @@ async fn rocket() -> Rocket<Build> {
 
     let flags = Flags::empty();
     let config = Config::from_env();
+
 
     if args.len() == 1{
         println!("Help:");
