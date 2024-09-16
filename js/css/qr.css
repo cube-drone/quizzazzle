@@ -10,4 +10,6 @@
 
 .qrcode{
     mix-blend-mode: multiply;
+    width: 350px;
+    height: 350px;
 }

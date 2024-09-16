@@ -235,17 +235,16 @@ fn index_template(deck_metadata: DeckMetadata, config: &State<Config>) -> Result
                     <div class="content">
                         <header id="primary-header">
                         </header>
-                    </header>
-                <div class="everything-feed">
-                    <div class="frames">
-                        <div class="loader-wrapper">
-                            <div class="loader">
+                        <div class="everything-feed">
+                            <div class="frames">
+                                <div class="loader-wrapper">
+                                    <div class="loader">
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>`
+                </div>`
 
             </div>
             <script src="{}"></script>
@@ -508,6 +507,61 @@ async fn qr(
     Ok(QrCodeResponse(image))
 }
 
+#[get("/qr_html?<link>")]
+fn qr_html(link: String, config: &State<Config>) -> content::RawHtml<String> {
+
+    let css_location = match config.dev {
+        true => "/js/style.css",
+        false => &format!("/js/{}/style.css", VERSION),
+    };
+
+    content::RawHtml(format!(indoc!(r#"
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <link rel="stylesheet" href="{}">
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width">
+        </head>
+        <body>
+            <div id="app">
+                    <div class="primary-card">
+                        <div class="content">
+                            <header id="primary-header">
+                            </header>
+                            <div class="everything-feed">
+                                <div class="qrcode-frame">
+                                    <img class="qrcode" src="/qr?link={}" />
+                                </header>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>`
+        </body>
+    </html>
+    "#), css_location, link))
+    /*
+                <div class="primary-card">
+                    <div class="content">
+                        <header id="primary-header">
+                        </header>
+                        <div class="everything-feed">
+                            <div class="frames">
+                                <div class="loader-wrapper">
+                                    <div class="loader">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`
+
+     */
+
+}
+
 async fn launch_server(flags: Flags, config: Config) -> Rocket<Build> {
 
     let mut app = rocket::build();
@@ -523,6 +577,7 @@ async fn launch_server(flags: Flags, config: Config) -> Rocket<Build> {
         default_assets,
         sitemap,
         qr,
+        qr_html,
         robots,
     ]);
 

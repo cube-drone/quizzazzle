@@ -5300,7 +5300,7 @@ ${content}</tr>
 
             <div class="title-row">
                 ${thumbnailImage}
-                <a class="qrlink" href="/qr?link=${window.location.origin}${window.location.pathname}">
+                <a class="qrlink" href="/qr_html?link=${window.location.origin}${window.location.pathname}">
                     <img src="/qr?link=${window.location.origin}${window.location.pathname}" alt="QR Code" />
                 </a>
             </div>

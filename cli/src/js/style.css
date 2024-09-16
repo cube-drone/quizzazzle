@@ -628,6 +628,8 @@ a.pushbutton:hover .opt {
 }
 .qrcode {
   mix-blend-mode: multiply;
+  width: 350px;
+  height: 350px;
 }
 
 /* css/invite.css */
