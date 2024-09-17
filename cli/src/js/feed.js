@@ -5238,27 +5238,27 @@ ${content}</tr>
     return html4`<nav id="primary-nav">
             <ul class="navbar">
                 <li>
-                    <a onClick=${top} title="top" class="nav-top">
+                    <a onClick=${top} title="Navigate to the first card in the deck" class="nav-top">
                         <${Icon} name="double-up" />
                     </a>
                 </li>
                 <li>
-                    <a onClick=${up} title="up" class="nav-up">
+                    <a onClick=${up} title="Navigate to the previous card in the deck" class="nav-up">
                         <${Icon} name="chevron-up" />
                     </a>
                 </li>
                 <li>
-                    <a onClick=${menu} title="Menu" class="nav-menu">
+                    <a onClick=${menu} title="Open a menu with a description of the current page, table of contents, and sitemap" class="nav-menu">
                         <${Icon} name="hamburger" />
                     </a>
                 </li>
                 <li>
-                    <a onClick=${down} title="down" class="nav-down">
+                    <a onClick=${down} title="Navigate to the next card in the deck" class="nav-down">
                         <${Icon} name="chevron-down" />
                     </a>
                 </li>
                 <li>
-                    <a onClick=${bottom} title="bottom" class="nav-bottom">
+                    <a onClick=${bottom} title="Navigate to the final card in the deck" class="nav-bottom">
                         <${Icon} name="double-down" />
                     </a>
                 </li>
@@ -5331,7 +5331,7 @@ ${content}</tr>
     return html6`<nav id="full-nav">
         <ul class="navbar">
             <li>
-                <a onClick=${onMenu} title="Menu">
+                <a onClick=${onMenu} title="Close the Hamburger Zone">
                     <${Icon} name="hamburger" />
                 </a>
             </li>
