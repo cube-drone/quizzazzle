@@ -213,6 +213,10 @@ fn index_template(deck_metadata: DeckMetadata, config: &State<Config>, is_home: 
         false => &format!("/js/{}/style.css", VERSION),
     };
 
+    if deck_metadata.hidden {
+        return Ok(error_template("This deck is hidden."));
+    }
+
     return Ok(format!(indoc!(r#"
     <!DOCTYPE html>
     <html>
@@ -321,6 +325,9 @@ pub struct Index{
 async fn get_index(services: &State<Services>, directory_path: &str) -> Result<Index> {
     let metadata = services.cache.get_metadata(directory_path).await?;
     let deck = services.cache.get_deck(directory_path).await?;
+    if metadata.hidden {
+        return Err(anyhow::anyhow!("This deck is hidden."));
+    }
     Ok(Index{
         id: format!("{}/{}", metadata.author_slug, metadata.slug),
         metadata,
@@ -362,9 +369,13 @@ async fn deck_range(services: &State<Services>, author_slug: &str, deck_slug: &s
     else{
         directory_path = path.to_str().unwrap_or_else(|| ".").to_string();
     }
+    let metadata = services.cache.get_metadata(&directory_path).await;
     let deck = services.cache.get_deck(&directory_path).await;
-    match deck {
-        Ok(deck) => {
+    match (metadata, deck) {
+        (Ok(metadata), Ok(deck)) => {
+            if metadata.hidden {
+                return Err(Status::NotFound);
+            }
             // find the start and end indices
             let start: usize;
             if start_id == "0" || start_id == "undefined" || start_id == "" || start_id == "null" {
@@ -389,7 +400,11 @@ async fn deck_range(services: &State<Services>, author_slug: &str, deck_slug: &s
             }
             Ok(Json(deck[start..end].to_vec()))
         },
-        Err(err) => {
+        (Err(err), _) => {
+            println!("Error getting deck metadata: {}", err);
+            Err(Status::InternalServerError)
+        },
+        (_, Err(err)) => {
             println!("Error getting deck: {}", err);
             Err(Status::InternalServerError)
         },
@@ -399,14 +414,22 @@ async fn deck_range(services: &State<Services>, author_slug: &str, deck_slug: &s
 #[get("/s/<author_slug>/<deck_slug>/content/<content_id>")]
 async fn deck_id(services: &State<Services>, author_slug: &str, deck_slug: &str, content_id: &str) -> Result<Json<ministry_directory::Card>, Status> {
     let path = std::path::PathBuf::from(author_slug).join(deck_slug);
+    let metadata = services.cache.get_metadata(path.to_str().unwrap_or_else(|| ".")).await;
     let deck = services.cache.get_deck(path.to_str().unwrap_or_else(|| ".")).await;
-    match deck {
-        Ok(deck) => {
+    match (metadata, deck) {
+        (Ok(metadata), Ok(deck)) => {
+            if metadata.hidden {
+                return Err(Status::NotFound);
+            }
             //find the matching card
             let index = deck.iter().position(|card| card.id == content_id).unwrap_or(0);
             Ok(Json(deck[index].clone()))
         },
-        Err(err) => {
+        (Err(err), _) => {
+            println!("Error getting deck metadata: {}", err);
+            Err(Status::InternalServerError)
+        },
+        (_, Err(err)) => {
             println!("Error getting deck: {}", err);
             Err(Status::InternalServerError)
         },
@@ -474,6 +497,11 @@ async fn sitemap(services: &State<Services>) -> Json<HashMap<String, Vec<DeckSum
                     let deck = ministry_directory::MinistryDirectory::new(deck_path.to_str().unwrap_or("").to_string());
                     if deck.exists(){
                         let metadata = services.cache.get_metadata(deck_path.to_str().unwrap_or("")).await.unwrap();
+                        if metadata.hidden || metadata.unlisted {
+                            // don't include hidden or unlisted decks in the sitemap
+                            continue;
+                        }
+
                         let author_slug = author_path.to_str().unwrap_or("").to_string().replace(".\\", "");
 
                         if hash_map.contains_key(&author_slug){

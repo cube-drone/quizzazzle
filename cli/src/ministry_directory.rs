@@ -21,6 +21,7 @@ pub struct DeckMetadata{
     pub locale: Option<String>,
     pub extra_header: Option<String>,
     pub hidden: bool,
+    pub unlisted: bool,
     pub last_update_time: std::time::SystemTime,
 }
 
@@ -319,6 +320,7 @@ impl MinistryDirectory{
             locale: doc["locale"].as_str().map(|s| s.to_string()),
             extra_header: doc["extra_header"].as_str().map(|s| s.to_string()),
             hidden: doc["hidden"].as_bool().unwrap_or(false),
+            unlisted: doc["unlisted"].as_bool().unwrap_or(false),
             last_update_time
         };
         Ok(dm)

@@ -1,0 +1,22 @@
+name: unlisted
+author: example
+author_link: https://example.com
+description: Whoa, look at all of these bees!
+image: assets/bee.jpg
+unlisted: true
+favicon: assets/favicon.png
+pages:
+  - title: Introduction
+    id: intro
+    content: |
+      Bees are **important pollinators** that help plants reproduce.
+
+      ![A bee](assets/bee.jpg?width=100)
+  - title: Types of Bees
+    id: bee-types
+    content: |
+      There are many types of bees, including honeybees, bumblebees, and solitary bees.
+  - title: Importance of Bees
+    id: importance
+    content: |
+      Bees are important because they help pollinate plants, which helps plants reproduce.
