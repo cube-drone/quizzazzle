@@ -54,8 +54,8 @@
       function escapeHtml(text) {
         return text == null ? "" : String(text).replace(runescaped, escapeHtmlChar);
       }
-      function unescapeHtml(html8) {
-        return html8 == null ? "" : String(html8).replace(rescaped, unescapeHtmlChar);
+      function unescapeHtml(html9) {
+        return html9 == null ? "" : String(html9).replace(rescaped, unescapeHtmlChar);
       }
       escapeHtml.options = unescapeHtml.options = {};
       module.exports = {
@@ -164,48 +164,48 @@
         };
         return stack;
       }
-      function parser2(html8, handler) {
+      function parser2(html9, handler) {
         var stack = createStack();
-        var last = html8;
+        var last = html9;
         var chars;
-        while (html8) {
+        while (html9) {
           parsePart();
         }
         parseEndTag();
         function parsePart() {
           chars = true;
           parseTag();
-          var same = html8 === last;
-          last = html8;
+          var same = html9 === last;
+          last = html9;
           if (same) {
-            html8 = "";
+            html9 = "";
           }
         }
         function parseTag() {
-          if (html8.substr(0, 4) === "<!--") {
+          if (html9.substr(0, 4) === "<!--") {
             parseComment();
-          } else if (rtagend.test(html8)) {
+          } else if (rtagend.test(html9)) {
             parseEdge(rend, parseEndTag);
-          } else if (rtag.test(html8)) {
+          } else if (rtag.test(html9)) {
             parseEdge(rstart, parseStartTag);
           }
           parseTagDecode();
         }
         function parseEdge(regex, parser3) {
-          var match = html8.match(regex);
+          var match = html9.match(regex);
           if (match) {
-            html8 = html8.substring(match[0].length);
+            html9 = html9.substring(match[0].length);
             match[0].replace(regex, parser3);
             chars = false;
           }
         }
         function parseComment() {
-          var index = html8.indexOf("-->");
+          var index = html9.indexOf("-->");
           if (index >= 0) {
             if (handler.comment) {
-              handler.comment(html8.substring(4, index));
+              handler.comment(html9.substring(4, index));
             }
-            html8 = html8.substring(index + 3);
+            html9 = html9.substring(index + 3);
             chars = false;
           }
         }
@@ -214,13 +214,13 @@
             return;
           }
           var text;
-          var index = html8.indexOf("<");
+          var index = html9.indexOf("<");
           if (index >= 0) {
-            text = html8.substring(0, index);
-            html8 = html8.substring(index);
+            text = html9.substring(0, index);
+            html9 = html9.substring(index);
           } else {
-            text = html8;
-            html8 = "";
+            text = html9;
+            html9 = "";
           }
           if (handler.chars) {
             handler.chars(text);
@@ -475,11 +475,11 @@
       var parser2 = require_parser();
       var sanitizer = require_sanitizer();
       var defaults = require_defaults();
-      function insane2(html8, options2, strict) {
+      function insane2(html9, options2, strict) {
         var buffer = [];
         var configuration = strict === true ? options2 : assign({}, defaults, options2);
         var handler = sanitizer(buffer, configuration);
-        parser2(html8, handler);
+        parser2(html9, handler);
         return buffer.join("");
       }
       insane2.defaults = defaults;
@@ -970,6 +970,7 @@
         locale: serverIndex.metadata.locale,
         contentIds: serverIndex.deck_ids || [],
         toc: serverIndex.toc || [],
+        mp3: serverIndex.metadata.mp3,
         updatedAt: new Date(serverIndex?.metadata?.last_update_time?.secs_since_epoch * 1e3),
         updatedAtTimestamp: serverIndex?.metadata?.last_update_time?.secs_since_epoch
       };
@@ -1013,6 +1014,7 @@
         delay: card.delay,
         easing: card.easing,
         animateContainer: card.animate_container,
+        next: card.next,
         stack: card.stack.map(this.cardTransform.bind(this)),
         tocDepth: card.toc_depth
       };
@@ -2665,21 +2667,21 @@
     "'": "&#39;"
   };
   var getEscapeReplacement = (ch) => escapeReplacements[ch];
-  function escape(html8, encode) {
+  function escape(html9, encode) {
     if (encode) {
-      if (escapeTest.test(html8)) {
-        return html8.replace(escapeReplace, getEscapeReplacement);
+      if (escapeTest.test(html9)) {
+        return html9.replace(escapeReplace, getEscapeReplacement);
       }
     } else {
-      if (escapeTestNoEncode.test(html8)) {
-        return html8.replace(escapeReplaceNoEncode, getEscapeReplacement);
+      if (escapeTestNoEncode.test(html9)) {
+        return html9.replace(escapeReplaceNoEncode, getEscapeReplacement);
       }
     }
-    return html8;
+    return html9;
   }
   var unescapeTest = /&(#(?:\d+)|(?:#x[0-9A-Fa-f]+)|(?:\w+));?/ig;
-  function unescape(html8) {
-    return html8.replace(unescapeTest, (_, n3) => {
+  function unescape(html9) {
+    return html9.replace(unescapeTest, (_, n3) => {
       n3 = n3.toLowerCase();
       if (n3 === "colon")
         return ":";
@@ -3957,8 +3959,8 @@
 ${quote}</blockquote>
 `;
     }
-    html(html8, block2) {
-      return html8;
+    html(html9, block2) {
+      return html9;
     }
     heading(text, level, raw) {
       return `<h${level}>${text}</h${level}>
@@ -4326,8 +4328,8 @@ ${content}</tr>
     /**
      * Process HTML after marked is finished
      */
-    postprocess(html8) {
-      return html8;
+    postprocess(html9) {
+      return html9;
     }
   };
   var Marked = class {
@@ -4542,7 +4544,7 @@ ${content}</tr>
           opt.hooks.options = opt;
         }
         if (opt.async) {
-          return Promise.resolve(opt.hooks ? opt.hooks.preprocess(src) : src).then((src2) => lexer2(src2, opt)).then((tokens) => opt.walkTokens ? Promise.all(this.walkTokens(tokens, opt.walkTokens)).then(() => tokens) : tokens).then((tokens) => parser2(tokens, opt)).then((html8) => opt.hooks ? opt.hooks.postprocess(html8) : html8).catch(throwError);
+          return Promise.resolve(opt.hooks ? opt.hooks.preprocess(src) : src).then((src2) => lexer2(src2, opt)).then((tokens) => opt.walkTokens ? Promise.all(this.walkTokens(tokens, opt.walkTokens)).then(() => tokens) : tokens).then((tokens) => parser2(tokens, opt)).then((html9) => opt.hooks ? opt.hooks.postprocess(html9) : html9).catch(throwError);
         }
         try {
           if (opt.hooks) {
@@ -4552,11 +4554,11 @@ ${content}</tr>
           if (opt.walkTokens) {
             this.walkTokens(tokens, opt.walkTokens);
           }
-          let html8 = parser2(tokens, opt);
+          let html9 = parser2(tokens, opt);
           if (opt.hooks) {
-            html8 = opt.hooks.postprocess(html8);
+            html9 = opt.hooks.postprocess(html9);
           }
-          return html8;
+          return html9;
         } catch (e3) {
           return throwError(e3);
         }
@@ -5414,7 +5416,33 @@ ${content}</tr>
     </nav>`;
   }
 
+  // src/components/AudioPlayer.js
+  var html7 = htm_module_default.bind(y);
+  function AudioPlayer({ mp3, onTimeUpdate }) {
+    if (!mp3) {
+      return null;
+    }
+    let onPlay = (_evt) => {
+      console.log("Playing audio");
+    };
+    let onPause = (_evt) => {
+      console.log("Pausing audio");
+    };
+    let _onTimeUpdate = (evt) => {
+      onTimeUpdate(Math.floor(evt.target.currentTime * 1e3));
+    };
+    let onEnded = (_evt) => {
+      console.log("Audio ended");
+    };
+    return html7`<div class="audio-footer">
+        <audio controls preload onPlay=${onPlay} onPause=${onPause} onTimeUpdate=${_onTimeUpdate} onEnded=${onEnded}>
+            <source src="${mp3}" type="audio/mpeg" />
+        </audio>
+    </div>`;
+  }
+
   // app.js
+  var html8 = htm_module_default.bind(y);
   function debounce(func, timeout = 300) {
     let timer;
     return (...args) => {
@@ -5424,7 +5452,6 @@ ${content}</tr>
       }, timeout);
     };
   }
-  var html7 = htm_module_default.bind(y);
   var App = class extends b {
     constructor(props) {
       super(props);
@@ -5481,6 +5508,21 @@ ${content}</tr>
         };
       }
     }
+    onTimeUpdate(time_ms) {
+      console.warn(`time update: ${time_ms}`);
+      let time_counter = 0;
+      for (let i3 = 0; i3 < this.state.index.toc.length; i3++) {
+        let { id, timing } = this.state.index.toc[i3];
+        let duration_ms = timing;
+        if (time_ms < time_counter + duration_ms) {
+          this.moveTo({ id });
+          break;
+        } else {
+          time_counter += duration_ms;
+        }
+      }
+      console.dir(this.state.index.toc);
+    }
     goToTop() {
       this.lastNavInteraction = Date.now();
       let element = this.base;
@@ -5488,6 +5530,9 @@ ${content}</tr>
       everything.scrollTop = 0;
     }
     moveTo({ id }) {
+      if (this.state.currentlySelected == id) {
+        return;
+      }
       let element = document.getElementById(id);
       console.warn(`moving to ${id}`);
       console.warn(element);
@@ -5547,9 +5592,10 @@ ${content}</tr>
         let select = () => {
           this.setCurrentlySelected(id, n3);
         };
-        return html7`<${VisibilityTriggerFrame} data=${this.data} order=${n3} id=${id} onPrimary=${select}/>`;
+        return html8`<${VisibilityTriggerFrame} data=${this.data} order=${n3} id=${id} onPrimary=${select}/>`;
       });
-      return html7`<div class="primary-card">
+      let mp3 = this.state.index.mp3;
+      return html8`<div class="primary-card">
             <div class="content">
                 <header id="primary-header" class="${headerVisible} ${disableTransparentIcons}">
                     <${Nav}
@@ -5572,6 +5618,7 @@ ${content}</tr>
                     ${items}
                     </div>
                 </div>
+                <${AudioPlayer} mp3=${mp3} onTimeUpdate=${this.onTimeUpdate.bind(this)} />
             </div>
         </div>`;
     }
@@ -5593,7 +5640,7 @@ ${content}</tr>
       console.warn(`loading index for s/${userSlug}/${contentSlug}#${hash}`);
       await Data2.loadIndex({ userSlug, contentSlug, contentId: hash });
     }
-    let app = html7`<${App} data=${Data2} initialElement=${window.location.hash} />`;
+    let app = html8`<${App} data=${Data2} initialElement=${window.location.hash} />`;
     B(app, document.getElementById("app"));
   }
   main();

@@ -34,6 +34,7 @@ class RealServer{
             locale: serverIndex.metadata.locale,
             contentIds: serverIndex.deck_ids || [],
             toc: serverIndex.toc || [],
+            mp3: serverIndex.metadata.mp3,
             updatedAt: new Date(serverIndex?.metadata?.last_update_time?.secs_since_epoch * 1000),
             updatedAtTimestamp: serverIndex?.metadata?.last_update_time?.secs_since_epoch,
         }
@@ -87,6 +88,8 @@ class RealServer{
             delay: card.delay,
             easing: card.easing,
             animateContainer: card.animate_container,
+
+            next: card.next,
 
             stack: card.stack.map(this.cardTransform.bind(this)),
             tocDepth: card.toc_depth,

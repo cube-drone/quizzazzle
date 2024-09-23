@@ -23,6 +23,8 @@ pub struct DeckMetadata{
     pub hidden: bool,
     pub unlisted: bool,
     pub last_update_time: std::time::SystemTime,
+    pub mp3: Option<String>,
+    pub audio_guide: bool,
 }
 
 impl DeckMetadata{
@@ -98,6 +100,9 @@ pub struct Card{
     pub easing: Option<String>,
     pub animate_container: Option<bool>,
 
+    // mp3
+    pub next: Option<i64>,
+
     // meta-card
     pub stack: Vec<Card>,
 
@@ -111,6 +116,7 @@ impl Card{
             title: self.title.clone(),
             id: self.id.clone(),
             depth: self.toc_depth.unwrap_or(1),
+            timing: self.next.unwrap_or(5000),
         }
     }
 }
@@ -120,6 +126,7 @@ pub struct TableOfContentsEntry{
     pub title: Option<String>,
     pub id: String,
     pub depth: i64,
+    pub timing: i64,
 }
 
 pub struct MinistryDirectory{
@@ -321,6 +328,8 @@ impl MinistryDirectory{
             extra_header: doc["extra_header"].as_str().map(|s| s.to_string()),
             hidden: doc["hidden"].as_bool().unwrap_or(false),
             unlisted: doc["unlisted"].as_bool().unwrap_or(false),
+            mp3: doc["mp3"].as_str().map(|s| s.to_string()),
+            audio_guide: doc["audio_guide"].as_bool().unwrap_or(false),
             last_update_time
         };
         Ok(dm)
@@ -494,6 +503,8 @@ impl MinistryDirectory{
             delay: doc["delay"].as_i64(),
             easing: doc["easing"].as_str().map(|s| s.to_string()),
             animate_container: doc["animate_container"].as_bool(),
+
+            next: doc["next"].as_i64(),
 
             stack,
 

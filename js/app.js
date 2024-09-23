@@ -5,7 +5,9 @@ import { initialize } from './src/data.js';
 import VisibilityTriggerFrame from './src/components/VisibilityTriggerFrame.js';
 import Nav from './src/components/Nav.js';
 import NavDropdown from './src/components/NavDropdown.js';
+import AudioPlayer from './src/components/AudioPlayer.js';
 
+const html = htm.bind(h);
 
 function debounce(func, timeout = 300){
     let timer;
@@ -14,8 +16,6 @@ function debounce(func, timeout = 300){
       timer = setTimeout(() => { func.apply(this, args); }, timeout);
     };
 }
-
-const html = htm.bind(h);
 
 class App extends Component {
 
@@ -89,6 +89,25 @@ class App extends Component {
         }
     }
 
+    onTimeUpdate(time_ms){
+        console.warn(`time update: ${time_ms}`);
+
+        let time_counter = 0;
+        for(let i = 0; i < this.state.index.toc.length; i++){
+            let {id, timing} = this.state.index.toc[i];
+            let duration_ms = timing;
+            if(time_ms < time_counter + duration_ms){
+                this.moveTo({id});
+                break;
+            }
+            else{
+                time_counter += duration_ms;
+            }
+        }
+
+        console.dir(this.state.index.toc);
+    }
+
     goToTop(){
         this.lastNavInteraction = Date.now();
         let element = this.base;
@@ -97,6 +116,11 @@ class App extends Component {
     }
 
     moveTo({id}){
+        // if we're already there, don't do anything
+        if(this.state.currentlySelected == id){
+            return;
+        }
+
         let element = document.getElementById(id);
         console.warn(`moving to ${id}`);
         console.warn(element);
@@ -182,6 +206,8 @@ class App extends Component {
             return html`<${VisibilityTriggerFrame} data=${this.data} order=${n} id=${id} onPrimary=${select}/>`;
         });
 
+        let mp3 = this.state.index.mp3;
+
         return html`<div class="primary-card">
             <div class="content">
                 <header id="primary-header" class="${headerVisible} ${disableTransparentIcons}">
@@ -205,8 +231,9 @@ class App extends Component {
                     ${items}
                     </div>
                 </div>
+                <${AudioPlayer} mp3=${mp3} onTimeUpdate=${this.onTimeUpdate.bind(this)} />
             </div>
-        </div>`
+        </div>`;
     }
 
 }

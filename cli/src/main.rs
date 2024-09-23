@@ -252,8 +252,7 @@ fn index_template(deck_metadata: DeckMetadata, config: &State<Config>, is_home: 
                             </div>
                         </div>
                     </div>
-                </div>`
-
+                </div>
             </div>
             <script src="{}"></script>
         </body>

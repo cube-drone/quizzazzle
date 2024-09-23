@@ -1,0 +1,20 @@
+
+.audio-footer {
+    display: block;
+    color: white;
+    mix-blend-mode: multiply;
+    width: 100%;
+    height: 35px;
+    background-color: black;
+    position: absolute;
+    z-index: 10;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    justify-content: space-between;
+}
+
+.audio-footer audio{
+    width: 100%;
+    margin: auto;
+}
