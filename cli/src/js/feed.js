@@ -971,6 +971,7 @@
         contentIds: serverIndex.deck_ids || [],
         toc: serverIndex.toc || [],
         mp3: serverIndex.metadata.mp3,
+        audioGuide: serverIndex.metadata.audio_guide,
         updatedAt: new Date(serverIndex?.metadata?.last_update_time?.secs_since_epoch * 1e3),
         updatedAtTimestamp: serverIndex?.metadata?.last_update_time?.secs_since_epoch
       };
@@ -5509,7 +5510,9 @@ ${content}</tr>
       }
     }
     onTimeUpdate(time_ms) {
-      console.warn(`time update: ${time_ms}`);
+      if (this.state.index.audioGuide == false || this.state.index.mp3 == null) {
+        return;
+      }
       let time_counter = 0;
       for (let i3 = 0; i3 < this.state.index.toc.length; i3++) {
         let { id, timing } = this.state.index.toc[i3];

@@ -90,7 +90,13 @@ class App extends Component {
     }
 
     onTimeUpdate(time_ms){
-        console.warn(`time update: ${time_ms}`);
+        // we get time updates from the audio player, and we use them to determine where we are in the content
+        // (so if you scrub around in the audio player, we'll move to the appropriate content)
+
+        if(this.state.index.audioGuide == false || this.state.index.mp3 == null){
+            // if the audio guide is disabled or there's no audio, we don't want to do anything
+            return;
+        }
 
         let time_counter = 0;
         for(let i = 0; i < this.state.index.toc.length; i++){

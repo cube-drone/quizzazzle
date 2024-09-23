@@ -35,6 +35,7 @@ class RealServer{
             contentIds: serverIndex.deck_ids || [],
             toc: serverIndex.toc || [],
             mp3: serverIndex.metadata.mp3,
+            audioGuide: serverIndex.metadata.audio_guide,
             updatedAt: new Date(serverIndex?.metadata?.last_update_time?.secs_since_epoch * 1000),
             updatedAtTimestamp: serverIndex?.metadata?.last_update_time?.secs_since_epoch,
         }
