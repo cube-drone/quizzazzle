@@ -43,6 +43,7 @@ body, #app{
 @media only screen and (max-width: 600px) {
     body{
         margin: 0;
+        overflow: hidden;
     }
     .primary-card{
         width: 100%;
@@ -53,12 +54,12 @@ body, #app{
     }
     .primary-card .content{
         width: 100% !important;
-        height: 100vh !important;
+        height: 93vh !important;
     }
     .primary-card .content .everything{
         padding: 0;
         width: 100% !important;
-        height: 100vh !important;
+        height: 100vh;
     }
 
     .primary-card .content .everything-feed{
