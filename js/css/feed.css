@@ -11,7 +11,7 @@
 .frame{
     width: var(--frame-width);
     height: var(--frame-height);
-    margin: 10px auto;
+    margin: 30px auto;
     overflow: hidden;
 }
 

@@ -12,13 +12,16 @@ svg {
     min-width: 20px;
 }
 
+body, #app{
+    margin: 0;
+    padding: 0;
+}
+
 
 /* the primary card is the central frame, the card that sits around all of the content */
 .primary-card {
-    width: 100px;
-    width: 96vw;
-    height: 100px;
-    height: 92vh;
+    width: 100vw;
+    height: 100vh;
     box-sizing: border-box;
     color: black;
     font-size: large;
@@ -35,16 +38,37 @@ svg {
 
     min-width: 360px;
     margin: auto;
-    border: 5px solid white;
 }
 
 @media only screen and (max-width: 600px) {
     body{
         margin: 0;
     }
-    .primary-card {
-        border: none;
+    .primary-card{
+        width: 100%;
+        height: 100vh;
         padding: 0;
+        overflow: hidden;
+        min-width: 100px;
+    }
+    .primary-card .content{
+        width: 100% !important;
+        height: 100vh !important;
+    }
+    .primary-card .content .everything{
+        padding: 0;
+        width: 100% !important;
+        height: 100vh !important;
+    }
+
+    .primary-card .content .everything-feed{
+        padding: 0;
+        width: 100% !important;
+        height: 600px;
+        /* center vertically */
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
     }
   }
 
