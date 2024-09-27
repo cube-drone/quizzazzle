@@ -94,19 +94,24 @@ pages:
     id: animated-text
   - id: even-more-animated-text
     animated_text: |
-      <jitter>Coffee coffee coffee coffee</jitter>
-      This text is <bounce>even more</bounce> animated!
-      C:\><cursor>dir \home\owen\bees</cursor>
+      <slow bounce="true" rainbow="true">ROYAL RAINBOW</slow>
+      <jitter color="brown" style="background-color: black;">Coffee coffee coffee coffee</jitter>
+      This text is <beat/><bounce>even more</bounce> animated!
+      <div color="limegreen" style="background-color: black;">C:\><cursor>dir \home\owen\bees</cursor></div>
+      <beat />
+      <div class="no-pad">Bees are <wave color="yellow">wavey</wave>!</div>
       Give me a little <wave>wavey wave on that textaroo</wave>!
+      <style value="font-size: 2em;">This text is big!</style>
+      <wavy style="font-size: 0.5em;" color="pink">This text is small!</wavy>
+      <color value="#ff0000">This text is red!</color>
+      <strong>Strong <em>text!</em></strong>
       <fast>It's got <fade>completely different</fade> animations!</fast>
       <faster>It's so faster!</faster>
       <faster>This is unbelievably fast whoa whoa whoa</faster>
-      <slow>It's so slow!</slow>
-      <slower>It's so slower!</slower>
-      <slowest>slow</slowest>
-  - id: royal-rainbow
-    animated_text: |
-      <slow><bounce><rainbow>ROYAL RAINBOW</rainbow></bounce></slow>
+      <slow>It's so <slower>slow!</slower></slow>
+      <slowest>s l o w</slowest>
+      <pause ms="7000"/>
+      <slow><bounce><rainbow>ROYAL RAINBOW!!!</rainbow></bounce></slow>
   - id: wow
     depth: 2
     pan_down: 400

@@ -130,6 +130,10 @@ body,
   margin: 0;
   padding: 0;
 }
+.no-pad {
+  margin: 0;
+  padding: 0;
+}
 .primary-card {
   width: 100vw;
   height: 100vh;
@@ -622,6 +626,7 @@ a.pushbutton:hover .opt {
 .error-card {
   background-color: rgba(235, 79, 79, 0.3);
   font-size: small;
+  overflow: auto;
 }
 .restrict-max-height img {
   max-height: var(--frame-height);

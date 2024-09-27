@@ -4814,7 +4814,7 @@ ${content}</tr>
         ${images}
     </${AnyCard}>`;
   }
-  function BasicTextAnimation({ text, next, fps, wave, bounce, jitter, fadeIn, rainbow, cursor }) {
+  function BasicTextAnimation({ text, next, fps, wave, bounce, jitter, fadeIn, rainbow, cursor, color, style, className, em, strong }) {
     let [animatedTextInterval, setAnimatedTextInterval] = h2(null);
     p2(() => {
       let characters = this.base.querySelectorAll("span");
@@ -4906,13 +4906,25 @@ ${content}</tr>
         setAnimatedTextInterval(animatedTextInterval);
       }, 0);
     }, []);
-    let inlineExtras = "";
+    let styleExtras = "";
+    if (color) {
+      styleExtras += `color: ${color};`;
+    }
+    if (em) {
+      styleExtras += `font-style: italic;`;
+    }
+    if (strong) {
+      styleExtras += `font-weight: bold;`;
+    }
+    if (style) {
+      styleExtras += `${style};`;
+    }
     let textSeparated = text.split("").map((char, index) => {
-      return html`<span style="display: none; opacity: 0;${inlineExtras}">${char}</span>`;
+      return html`<span class=${className} style="display: none; opacity: 0;${styleExtras}">${char}</span>`;
     });
     let cursy = "";
     if (cursor) {
-      cursy = html`<span class="cursor" style="opacity: 1;">_</span>`;
+      cursy = html`<span class="cursor" style="opacity: 1;${styleExtras}">_</span>`;
     }
     return html`
         <span class="basic-text-animation">
@@ -4921,22 +4933,33 @@ ${content}</tr>
         </span>
     `;
   }
-  function LineBreakAnimation({ next, fps }) {
+  function LineBreakAnimation({ next }) {
+    let lineBreakMs = 750;
     p2(() => {
       setTimeout(() => {
         next();
-      }, 1e3 / fps);
+      }, lineBreakMs);
     }, []);
     return html`<br />`;
   }
-  function ComplexTextAnimation({ node, next, fps, primary, visible, wave, bounce, jitter, fadeIn, rainbow, cursor }) {
+  function DelayAnimation({ next, delay }) {
+    p2(() => {
+      setTimeout(() => {
+        next();
+      }, delay);
+    }, []);
+    return null;
+  }
+  function ComplexTextAnimation({ node, next, fps, primary, visible, delay = 0, wave, bounce, jitter, fadeIn, rainbow, cursor, color, strong, em, style, className }) {
     let [currentIndex, setCurrentIndex] = h2(1);
     let [active, setActive] = h2(false);
     let animations = [];
     p2(() => {
       if (primary) {
-        setCurrentIndex(1);
-        setActive(true);
+        setTimeout(() => {
+          setCurrentIndex(1);
+          setActive(true);
+        }, delay);
       } else {
         setCurrentIndex(0);
         setActive(false);
@@ -4952,28 +4975,60 @@ ${content}</tr>
     for (let child of node.childNodes) {
       let key = `anim-${counter++}`;
       let _wave = wave;
-      if (child.nodeName === "wave") {
+      if (child.nodeName === "wave" || child.nodeName === "wavy" || child.getAttribute && child.getAttribute("wave")) {
         _wave = true;
       }
       let _bounce = bounce;
-      if (child.nodeName === "bounce") {
+      if (child.nodeName === "bounce" || child.getAttribute && child.getAttribute("bounce")) {
         _bounce = true;
       }
       let _jitter = jitter;
-      if (child.nodeName === "jitter") {
+      if (child.nodeName === "jitter" || child.getAttribute && child.getAttribute("jitter")) {
         _jitter = true;
       }
       let _fadeIn = fadeIn;
-      if (child.nodeName === "fade") {
+      if (child.nodeName === "fade" || child.getAttribute && child.getAttribute("fade")) {
         _fadeIn = true;
       }
       let _rainbow = rainbow;
-      if (child.nodeName === "rainbow") {
+      if (child.nodeName === "rainbow" || child.getAttribute && child.getAttribute("rainbow")) {
         _rainbow = true;
       }
       let _cursor = cursor;
-      if (child.nodeName === "cursor") {
+      if (child.nodeName === "cursor" || child.getAttribute && child.getAttribute("cursor")) {
         _cursor = true;
+      }
+      let _color = color;
+      if (child.nodeName === "color") {
+        if (child.getAttribute) {
+          _color = child.getAttribute("value") ?? "white";
+        } else {
+          _color = "white";
+        }
+      }
+      if (child.getAttribute && child.getAttribute("color")) {
+        _color = child.getAttribute("color");
+      }
+      let _style = style;
+      if (child.nodeName === "style") {
+        if (child.getAttribute) {
+          _style = `${style};${child.getAttribute("value") ?? ""}`;
+        }
+      }
+      if (child.getAttribute && child.getAttribute("style")) {
+        _style = `${style};${child.getAttribute("style")}`;
+      }
+      let _class = className;
+      if (child.getAttribute && child.getAttribute("class")) {
+        _class = `${className} ${child.getAttribute("class") ?? ""}`;
+      }
+      let _em = em;
+      if (child.nodeName === "em") {
+        _em = true;
+      }
+      let _strong = strong;
+      if (child.nodeName === "strong") {
+        _strong = true;
       }
       let _fps = fps;
       if (child.nodeName === "slow") {
@@ -4996,12 +5051,36 @@ ${content}</tr>
             complex = true;
           }
         }
+        if (child.nodeName === "div") {
+          complex = true;
+        }
       }
       if (child.nodeName === "br") {
         animations.push(html`<${LineBreakAnimation} next=${newNext} fps=${_fps} key=${key} />`);
         continue;
+      } else if (child.nodeName === "beat") {
+        let delayAmount = child.getAttribute("ms") ?? 750;
+        animations.push(html`<${DelayAnimation} next=${newNext} delay=${delayAmount} key=${key} />`);
+        continue;
+      } else if (child.nodeName === "delay") {
+        let delayAmount = child.getAttribute("ms") ?? 1500;
+        animations.push(html`<${DelayAnimation} next=${newNext} delay=${delayAmount} key=${key} />`);
+        continue;
+      } else if (child.nodeName === "pause") {
+        let delayAmount = child.getAttribute("ms") ?? 3e3;
+        animations.push(html`<${DelayAnimation} next=${newNext} delay=${delayAmount} key=${key} />`);
+        continue;
       } else if (complex) {
-        animations.push(html`<${ComplexTextAnimation}
+        let tempStyle, tempClass, tempColor;
+        if (child.nodeName === "div") {
+          tempStyle = _style;
+          _style = null;
+          tempClass = _class;
+          _class = null;
+          tempColor = _color;
+          _color = null;
+        }
+        let animation = html`<${ComplexTextAnimation}
                 node=${child}
                 next=${newNext}
                 fps=${_fps}
@@ -5013,7 +5092,20 @@ ${content}</tr>
                 fadeIn=${_fadeIn}
                 rainbow=${_rainbow}
                 cursor=${_cursor}
-                key=${key} />`);
+                color=${_color}
+                strong=${_strong}
+                em=${_em}
+                style=${_style}
+                className=${_class}
+                key=${key} />`;
+        if (child.nodeName === "div") {
+          if (tempColor) {
+            tempStyle = `${tempStyle};color:${tempColor}`;
+          }
+          animations.push(html`<div class="complex-animation" style=${tempStyle} class=${tempClass}>${animation}</div>`);
+        } else {
+          animations.push(animation);
+        }
       } else {
         animations.push(html`<${BasicTextAnimation}
                 text=${child.textContent}
@@ -5025,6 +5117,11 @@ ${content}</tr>
                 fadeIn=${_fadeIn}
                 rainbow=${_rainbow}
                 cursor=${_cursor}
+                color=${_color}
+                strong=${_strong}
+                em=${_em}
+                style=${_style}
+                className=${_class}
                 key=${key} />`);
       }
     }
@@ -5041,12 +5138,16 @@ ${content}</tr>
   function AnimatedTextCard({ card, primary, visible, stackIndex }) {
     let fps = card.fps ?? 24;
     let parsedXml = new DOMParser().parseFromString(`<animation>${card.content}</animation>`, "text/xml");
+    if (parsedXml.documentElement.nodeName === "parsererror") {
+      console.error("Error parsing XML");
+      return html`<${ErrorCard} message="Error parsing Animation XML" card=${card} stackIndex=${stackIndex} primary=${primary} visible=${visible} />`;
+    }
     function done() {
       console.log("done");
     }
     return html`<${AnyCard} card=${card} cardType="animated-text" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
         <div class="animated-text-content">
-            <${ComplexTextAnimation} node=${parsedXml.childNodes[0]} fps=${fps} next=${done} primary=${primary} visible=${visible} />
+            <${ComplexTextAnimation} node=${parsedXml.childNodes[0]} fps=${fps} next=${done} primary=${primary} visible=${visible} delay=${card.delay ?? 0} />
         </div>
     </${AnyCard}>`;
   }
@@ -5071,8 +5172,10 @@ ${content}</tr>
         </video>
     </${AnyCard}>`;
   }
-  function ErrorCard({ card, stackIndex, primary, visible }) {
+  function ErrorCard({ card, message, stackIndex, primary, visible }) {
     return html`<${AnyCard} card=${card} cardType="error" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
+        <h4>Error</h4>
+        <p>${message}</p>
         <div class="error-content">
             <pre>
             <code>

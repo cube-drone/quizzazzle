@@ -17,6 +17,11 @@ body, #app{
     padding: 0;
 }
 
+.no-pad{
+    margin: 0;
+    padding: 0;
+}
+
 
 /* the primary card is the central frame, the card that sits around all of the content */
 .primary-card {

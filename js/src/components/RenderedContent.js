@@ -242,7 +242,7 @@ function AnimatedImageCard({card, primary, visible, stackIndex}){
     </${AnyCard}>`;
 }
 
-function BasicTextAnimation({text, next, fps, wave, bounce, jitter, fadeIn, rainbow, cursor}){
+function BasicTextAnimation({text, next, fps, wave, bounce, jitter, fadeIn, rainbow, cursor, color, style, className, em, strong}){
     let [animatedTextInterval, setAnimatedTextInterval] = useState(null);
 
     useEffect(() => {
@@ -343,19 +343,25 @@ function BasicTextAnimation({text, next, fps, wave, bounce, jitter, fadeIn, rain
 
     }, []);
 
-    /*
-    let inlineExtras = '';
-    if (bounce || wave || jitter) {
-        inlineExtras += 'display: inline-block;min-width:0.25em;';
+    let styleExtras = '';
+    if(color){
+        styleExtras += `color: ${color};`;
     }
-    */
-    let inlineExtras = '';
+    if(em){
+        styleExtras += `font-style: italic;`;
+    }
+    if(strong){
+        styleExtras += `font-weight: bold;`;
+    }
+    if(style){
+        styleExtras += `${style};`;
+    }
 
-    let textSeparated = text.split('').map((char, index) => {return html`<span style="display: none; opacity: 0;${inlineExtras}">${char}</span>`;});
+    let textSeparated = text.split('').map((char, index) => {return html`<span class=${className} style="display: none; opacity: 0;${styleExtras}">${char}</span>`;});
 
     let cursy = '';
     if(cursor){
-        cursy = html`<span class="cursor" style="opacity: 1;">_</span>`;
+        cursy = html`<span class="cursor" style="opacity: 1;${styleExtras}">_</span>`;
     }
 
     return html`
@@ -366,17 +372,29 @@ function BasicTextAnimation({text, next, fps, wave, bounce, jitter, fadeIn, rain
     `;
 }
 
-function LineBreakAnimation({next, fps}){
+function LineBreakAnimation({next}){
+    // every line break implies a little pause
+    let lineBreakMs = 750;
     useEffect(() => {
         setTimeout(() => {
             next();
-        }, 1000 / fps);
+        }, lineBreakMs);
     }, []);
 
     return html`<br />`;
 }
 
-function ComplexTextAnimation({node, next, fps, primary, visible, wave, bounce, jitter, fadeIn, rainbow, cursor}){
+function DelayAnimation({next, delay}){
+    useEffect(() => {
+        setTimeout(() => {
+            next();
+        }, delay);
+    }, []);
+
+    return null;
+}
+
+function ComplexTextAnimation({node, next, fps, primary, visible, delay=0, wave, bounce, jitter, fadeIn, rainbow, cursor, color, strong, em, style, className}){
     // call next() when done
 
     let [currentIndex, setCurrentIndex] = useState(1);
@@ -385,8 +403,10 @@ function ComplexTextAnimation({node, next, fps, primary, visible, wave, bounce, 
 
     useEffect(() => {
         if(primary){
-            setCurrentIndex(1);
-            setActive(true);
+            setTimeout(() => {
+                setCurrentIndex(1);
+                setActive(true);
+            }, delay);
         }
         else{
             setCurrentIndex(0);
@@ -406,28 +426,62 @@ function ComplexTextAnimation({node, next, fps, primary, visible, wave, bounce, 
     for(let child of node.childNodes){
         let key = `anim-${counter++}`;
         let _wave = wave;
-        if(child.nodeName === 'wave'){
+        if(child.nodeName === 'wave' || child.nodeName === "wavy" || (child.getAttribute && child.getAttribute('wave'))){
             _wave = true;
         }
         let _bounce = bounce;
-        if(child.nodeName === 'bounce'){
+        if(child.nodeName === 'bounce' || (child.getAttribute && child.getAttribute('bounce'))){
             _bounce = true;
         }
         let _jitter = jitter;
-        if(child.nodeName === 'jitter'){
+        if(child.nodeName === 'jitter' || (child.getAttribute && child.getAttribute('jitter'))){
             _jitter = true;
         }
         let _fadeIn = fadeIn;
-        if(child.nodeName === 'fade'){
+        if(child.nodeName === 'fade' || (child.getAttribute && child.getAttribute('fade'))){
             _fadeIn = true;
         }
         let _rainbow = rainbow;
-        if(child.nodeName === 'rainbow'){
+        if(child.nodeName === 'rainbow' || (child.getAttribute && child.getAttribute('rainbow'))){
             _rainbow = true;
         }
         let _cursor = cursor;
-        if(child.nodeName === 'cursor'){
+        if(child.nodeName === 'cursor' || (child.getAttribute && child.getAttribute('cursor'))){
             _cursor = true;
+        }
+        let _color = color;
+        if(child.nodeName === 'color'){
+            if(child.getAttribute){
+                _color = child.getAttribute('value') ?? 'white';
+            }
+            else{
+                _color = 'white';
+            }
+        }
+        if(child.getAttribute && child.getAttribute('color')){
+            _color = child.getAttribute('color');
+        }
+        let _style = style;
+        if(child.nodeName === 'style'){
+            if(child.getAttribute){
+                _style = `${style};${child.getAttribute('value') ?? ''}`;
+            }
+        }
+        if(child.getAttribute && child.getAttribute('style')){
+            _style = `${style};${child.getAttribute('style')}`;
+        }
+        let _class = className;
+        if(child.getAttribute && child.getAttribute('class')){
+            _class = `${className} ${child.getAttribute('class') ?? ''}`;
+        }
+
+        let _em = em;
+        if(child.nodeName === 'em'){
+            _em = true;
+        }
+        let _strong = strong;
+        if(child.nodeName === 'strong'){
+            _strong = true;
         }
 
         let _fps = fps;
@@ -457,14 +511,46 @@ function ComplexTextAnimation({node, next, fps, primary, visible, wave, bounce, 
                     complex = true;
                 }
             }
+            if(child.nodeName === "div"){
+                complex = true;
+            }
         }
 
         if(child.nodeName === 'br'){
             animations.push(html`<${LineBreakAnimation} next=${newNext} fps=${_fps} key=${key} />`);
             continue;
         }
+        else if(child.nodeName === 'beat'){
+            let delayAmount = child.getAttribute('ms') ?? 750;
+            animations.push(html`<${DelayAnimation} next=${newNext} delay=${delayAmount} key=${key} />`);
+            continue;
+        }
+        else if(child.nodeName === 'delay'){
+            let delayAmount = child.getAttribute('ms') ?? 1500;
+            animations.push(html`<${DelayAnimation} next=${newNext} delay=${delayAmount} key=${key} />`);
+            continue;
+        }
+        else if(child.nodeName === 'pause'){
+            let delayAmount = child.getAttribute('ms') ?? 3000;
+            animations.push(html`<${DelayAnimation} next=${newNext} delay=${delayAmount} key=${key} />`);
+            continue;
+        }
         else if(complex){
-            animations.push(html`<${ComplexTextAnimation}
+
+            let tempStyle, tempClass, tempColor;
+            if(child.nodeName === 'div'){
+                // if it's a div, then we don't want to pass the style, class, or color to the children
+                //   (depend on the div's bubblin')
+                tempStyle = _style;
+                _style = null;
+                tempClass = _class;
+                _class = null;
+                tempColor = _color;
+                _color = null;
+            }
+
+
+            let animation = html`<${ComplexTextAnimation}
                 node=${child}
                 next=${newNext}
                 fps=${_fps}
@@ -476,7 +562,22 @@ function ComplexTextAnimation({node, next, fps, primary, visible, wave, bounce, 
                 fadeIn=${_fadeIn}
                 rainbow=${_rainbow}
                 cursor=${_cursor}
-                key=${key} />`);
+                color=${_color}
+                strong=${_strong}
+                em=${_em}
+                style=${_style}
+                className=${_class}
+                key=${key} />`;
+
+            if(child.nodeName === 'div'){
+                if(tempColor){
+                    tempStyle = `${tempStyle};color:${tempColor}`;
+                }
+                animations.push(html`<div class="complex-animation" style=${tempStyle} class=${tempClass}>${animation}</div>`);
+            }
+            else{
+                animations.push(animation);
+            }
         }
         else{
             animations.push(html`<${BasicTextAnimation}
@@ -489,6 +590,11 @@ function ComplexTextAnimation({node, next, fps, primary, visible, wave, bounce, 
                 fadeIn=${_fadeIn}
                 rainbow=${_rainbow}
                 cursor=${_cursor}
+                color=${_color}
+                strong=${_strong}
+                em=${_em}
+                style=${_style}
+                className=${_class}
                 key=${key} />`);
         }
     }
@@ -510,13 +616,18 @@ function AnimatedTextCard({card, primary, visible, stackIndex}){
 
     let parsedXml = new DOMParser().parseFromString(`<animation>${card.content}</animation>`, 'text/xml');
 
+    if(parsedXml.documentElement.nodeName === 'parsererror'){
+        console.error('Error parsing XML');
+        return html`<${ErrorCard} message="Error parsing Animation XML" card=${card} stackIndex=${stackIndex} primary=${primary} visible=${visible} />`;
+    }
+
     function done(){
         console.log('done');
     }
 
     return html`<${AnyCard} card=${card} cardType="animated-text" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
         <div class="animated-text-content">
-            <${ComplexTextAnimation} node=${parsedXml.childNodes[0]} fps=${fps} next=${done} primary=${primary} visible=${visible} />
+            <${ComplexTextAnimation} node=${parsedXml.childNodes[0]} fps=${fps} next=${done} primary=${primary} visible=${visible} delay=${card.delay ?? 0} />
         </div>
     </${AnyCard}>`;
 }
@@ -551,9 +662,11 @@ function VideoCard({card, primary, visible, stackIndex}){
     </${AnyCard}>`;
 }
 
-function ErrorCard({card, stackIndex, primary, visible}){
+function ErrorCard({card, message, stackIndex, primary, visible}){
 
     return html`<${AnyCard} card=${card} cardType="error" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
+        <h4>Error</h4>
+        <p>${message}</p>
         <div class="error-content">
             <pre>
             <code>
