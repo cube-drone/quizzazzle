@@ -10,7 +10,7 @@ class RealServer{
     }
 
     async getIndexId({userSlug, contentSlug}){
-        console.warn(`getting index id for ${userSlug}/${contentSlug}`);
+        console.log(`getting index id for ${userSlug}/${contentSlug}`);
         if(userSlug == null || contentSlug == null){
             const response = await fetch(`${this.serverUrl}/index`, {});
             this.index = await response.json();
@@ -39,7 +39,7 @@ class RealServer{
             updatedAt: new Date(serverIndex?.metadata?.last_update_time?.secs_since_epoch * 1000),
             updatedAtTimestamp: serverIndex?.metadata?.last_update_time?.secs_since_epoch,
         }
-        console.dir(appIndex);
+        //console.dir(appIndex);
         return appIndex;
     }
 
@@ -111,7 +111,7 @@ class RealServer{
     }
 
     async getContent({indexId, contentId}){
-        console.warn(`getting: ${indexId} / ${contentId}`)
+        //console.warn(`getting: ${indexId} / ${contentId}`)
         const response = await fetch(`${this.serverUrl}${indexId}/content/${contentId}`, {});
         let card = await response.json();
         return this.cardTransform.bind(this)(card);
@@ -121,7 +121,8 @@ class RealServer{
         let contents = [];
         for (let contentId of contentIds){
             let content = await this.getContent({indexId, contentId});
-            console.warn(content);
+            contents.push(content);
+            //console.warn(content);
         }
         return contents;
     }
@@ -163,18 +164,9 @@ class Data{
         // while you're staring at the page, we keep loading content in the background
         setTimeout(this.ping.bind(this), 2000);
 
-        let sitemap;
-
-        if(sitemap){
-            console.log("loading sitemap from cache");
-            this.sitemap = JSON.parse(sitemap);
-        }
-        else{
-            this.server.getSitemap().then(sitemap => {
-                this.sitemap = sitemap;
-            });
-        }
-
+        this.server.getSitemap().then(sitemap => {
+            this.sitemap = sitemap;
+        });
     }
 
     async _addItem({node}){
@@ -182,8 +174,8 @@ class Data{
     }
 
     async _addItems(nodes){
-        console.log("adding items");
-        console.dir(nodes);
+        //console.log("adding items");
+        //console.dir(nodes);
         for(let node of nodes.filter(node => node != null)){
             this._addItem({node});
         }
@@ -281,9 +273,9 @@ class Data{
 
         let indexId = await this.server.getIndexId({userSlug, contentSlug});
         this.indexId = indexId;
-        console.warn(`got index id ${indexId}`);
+        console.log(`loading index id ${indexId}`);
 
-        console.warn(`loading index from server`);
+        // console.warn(`loading index from server`);
         this.index = await this.server.getIndex({indexId});
 
         if(contentId == null || contentId == ""){
@@ -326,7 +318,7 @@ class Data{
 
     bakePotato(){
         this.fullyLoadedBakedPotato = true;
-        console.log("baking the potato");
+        console.log("all content has been loaded");
     }
 
     async loadSomeNearbyContent(){
@@ -346,7 +338,6 @@ class Data{
         }
 
         // if we've gotten here, we've loaded all of the content
-        console.log("there's no more content to load");
         this.bakePotato();
     }
 

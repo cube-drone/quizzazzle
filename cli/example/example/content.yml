@@ -92,6 +92,21 @@ pages:
     shake: 100
     duration: 5000
     id: animated-text
+  - id: even-more-animated-text
+    animated_text: |
+      <jitter>Coffee coffee coffee coffee</jitter>
+      This text is <bounce>even more</bounce> animated!
+      C:\><cursor>dir \home\owen\bees</cursor>
+      Give me a little <wave>wavey wave on that textaroo</wave>!
+      <fast>It's got <fade>completely different</fade> animations!</fast>
+      <faster>It's so faster!</faster>
+      <faster>This is unbelievably fast whoa whoa whoa</faster>
+      <slow>It's so slow!</slow>
+      <slower>It's so slower!</slower>
+      <slowest>slow</slowest>
+  - id: royal-rainbow
+    animated_text: |
+      <slow><bounce><rainbow>ROYAL RAINBOW</rainbow></bounce></slow>
   - id: wow
     depth: 2
     pan_down: 400

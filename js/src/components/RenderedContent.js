@@ -242,52 +242,281 @@ function AnimatedImageCard({card, primary, visible, stackIndex}){
     </${AnyCard}>`;
 }
 
-function AnimatedTextCard({card, primary, visible, stackIndex}){
-    let textToAnimate = card.content;
-    let fps = card.fps ?? 24;
-
+function BasicTextAnimation({text, next, fps, wave, bounce, jitter, fadeIn, rainbow, cursor}){
     let [animatedTextInterval, setAnimatedTextInterval] = useState(null);
 
     useEffect(() => {
         let characters = this.base.querySelectorAll('span');
-        if(primary){
-            // start the video
-            setTimeout(() => {
-                clearInterval(animatedTextInterval);
-                let index = 0;
-                animatedTextInterval = setInterval(() => {
-                    characters.forEach((char, i) => {
-                        if(i === index){
+        setTimeout(() => {
+            clearInterval(animatedTextInterval);
+            let index = 0;
+            if(cursor){
+                let cursor = this.base.querySelector('.cursor');
+                let a = anime({
+                    targets: cursor,
+                    opacity: [1, 0],
+                    duration: 500,
+                    easing: 'linear',
+                    loop: true
+                })
+                a.play();
+            }
+
+            animatedTextInterval = setInterval(() => {
+                characters.forEach((char, i) => {
+                    if(i === index){
+                        char.style.display = 'inline';
+                        if(fadeIn){
+                            let a = anime({
+                                targets: char,
+                                opacity: [0, 1],
+                                duration: 1000,
+                                easing: 'linear'
+                            });
+                            a.play();
+                        }
+                        else{
                             char.style.opacity = '1';
                         }
-                    });
-                    index = (index + 1) % (characters.length+20);
-                    if(!card.loop && index === 0){
-                        clearInterval(animatedTextInterval);
+
+                        if(wave){
+                            char.style.display = 'inline-block';
+                            char.style.minWidth = '0.25em';
+                            let a = anime({
+                                targets: char,
+                                translateY: [-3, 3, -3, 3, -3, 3, 0],
+                                duration: 5000,
+                                easing: 'easeInOutQuad'
+                            });
+                            a.play();
+                        }
+
+                        if(bounce){
+                            char.style.display = 'inline-block';
+                            char.style.minWidth = '0.25em';
+                            let a = anime({
+                                targets: char,
+                                translateY: [-3, 3, -3, 3, -3, 3, -3, 3, -3, 3, -3, 3, -3, 3, -3, 3, -3, 3, 0],
+                                duration: 5000,
+                                easing: 'easeInOutBounce'
+                            });
+                            a.play();
+                        }
+
+                        if(jitter){
+                            char.style.display = 'inline-block';
+                            char.style.minWidth = '0.25em';
+                            let yTranslations = [];
+                            for(let i = 0; i < 20; i++){
+                                yTranslations.push(Math.random() * 4 - 2);
+                            }
+                            yTranslations.push(0);
+                            let a = anime({
+                                targets: char,
+                                translateY: yTranslations,
+                                duration: 1500,
+                                easing: 'easeInOutBack'
+                            });
+                            a.play();
+                        }
+
+                        if(rainbow){
+                            let a = anime({
+                                targets: char,
+                                color: ['#ff0000', '#ff7f00', '#ffff00', '#00ff00', '#0000ff', '#4b0082', '#8b00ff'],
+                                duration: 1000,
+                                easing: 'linear',
+                                loop: true
+                            });
+                            a.play();
+                        }
                     }
-                    else if (index === 0){
-                        characters.forEach((char, i) => {
-                            char.style.opacity = '0';
-                        });
-                    }
-                }, 1000 / fps);
-                setAnimatedTextInterval(animatedTextInterval);
-            }, card.delay ?? 0);
+                });
+                index = (index + 1) % (characters.length+1);
+                if(index === 0){
+                    clearInterval(animatedTextInterval);
+                    next();
+                }
+            }, 1000 / fps);
+            setAnimatedTextInterval(animatedTextInterval);
+        }, 0);
+
+    }, []);
+
+    /*
+    let inlineExtras = '';
+    if (bounce || wave || jitter) {
+        inlineExtras += 'display: inline-block;min-width:0.25em;';
+    }
+    */
+    let inlineExtras = '';
+
+    let textSeparated = text.split('').map((char, index) => {return html`<span style="display: none; opacity: 0;${inlineExtras}">${char}</span>`;});
+
+    let cursy = '';
+    if(cursor){
+        cursy = html`<span class="cursor" style="opacity: 1;">_</span>`;
+    }
+
+    return html`
+        <span class="basic-text-animation">
+            ${textSeparated}
+            ${cursy}
+        </span>
+    `;
+}
+
+function LineBreakAnimation({next, fps}){
+    useEffect(() => {
+        setTimeout(() => {
+            next();
+        }, 1000 / fps);
+    }, []);
+
+    return html`<br />`;
+}
+
+function ComplexTextAnimation({node, next, fps, primary, visible, wave, bounce, jitter, fadeIn, rainbow, cursor}){
+    // call next() when done
+
+    let [currentIndex, setCurrentIndex] = useState(1);
+    let [active, setActive] = useState(false);
+    let animations = [];
+
+    useEffect(() => {
+        if(primary){
+            setCurrentIndex(1);
+            setActive(true);
         }
         else{
-            characters.forEach((char, i) => {
-                char.style.opacity = '0';
-            });
-            clearInterval(animatedTextInterval);
+            setCurrentIndex(0);
+            setActive(false);
         }
 
     }, [primary]);
 
-    let textSeparated = textToAnimate.split('').map((char, index) => {return html`<span style="opacity: 0;">${char}</span>`;});
+    function newNext(){
+        setCurrentIndex(currentIndex + 1);
+        if(currentIndex === animations.length){
+            next();
+        }
+    }
+
+    let counter = 0;
+    for(let child of node.childNodes){
+        let key = `anim-${counter++}`;
+        let _wave = wave;
+        if(child.nodeName === 'wave'){
+            _wave = true;
+        }
+        let _bounce = bounce;
+        if(child.nodeName === 'bounce'){
+            _bounce = true;
+        }
+        let _jitter = jitter;
+        if(child.nodeName === 'jitter'){
+            _jitter = true;
+        }
+        let _fadeIn = fadeIn;
+        if(child.nodeName === 'fade'){
+            _fadeIn = true;
+        }
+        let _rainbow = rainbow;
+        if(child.nodeName === 'rainbow'){
+            _rainbow = true;
+        }
+        let _cursor = cursor;
+        if(child.nodeName === 'cursor'){
+            _cursor = true;
+        }
+
+        let _fps = fps;
+        if(child.nodeName === 'slow'){
+            _fps = fps / 2;
+        }
+        else if(child.nodeName === 'slower'){
+            _fps = fps / 4;
+        }
+        else if(child.nodeName === 'slowest'){
+            _fps = fps / 8;
+        }
+        else if(child.nodeName === 'fast'){
+            _fps = fps * 2;
+        }
+        else if(child.nodeName === 'faster'){
+            _fps = fps * 4;
+        }
+        else if(child.nodeName === 'fastest'){
+            _fps = fps * 8;
+        }
+
+        let complex = false;
+        if(child.nodeName !== '#text'){
+            for(let c of child.childNodes){
+                if(c.nodeName !== '#text'){
+                    complex = true;
+                }
+            }
+        }
+
+        if(child.nodeName === 'br'){
+            animations.push(html`<${LineBreakAnimation} next=${newNext} fps=${_fps} key=${key} />`);
+            continue;
+        }
+        else if(complex){
+            animations.push(html`<${ComplexTextAnimation}
+                node=${child}
+                next=${newNext}
+                fps=${_fps}
+                primary=${primary}
+                visible=${visible}
+                wave=${_wave}
+                bounce=${_bounce}
+                jitter=${_jitter}
+                fadeIn=${_fadeIn}
+                rainbow=${_rainbow}
+                cursor=${_cursor}
+                key=${key} />`);
+        }
+        else{
+            animations.push(html`<${BasicTextAnimation}
+                text=${child.textContent}
+                next=${newNext}
+                fps=${_fps}
+                wave=${_wave}
+                bounce=${_bounce}
+                jitter=${_jitter}
+                fadeIn=${_fadeIn}
+                rainbow=${_rainbow}
+                cursor=${_cursor}
+                key=${key} />`);
+        }
+    }
+
+    let visibleAnimations = animations.slice(0, currentIndex);
+
+    if(!active){
+        return null;
+    }
+    return html`
+        <span class="complex-animation">
+            ${visibleAnimations}
+        </span>
+    `;
+}
+
+function AnimatedTextCard({card, primary, visible, stackIndex}){
+    let fps = card.fps ?? 24;
+
+    let parsedXml = new DOMParser().parseFromString(`<animation>${card.content}</animation>`, 'text/xml');
+
+    function done(){
+        console.log('done');
+    }
 
     return html`<${AnyCard} card=${card} cardType="animated-text" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
         <div class="animated-text-content">
-            ${textSeparated}
+            <${ComplexTextAnimation} node=${parsedXml.childNodes[0]} fps=${fps} next=${done} primary=${primary} visible=${visible} />
         </div>
     </${AnyCard}>`;
 }

@@ -347,9 +347,15 @@ impl MinistryDirectory{
         let id = slugify!(&id);
         let mut card_type = doc["type"].as_str().unwrap_or_else(|| "").to_string();
 
+        let mut content: Option<String> = doc["content"].as_str().map(|s| s.to_string());
+
         if card_type == "" {
             if doc["content"].as_str().is_some(){
                 card_type = "markdown".to_string();
+            }
+            else if doc["animated_text"].as_str().is_some(){
+                card_type = "animated_text".to_string();
+                content = doc["animated_text"].as_str().map(|s| s.to_string());
             }
             else if doc["image"].as_str().is_some(){
                 card_type = "image".to_string();
@@ -466,6 +472,10 @@ impl MinistryDirectory{
             dolly_out = doc["dolly_out"].as_f64();
         }
 
+        if card_type == "animated_text"{
+            content = content.map(|s| s.replace("\n", "<br />"));
+        }
+
         Card{
             id,
             title: doc["title"].as_str().map(|s| s.to_string()),
@@ -474,7 +484,7 @@ impl MinistryDirectory{
             container_class,
             document_class,
 
-            content: doc["content"].as_str().map(|s| s.to_string()),
+            content,
 
             image_url: doc["image"].as_str().map(|s| s.to_string()),
 
