@@ -423,6 +423,8 @@ impl MinistryDirectory{
                         pngs.push(png);
                     }
                 }
+                // sort paths by filename (random order created some _fun_)
+                pngs.sort();
             }
         }
 
