@@ -84,6 +84,18 @@ pages:
       <sup>2</sup>: Plants reproduce by using bees to pollinate them.
 
       <sup>3</sup>: These are the only two things that Copilot knows about bees.
+  - title: Bees With Footnote In A Stack
+    id: bees-with-footnote-2
+    stack:
+      - id: bee-1
+        content: |
+          Bees are "important pollinators" <sup>1</sup> that "help plants reproduce" <sup>2</sup>.
+        footnote: |
+          <sup>1</sup>: Bees are important pollinators because they <a href="https://wikipedia.org/bees">help plants reproduce</a>.
+
+          <sup>2</sup>: Plants reproduce by using bees to pollinate them.
+
+          <sup>3</sup>: These are the only two things that Copilot knows about bees.
   - title: Bottom Text
     id: bottoms-up
     class:
@@ -125,7 +137,7 @@ pages:
       This text is <beat/><bounce>even more</bounce> animated!
       <div color="limegreen" style="background-color: black;">C:\><cursor>dir \home\owen\bees</cursor></div>
       <beat />
-      <div class="no-pad">Bees are <wave color="yellow">wavey</wave>!</div>
+      <div class="no-pad">Bees <tab/> are <tab/> <wave color="yellow">wavey</wave>!</div>
       Give me a little <wave>wavey wave on that textaroo</wave>!
       <style value="font-size: 2em;">This text is big!</style>
       <wavy style="font-size: 0.5em;" color="pink">This text is small!</wavy>

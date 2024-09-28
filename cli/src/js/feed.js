@@ -4507,6 +4507,24 @@ ${content}</tr>
     }, []);
     return html`<br />`;
   }
+  function NbspAnimation({ next, fps }) {
+    p2(() => {
+      setTimeout(() => {
+        next();
+      }, 1e3 / fps);
+    }, []);
+    let nbsp = String.fromCharCode(160);
+    return html`<span>${nbsp}</span>`;
+  }
+  function TabAnimation({ next, fps }) {
+    p2(() => {
+      setTimeout(() => {
+        next();
+      }, 1e3 / fps);
+    }, []);
+    let nbsp = String.fromCharCode(160);
+    return html`<span>${nbsp}${nbsp}${nbsp}${nbsp}</span>`;
+  }
   function DelayAnimation({ next, delay }) {
     p2(() => {
       setTimeout(() => {
@@ -4622,6 +4640,14 @@ ${content}</tr>
       }
       if (child.nodeName === "br") {
         animations.push(html`<${LineBreakAnimation} next=${newNext} fps=${_fps} key=${key} />`);
+        continue;
+      }
+      if (child.nodeName === "nbsp") {
+        animations.push(html`<${NbspAnimation} next=${newNext} fps=${_fps} key=${key} />`);
+        continue;
+      }
+      if (child.nodeName === "tab") {
+        animations.push(html`<${TabAnimation} next=${newNext} fps=${_fps} key=${key} />`);
         continue;
       } else if (child.nodeName === "beat") {
         let delayAmount = child.getAttribute("ms") ?? 750;
