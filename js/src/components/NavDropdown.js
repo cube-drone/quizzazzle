@@ -35,7 +35,7 @@ export default function NavDropdown({onMenu, navigateTo, data}){
     return html`<nav id="full-nav">
         <ul class="navbar">
             <li>
-                <a onClick=${onMenu} title="Close the Hamburger Zone">
+                <a onClick=${onMenu} title="Close the Hamburger Zone" autofocus>
                     <${Icon} name="hamburger" />
                 </a>
             </li>

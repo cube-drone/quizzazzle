@@ -5048,27 +5048,27 @@ ${content}</tr>
     return html4`<nav id="primary-nav">
             <ul class="navbar">
                 <li>
-                    <a onClick=${top} title="Navigate to the first card in the deck" class="nav-top">
+                    <a onClick=${top} title="Navigate to the first card in the deck" class="nav-top" aria-label="First card" tabindex="-1">
                         <${Icon} name="double-up" />
                     </a>
                 </li>
                 <li>
-                    <a onClick=${up} title="Navigate to the previous card in the deck" class="nav-up">
+                    <a onClick=${up} title="Navigate to the previous card in the deck" class="nav-up" aria-label="Previous card" tabindex="-1">
                         <${Icon} name="chevron-up" />
                     </a>
                 </li>
                 <li>
-                    <a onClick=${menu} title="Open a menu with a description of the current page, table of contents, and sitemap" class="nav-menu">
+                    <a onClick=${menu} title="Open a menu with a description of the current page, table of contents, and sitemap" class="nav-menu" aria-label="Extended Nav Menu" tabindex="-1">
                         <${Icon} name="hamburger" />
                     </a>
                 </li>
                 <li>
-                    <a onClick=${down} title="Navigate to the next card in the deck" class="nav-down">
+                    <a onClick=${down} title="Navigate to the next card in the deck" class="nav-down" aria-label="Next Card" tabindex="-1">
                         <${Icon} name="chevron-down" />
                     </a>
                 </li>
                 <li>
-                    <a onClick=${bottom} title="Navigate to the final card in the deck" class="nav-bottom">
+                    <a onClick=${bottom} title="Navigate to the final card in the deck" class="nav-bottom" aria-label="Last Card" tabindex="-1">
                         <${Icon} name="double-down" />
                     </a>
                 </li>
@@ -5141,7 +5141,7 @@ ${content}</tr>
     return html6`<nav id="full-nav">
         <ul class="navbar">
             <li>
-                <a onClick=${onMenu} title="Close the Hamburger Zone">
+                <a onClick=${onMenu} title="Close the Hamburger Zone" autofocus>
                     <${Icon} name="hamburger" />
                 </a>
             </li>
@@ -5300,11 +5300,29 @@ ${content}</tr>
       });
       window.onkeyup = (e3) => {
         let key = e3.key;
-        if (key === "ArrowUp" || key.toLowerCase() === "w") {
-          this.goUpOne();
+        if (!this.state.expandedMenu) {
+          if (key === "ArrowUp" || key.toLowerCase() === "w" || key === "PageUp") {
+            e3.preventDefault();
+            this.goUpOne();
+          }
+          if (key === "ArrowDown" || key.toLowerCase() === "s" || key === "PageDown" || key === " ") {
+            e3.preventDefault();
+            this.goDownOne();
+          }
+          if (key.toLowerCase() === "h" || key === "Home") {
+            e3.preventDefault();
+            this.goToTop();
+          }
+          if (key.toLowerCase() === "e" || key === "End") {
+            e3.preventDefault();
+            this.goToBottom();
+          }
         }
-        if (key === "ArrowDown" || key.toLowerCase() === "s") {
-          this.goDownOne();
+        if (key.toLowerCase() === "m") {
+          e3.preventDefault();
+          this.setState({
+            expandedMenu: !this.state.expandedMenu
+          });
         }
       };
       if (this.initialElement) {

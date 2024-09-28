@@ -296,9 +296,15 @@ header.header-invisible {
   left: 0;
   transition: 500ms ease 100ms;
 }
+#full-header #full-nav {
+  display: none;
+}
 #full-header.expanded {
   height: 600px;
   width: 100%;
+}
+#full-header.expanded #full-nav {
+  display: block;
 }
 #primary-nav {
   margin: 0;

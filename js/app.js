@@ -70,11 +70,31 @@ class App extends Component {
 
         window.onkeyup = (e) => {
             let key = e.key;
-            if (key === 'ArrowUp' || key.toLowerCase() === "w") {
-                this.goUpOne();
+            if(!this.state.expandedMenu){
+                // we only want to do keyboard shortcut stuff if the menu isn't expanded
+                if (key === 'ArrowUp' || key.toLowerCase() === "w" || key === 'PageUp') {
+                    e.preventDefault();
+                    this.goUpOne();
+                }
+                if (key === 'ArrowDown' || key.toLowerCase() === "s" || key === 'PageDown' || key === ' ') {
+                    e.preventDefault();
+                    this.goDownOne();
+                }
+                if (key.toLowerCase() === "h" || key === 'Home') {
+                    e.preventDefault();
+                    this.goToTop();
+                }
+                if (key.toLowerCase() === "e" || key === 'End') {
+                    e.preventDefault();
+                    this.goToBottom();
+                }
+
             }
-            if (key === 'ArrowDown' || key.toLowerCase() === "s") {
-                this.goDownOne();
+            if (key.toLowerCase() === "m") {
+                e.preventDefault();
+                this.setState({
+                    expandedMenu: !this.state.expandedMenu
+                });
             }
         }
 
