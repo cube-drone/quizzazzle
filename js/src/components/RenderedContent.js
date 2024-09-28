@@ -71,6 +71,47 @@ function AnyCard({card, cardType, stackIndex, primary, visible, children}){
         }
         translateX.push(0);
     }
+    if(card.verticalShake){
+        isAnimation = true;
+        if(!isNaN(card.shakeY)){
+            duration = card.shakeY;
+        }
+        let amount = card.amount ?? 5;
+        translateY = [];
+        translateY.push(0);
+        for(let i = 0; i < duration / 100; i++){
+            translateY.push(i % 2 === 0 ? amount : -amount);
+        }
+        translateY.push(0);
+    }
+    if(card.jitter){
+        // a jitter is a shake, but with randomized amounts
+        isAnimation = true;
+        if(!isNaN(card.jitter)){
+            duration = card.jitter;
+        }
+        let amount = card.amount ?? 5;
+        translateX = [];
+        translateX.push(0);
+        for(let i = 0; i < duration / 50; i++){
+            translateX.push((Math.random() * amount * 2) - amount);
+        }
+        translateX.push(0);
+    }
+    if(card.verticalJitter){
+        // a jitter is a shake, but with randomized amounts
+        isAnimation = true;
+        if(!isNaN(card.jitter)){
+            duration = card.verticalJitter;
+        }
+        let amount = card.amount ?? 5;
+        translateY = [];
+        translateY.push(0);
+        for(let i = 0; i < duration / 50; i++){
+            translateY.push((Math.random() * amount * 2) - amount);
+        }
+        translateY.push(0);
+    }
     if(card.panLeft){
         isAnimation = true;
         translateX = -card.panLeft;

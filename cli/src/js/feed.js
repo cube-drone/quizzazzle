@@ -515,6 +515,9 @@
         fadeIn: card.fade_in,
         fadeOut: card.fade_out,
         shake: card.shake,
+        verticalShake: card.vertical_shake,
+        jitter: card.jitter,
+        verticalJitter: card.vertical_jitter,
         panLeft: card.pan_left,
         panRight: card.pan_right,
         panUp: card.pan_up,
@@ -4174,6 +4177,45 @@ ${content}</tr>
         translateX.push(i3 % 2 === 0 ? amount2 : -amount2);
       }
       translateX.push(0);
+    }
+    if (card.verticalShake) {
+      isAnimation = true;
+      if (!isNaN(card.shakeY)) {
+        duration = card.shakeY;
+      }
+      let amount2 = card.amount ?? 5;
+      translateY = [];
+      translateY.push(0);
+      for (let i3 = 0; i3 < duration / 100; i3++) {
+        translateY.push(i3 % 2 === 0 ? amount2 : -amount2);
+      }
+      translateY.push(0);
+    }
+    if (card.jitter) {
+      isAnimation = true;
+      if (!isNaN(card.jitter)) {
+        duration = card.jitter;
+      }
+      let amount2 = card.amount ?? 5;
+      translateX = [];
+      translateX.push(0);
+      for (let i3 = 0; i3 < duration / 50; i3++) {
+        translateX.push(Math.random() * amount2 * 2 - amount2);
+      }
+      translateX.push(0);
+    }
+    if (card.verticalJitter) {
+      isAnimation = true;
+      if (!isNaN(card.jitter)) {
+        duration = card.verticalJitter;
+      }
+      let amount2 = card.amount ?? 5;
+      translateY = [];
+      translateY.push(0);
+      for (let i3 = 0; i3 < duration / 50; i3++) {
+        translateY.push(Math.random() * amount2 * 2 - amount2);
+      }
+      translateY.push(0);
     }
     if (card.panLeft) {
       isAnimation = true;
