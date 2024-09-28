@@ -71,6 +71,30 @@ pages:
         class:
           - textboss
         content: Bees are really important.
+  - title: Bees With Footnote
+    id: bees-with-footnote
+    class:
+      - middle
+      - center
+    content: |
+      Bees are "important pollinators" <sup>1</sup> that "help plants reproduce" <sup>2</sup>.
+    footnote: |
+      <sup>1</sup>: Bees are important pollinators because they <a href="https://wikipedia.org/bees">help plants reproduce</a>.
+
+      <sup>2</sup>: Plants reproduce by using bees to pollinate them.
+
+      <sup>3</sup>: These are the only two things that Copilot knows about bees.
+  - title: Bottom Text
+    id: bottoms-up
+    class:
+      - bottom
+      - center
+    content: |
+      This text should be at the bottom of the card.
+
+      This text should be below the other text.
+
+      [This text should link to the previous card.](#bees-with-footnote)
   - title: Dolly Out
     id: dolly-out
     image: assets/owen.png

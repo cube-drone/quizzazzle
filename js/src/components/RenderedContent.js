@@ -4,11 +4,20 @@ import { useEffect, useState } from 'preact/hooks';
 import htm from 'htm';
 import anime from 'animejs';
 
-import { marked } from 'marked';
-import insane from 'insane';
+import { Marked } from 'marked';
 
 const html = htm.bind(h);
 
+function markdownify(md){
+    let markyMark = new Marked();
+    // if you wanted to use plugins, you'd do it here, like this:
+    // markyMark.use(plugin1).use(plugin2);
+    // if you wanted to sanitize the HTML (when are we going to have untrusted markdown?),
+    // you'd do it here, like this:
+    // return insane(markyMark.parse(md));
+
+    return markyMark.parse(md);
+}
 
 function AnyCard({card, cardType, stackIndex, primary, visible, children}){
 
@@ -166,10 +175,18 @@ function AnyCard({card, cardType, stackIndex, primary, visible, children}){
         animStyle = [];
     }
 
+    let footnote = null;
+    if(card.footnote){
+        footnote = html`<div class="footnote">
+            <div class="markdown-content" dangerouslySetInnerHTML=${{ __html: markdownify(card.footnote) }}></div>
+        </div>`;
+    }
+
     return html `<div style=${style} class="card ${cardType}-card any-card ${stackIndex ? "stacked" : ""} ${card.containerClass.join(" ")} ${restrictions.join(" ")}">
         <div style=${animStyle.join(" ")} class="animation-frame ${card.extraClass.join(" ")}">
         ${children}
         </div>
+        ${footnote}
     </div>`;
 }
 
@@ -181,7 +198,7 @@ function TitleCard({card, stackIndex, primary, visible}){
 
 function MarkdownCard({card, stackIndex, primary, visible}){
     return html`<${AnyCard} card=${card} cardType="markdown" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
-        <div class="markdown-content" dangerouslySetInnerHTML=${{ __html: insane(marked.parse(card.content)) }}></div>
+        <div class="markdown-content" dangerouslySetInnerHTML=${{ __html: markdownify(card.content) }}></div>
     </${AnyCard}>`;
 }
 

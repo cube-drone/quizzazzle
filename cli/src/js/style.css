@@ -134,6 +134,9 @@ body,
   margin: 0;
   padding: 0;
 }
+.sr-only {
+  display: none;
+}
 .primary-card {
   width: 100vw;
   height: 100vh;
@@ -174,15 +177,13 @@ body,
     padding: 0;
     width: 100% !important;
     height: 600px;
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
+    margin-top: 100px !important;
   }
 }
 .primary-card .content {
   position: relative;
   width: 350px;
-  height: 600px;
+  height: 650px;
   max-height: 100%;
   border: 5px solid black;
   padding: 0;
@@ -623,6 +624,9 @@ a.pushbutton:hover .opt {
   padding: 5px 15px;
   background-color: rgb(255, 255, 255, 0.3);
 }
+.markdown-card .footnotes a {
+  display: none;
+}
 .error-card {
   background-color: rgba(235, 79, 79, 0.3);
   font-size: small;
@@ -638,11 +642,52 @@ a.pushbutton:hover .opt {
   max-width: var(--frame-width);
   max-height: var(--frame-height);
 }
+.footnote {
+  opacity: 0;
+}
+.frame-primary .footnote {
+  display: block;
+  box-sizing: border-box;
+  padding: 2px;
+  padding-bottom: 50px;
+  position: absolute;
+  z-index: 9;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background-color: black;
+  color: #BBB;
+  opacity: 1;
+  transition: opacity 2.5s;
+}
+.frame-primary .footnote p {
+  margin: 5px;
+  padding: 0;
+  font-size: small;
+}
+.frame-primary .footnote a {
+  color: white;
+}
+.center {
+  text-align: center;
+}
 .border {
   border: 1px solid black;
 }
 .opaque {
   background-color: white;
+}
+.middle {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+}
+.bottom {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  height: 100%;
 }
 
 /* css/qr.css */

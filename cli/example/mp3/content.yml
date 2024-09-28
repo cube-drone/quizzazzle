@@ -17,12 +17,18 @@ pages:
   - title: Types of Bees
     id: bee-types
     content: |
-      There are many types of bees, including honeybees, bumblebees, and solitary bees.
+      There are many types of bees, including honeybees, bumblebees, and solitary bees. <sup>1</sup>
+    footnote: |
+      <sup>1</sup> [Wikipedia](https://en.wikipedia.org/wiki/Bee)
     next: 6000
   - title: Importance of Bees
     id: importance
     content: |
-      Bees are important because they help pollinate plants, which helps plants reproduce.
+      Bees are important because they help pollinate plants<sup>1</sup>, which helps plants reproduce.
+    footnote: |
+      <sup>1</sup> This is an extremely long and detailed footnote in which I go on something of a wild tangent.
+        You would not believe how much information I can pack into a single footnote. It's truly remarkable.
+        I could go on for hours about bees and their importance, but I'll spare you the details.
     next: 10000
   - title: Importance of Bees
     id: importance-2

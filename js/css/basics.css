@@ -22,6 +22,10 @@ body, #app{
     padding: 0;
 }
 
+.sr-only{
+    display: none;
+}
+
 
 /* the primary card is the central frame, the card that sits around all of the content */
 .primary-card {
@@ -70,17 +74,14 @@ body, #app{
         padding: 0;
         width: 100% !important;
         height: 600px;
-        /* center vertically */
-        position: absolute;
-        top: 50%;
-        transform: translateY(-50%);
+        margin-top: 100px !important;
     }
   }
 
 .primary-card .content{
     position: relative;
     width: 350px;
-    height: 600px;
+    height: 650px;
     max-height: 100%;
     border: 5px solid black;
     padding: 0;

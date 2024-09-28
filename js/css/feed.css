@@ -94,6 +94,10 @@
     background-color: rgb(255, 255, 255, 0.3);
 }
 
+.markdown-card .footnotes a{
+    display: none;
+}
+
 .error-card{
     background-color: rgba(235, 79, 79, 0.3);
     font-size: small;
@@ -130,11 +134,58 @@
 }
 
 
+.footnote{
+    opacity: 0;
+}
+.frame-primary .footnote {
+    display: block;
+    box-sizing: border-box;
+    padding: 2px;
+    padding-bottom: 50px;
+    position: absolute;
+    z-index: 9;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: black;
+    color: #BBB;
+    opacity: 1;
+    transition: opacity 2.5s;
+}
+.frame-primary .footnote p {
+    margin: 5px;
+    padding: 0;
+    font-size: small;
+}
+.frame-primary .footnote a {
+    color: white;
+}
+
+
 /* extra classes */
+
+.center {
+    text-align: center;
+}
+
 .border {
     border: 1px solid black;
 }
 
 .opaque {
     background-color: white;
+}
+
+.middle{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+}
+
+.bottom{
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    height: 100%;
 }

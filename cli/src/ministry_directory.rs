@@ -65,6 +65,7 @@ pub struct Card{
 
     // markdown
     pub content: Option<String>,
+    pub footnote: Option<String>,
 
     // image
     pub image_url: Option<String>,
@@ -487,6 +488,7 @@ impl MinistryDirectory{
             document_class,
 
             content,
+            footnote: doc["footnote"].as_str().map(|s| s.to_string()),
 
             image_url: doc["image"].as_str().map(|s| s.to_string()),
 

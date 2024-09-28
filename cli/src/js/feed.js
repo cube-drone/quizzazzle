@@ -1,492 +1,4 @@
 (() => {
-  var __create = Object.create;
-  var __defProp = Object.defineProperty;
-  var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-  var __getOwnPropNames = Object.getOwnPropertyNames;
-  var __getProtoOf = Object.getPrototypeOf;
-  var __hasOwnProp = Object.prototype.hasOwnProperty;
-  var __commonJS = (cb, mod) => function __require() {
-    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
-  };
-  var __copyProps = (to, from, except, desc) => {
-    if (from && typeof from === "object" || typeof from === "function") {
-      for (let key of __getOwnPropNames(from))
-        if (!__hasOwnProp.call(to, key) && key !== except)
-          __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-    }
-    return to;
-  };
-  var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-    // If the importer is in node compatibility mode or this is not an ESM
-    // file that has been converted to a CommonJS file using a Babel-
-    // compatible transform (i.e. "__esModule" has not been set), then set
-    // "default" to the CommonJS "module.exports" for node compatibility.
-    isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-    mod
-  ));
-
-  // node_modules/insane/she.js
-  var require_she = __commonJS({
-    "node_modules/insane/she.js"(exports, module) {
-      "use strict";
-      var escapes = {
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;"
-      };
-      var unescapes = {
-        "&amp;": "&",
-        "&lt;": "<",
-        "&gt;": ">",
-        "&quot;": '"',
-        "&#39;": "'"
-      };
-      var rescaped = /(&amp;|&lt;|&gt;|&quot;|&#39;)/g;
-      var runescaped = /[&<>"']/g;
-      function escapeHtmlChar(match) {
-        return escapes[match];
-      }
-      function unescapeHtmlChar(match) {
-        return unescapes[match];
-      }
-      function escapeHtml(text) {
-        return text == null ? "" : String(text).replace(runescaped, escapeHtmlChar);
-      }
-      function unescapeHtml(html9) {
-        return html9 == null ? "" : String(html9).replace(rescaped, unescapeHtmlChar);
-      }
-      escapeHtml.options = unescapeHtml.options = {};
-      module.exports = {
-        encode: escapeHtml,
-        escape: escapeHtml,
-        decode: unescapeHtml,
-        unescape: unescapeHtml,
-        version: "1.0.0-browser"
-      };
-    }
-  });
-
-  // node_modules/assignment/assignment.js
-  var require_assignment = __commonJS({
-    "node_modules/assignment/assignment.js"(exports, module) {
-      "use strict";
-      function assignment(result) {
-        var stack = Array.prototype.slice.call(arguments, 1);
-        var item;
-        var key;
-        while (stack.length) {
-          item = stack.shift();
-          for (key in item) {
-            if (item.hasOwnProperty(key)) {
-              if (Object.prototype.toString.call(result[key]) === "[object Object]") {
-                result[key] = assignment(result[key], item[key]);
-              } else {
-                result[key] = item[key];
-              }
-            }
-          }
-        }
-        return result;
-      }
-      module.exports = assignment;
-    }
-  });
-
-  // node_modules/insane/lowercase.js
-  var require_lowercase = __commonJS({
-    "node_modules/insane/lowercase.js"(exports, module) {
-      "use strict";
-      module.exports = function lowercase(string) {
-        return typeof string === "string" ? string.toLowerCase() : string;
-      };
-    }
-  });
-
-  // node_modules/insane/toMap.js
-  var require_toMap = __commonJS({
-    "node_modules/insane/toMap.js"(exports, module) {
-      "use strict";
-      function toMap(list) {
-        return list.reduce(asKey, {});
-      }
-      function asKey(accumulator, item) {
-        accumulator[item] = true;
-        return accumulator;
-      }
-      module.exports = toMap;
-    }
-  });
-
-  // node_modules/insane/attributes.js
-  var require_attributes = __commonJS({
-    "node_modules/insane/attributes.js"(exports, module) {
-      "use strict";
-      var toMap = require_toMap();
-      var uris = ["background", "base", "cite", "href", "longdesc", "src", "usemap"];
-      module.exports = {
-        uris: toMap(uris)
-        // attributes that have an href and hence need to be sanitized
-      };
-    }
-  });
-
-  // node_modules/insane/elements.js
-  var require_elements = __commonJS({
-    "node_modules/insane/elements.js"(exports, module) {
-      "use strict";
-      var toMap = require_toMap();
-      var voids = ["area", "br", "col", "hr", "img", "wbr", "input", "base", "basefont", "link", "meta"];
-      module.exports = {
-        voids: toMap(voids)
-      };
-    }
-  });
-
-  // node_modules/insane/parser.js
-  var require_parser = __commonJS({
-    "node_modules/insane/parser.js"(exports, module) {
-      "use strict";
-      var he = require_she();
-      var lowercase = require_lowercase();
-      var attributes = require_attributes();
-      var elements = require_elements();
-      var rstart = /^<\s*([\w:-]+)((?:\s+[\w:-]+(?:\s*=\s*(?:(?:"[^"]*")|(?:'[^']*')|[^>\s]+))?)*)\s*(\/?)\s*>/;
-      var rend = /^<\s*\/\s*([\w:-]+)[^>]*>/;
-      var rattrs = /([\w:-]+)(?:\s*=\s*(?:(?:"((?:[^"])*)")|(?:'((?:[^'])*)')|([^>\s]+)))?/g;
-      var rtag = /^</;
-      var rtagend = /^<\s*\//;
-      function createStack() {
-        var stack = [];
-        stack.lastItem = function lastItem() {
-          return stack[stack.length - 1];
-        };
-        return stack;
-      }
-      function parser2(html9, handler) {
-        var stack = createStack();
-        var last = html9;
-        var chars;
-        while (html9) {
-          parsePart();
-        }
-        parseEndTag();
-        function parsePart() {
-          chars = true;
-          parseTag();
-          var same = html9 === last;
-          last = html9;
-          if (same) {
-            html9 = "";
-          }
-        }
-        function parseTag() {
-          if (html9.substr(0, 4) === "<!--") {
-            parseComment();
-          } else if (rtagend.test(html9)) {
-            parseEdge(rend, parseEndTag);
-          } else if (rtag.test(html9)) {
-            parseEdge(rstart, parseStartTag);
-          }
-          parseTagDecode();
-        }
-        function parseEdge(regex, parser3) {
-          var match = html9.match(regex);
-          if (match) {
-            html9 = html9.substring(match[0].length);
-            match[0].replace(regex, parser3);
-            chars = false;
-          }
-        }
-        function parseComment() {
-          var index = html9.indexOf("-->");
-          if (index >= 0) {
-            if (handler.comment) {
-              handler.comment(html9.substring(4, index));
-            }
-            html9 = html9.substring(index + 3);
-            chars = false;
-          }
-        }
-        function parseTagDecode() {
-          if (!chars) {
-            return;
-          }
-          var text;
-          var index = html9.indexOf("<");
-          if (index >= 0) {
-            text = html9.substring(0, index);
-            html9 = html9.substring(index);
-          } else {
-            text = html9;
-            html9 = "";
-          }
-          if (handler.chars) {
-            handler.chars(text);
-          }
-        }
-        function parseStartTag(tag, tagName, rest, unary) {
-          var attrs = {};
-          var low = lowercase(tagName);
-          var u3 = elements.voids[low] || !!unary;
-          rest.replace(rattrs, attrReplacer);
-          if (!u3) {
-            stack.push(low);
-          }
-          if (handler.start) {
-            handler.start(low, attrs, u3);
-          }
-          function attrReplacer(match, name, doubleQuotedValue, singleQuotedValue, unquotedValue) {
-            if (doubleQuotedValue === void 0 && singleQuotedValue === void 0 && unquotedValue === void 0) {
-              attrs[name] = void 0;
-            } else {
-              attrs[name] = he.decode(doubleQuotedValue || singleQuotedValue || unquotedValue || "");
-            }
-          }
-        }
-        function parseEndTag(tag, tagName) {
-          var i3;
-          var pos = 0;
-          var low = lowercase(tagName);
-          if (low) {
-            for (pos = stack.length - 1; pos >= 0; pos--) {
-              if (stack[pos] === low) {
-                break;
-              }
-            }
-          }
-          if (pos >= 0) {
-            for (i3 = stack.length - 1; i3 >= pos; i3--) {
-              if (handler.end) {
-                handler.end(stack[i3]);
-              }
-            }
-            stack.length = pos;
-          }
-        }
-      }
-      module.exports = parser2;
-    }
-  });
-
-  // node_modules/insane/sanitizer.js
-  var require_sanitizer = __commonJS({
-    "node_modules/insane/sanitizer.js"(exports, module) {
-      "use strict";
-      var he = require_she();
-      var lowercase = require_lowercase();
-      var attributes = require_attributes();
-      var elements = require_elements();
-      function sanitizer(buffer, options2) {
-        var last;
-        var context;
-        var o3 = options2 || {};
-        reset();
-        return {
-          start,
-          end,
-          chars
-        };
-        function out(value) {
-          buffer.push(value);
-        }
-        function start(tag, attrs, unary) {
-          var low = lowercase(tag);
-          if (context.ignoring) {
-            ignore(low);
-            return;
-          }
-          if ((o3.allowedTags || []).indexOf(low) === -1) {
-            ignore(low);
-            return;
-          }
-          if (o3.filter && !o3.filter({ tag: low, attrs })) {
-            ignore(low);
-            return;
-          }
-          out("<");
-          out(low);
-          Object.keys(attrs).forEach(parse);
-          out(unary ? "/>" : ">");
-          function parse(key) {
-            var value = attrs[key];
-            var classesOk = (o3.allowedClasses || {})[low] || [];
-            var attrsOk = (o3.allowedAttributes || {})[low] || [];
-            var valid;
-            var lkey = lowercase(key);
-            if (lkey === "class" && attrsOk.indexOf(lkey) === -1) {
-              value = value.split(" ").filter(isValidClass).join(" ").trim();
-              valid = value.length;
-            } else {
-              valid = attrsOk.indexOf(lkey) !== -1 && (attributes.uris[lkey] !== true || testUrl(value));
-            }
-            if (valid) {
-              out(" ");
-              out(key);
-              if (typeof value === "string") {
-                out('="');
-                out(he.encode(value));
-                out('"');
-              }
-            }
-            function isValidClass(className) {
-              return classesOk && classesOk.indexOf(className) !== -1;
-            }
-          }
-        }
-        function end(tag) {
-          var low = lowercase(tag);
-          var allowed = (o3.allowedTags || []).indexOf(low) !== -1;
-          if (allowed) {
-            if (context.ignoring === false) {
-              out("</");
-              out(low);
-              out(">");
-            } else {
-              unignore(low);
-            }
-          } else {
-            unignore(low);
-          }
-        }
-        function testUrl(text) {
-          var start2 = text[0];
-          if (start2 === "#" || start2 === "/") {
-            return true;
-          }
-          var colon = text.indexOf(":");
-          if (colon === -1) {
-            return true;
-          }
-          var questionmark = text.indexOf("?");
-          if (questionmark !== -1 && colon > questionmark) {
-            return true;
-          }
-          var hash = text.indexOf("#");
-          if (hash !== -1 && colon > hash) {
-            return true;
-          }
-          return o3.allowedSchemes.some(matches);
-          function matches(scheme) {
-            return text.indexOf(scheme + ":") === 0;
-          }
-        }
-        function chars(text) {
-          if (context.ignoring === false) {
-            out(o3.transformText ? o3.transformText(text) : text);
-          }
-        }
-        function ignore(tag) {
-          if (elements.voids[tag]) {
-            return;
-          }
-          if (context.ignoring === false) {
-            context = { ignoring: tag, depth: 1 };
-          } else if (context.ignoring === tag) {
-            context.depth++;
-          }
-        }
-        function unignore(tag) {
-          if (context.ignoring === tag) {
-            if (--context.depth <= 0) {
-              reset();
-            }
-          }
-        }
-        function reset() {
-          context = { ignoring: false, depth: 0 };
-        }
-      }
-      module.exports = sanitizer;
-    }
-  });
-
-  // node_modules/insane/defaults.js
-  var require_defaults = __commonJS({
-    "node_modules/insane/defaults.js"(exports, module) {
-      "use strict";
-      var defaults = {
-        allowedAttributes: {
-          a: ["href", "name", "target", "title", "aria-label"],
-          iframe: ["allowfullscreen", "frameborder", "src"],
-          img: ["src", "alt", "title", "aria-label"]
-        },
-        allowedClasses: {},
-        allowedSchemes: ["http", "https", "mailto"],
-        allowedTags: [
-          "a",
-          "abbr",
-          "article",
-          "b",
-          "blockquote",
-          "br",
-          "caption",
-          "code",
-          "del",
-          "details",
-          "div",
-          "em",
-          "h1",
-          "h2",
-          "h3",
-          "h4",
-          "h5",
-          "h6",
-          "hr",
-          "i",
-          "img",
-          "ins",
-          "kbd",
-          "li",
-          "main",
-          "mark",
-          "ol",
-          "p",
-          "pre",
-          "section",
-          "span",
-          "strike",
-          "strong",
-          "sub",
-          "summary",
-          "sup",
-          "table",
-          "tbody",
-          "td",
-          "th",
-          "thead",
-          "tr",
-          "u",
-          "ul"
-        ],
-        filter: null
-      };
-      module.exports = defaults;
-    }
-  });
-
-  // node_modules/insane/insane.js
-  var require_insane = __commonJS({
-    "node_modules/insane/insane.js"(exports, module) {
-      "use strict";
-      var he = require_she();
-      var assign = require_assignment();
-      var parser2 = require_parser();
-      var sanitizer = require_sanitizer();
-      var defaults = require_defaults();
-      function insane2(html9, options2, strict) {
-        var buffer = [];
-        var configuration = strict === true ? options2 : assign({}, defaults, options2);
-        var handler = sanitizer(buffer, configuration);
-        parser2(html9, handler);
-        return buffer.join("");
-      }
-      insane2.defaults = defaults;
-      module.exports = insane2;
-    }
-  });
-
   // node_modules/preact/dist/preact.module.js
   var n;
   var l;
@@ -992,6 +504,7 @@
         extraClass: card.extra_class,
         containerClass: card.container_class,
         content: card.content,
+        footnote: card.footnote,
         imageUrl: card.image_url,
         videoUrl: card.video_url,
         videoHasSound: card.video_has_sound,
@@ -4610,8 +4123,11 @@ ${content}</tr>
   var lexer = _Lexer.lex;
 
   // src/components/RenderedContent.js
-  var import_insane = __toESM(require_insane());
   var html = htm_module_default.bind(y);
+  function markdownify(md) {
+    let markyMark = new Marked();
+    return markyMark.parse(md);
+  }
   function AnyCard({ card, cardType, stackIndex, primary, visible, children }) {
     let [animation, setAnimation] = h2(null);
     let style = stackIndex != "" ? `z-index:${stackIndex};` : "";
@@ -4751,10 +4267,17 @@ ${content}</tr>
       style = style.concat(animStyle);
       animStyle = [];
     }
+    let footnote = null;
+    if (card.footnote) {
+      footnote = html`<div class="footnote">
+            <div class="markdown-content" dangerouslySetInnerHTML=${{ __html: markdownify(card.footnote) }}></div>
+        </div>`;
+    }
     return html`<div style=${style} class="card ${cardType}-card any-card ${stackIndex ? "stacked" : ""} ${card.containerClass.join(" ")} ${restrictions.join(" ")}">
         <div style=${animStyle.join(" ")} class="animation-frame ${card.extraClass.join(" ")}">
         ${children}
         </div>
+        ${footnote}
     </div>`;
   }
   function TitleCard({ card, stackIndex, primary, visible }) {
@@ -4764,12 +4287,12 @@ ${content}</tr>
   }
   function MarkdownCard({ card, stackIndex, primary, visible }) {
     return html`<${AnyCard} card=${card} cardType="markdown" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
-        <div class="markdown-content" dangerouslySetInnerHTML=${{ __html: (0, import_insane.default)(marked.parse(card.content)) }}></div>
+        <div class="markdown-content" dangerouslySetInnerHTML=${{ __html: markdownify(card.content) }}></div>
     </${AnyCard}>`;
   }
   function HtmlCard({ card, stackIndex, primary, visible }) {
     return html`<${AnyCard} card=${card} cardType="html" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
-        <div class="html-content" dangerouslySetInnerHTML=${{ __html: (0, import_insane.default)(card.content) }}></div>
+        <div class="html-content" dangerouslySetInnerHTML=${{ __html: insane(card.content) }}></div>
     </${AnyCard}>`;
   }
   function ImageCard({ card, stackIndex, primary, visible }) {

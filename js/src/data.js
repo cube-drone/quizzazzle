@@ -61,6 +61,7 @@ class RealServer{
             containerClass: card.container_class,
 
             content: card.content,
+            footnote: card.footnote,
 
             imageUrl: card.image_url,
 
