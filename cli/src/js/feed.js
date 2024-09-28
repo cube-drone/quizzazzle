@@ -484,6 +484,8 @@
         toc: serverIndex.toc || [],
         mp3: serverIndex.metadata.mp3,
         audioGuide: serverIndex.metadata.audio_guide,
+        containerClass: serverIndex.metadata.container_class,
+        extraClass: serverIndex.metadata.extra_class,
         updatedAt: new Date(serverIndex?.metadata?.last_update_time?.secs_since_epoch * 1e3),
         updatedAtTimestamp: serverIndex?.metadata?.last_update_time?.secs_since_epoch
       };
@@ -501,8 +503,8 @@
         id: card.id,
         title: card.title,
         type: card.card_type || "title",
-        extraClass: card.extra_class,
-        containerClass: card.container_class,
+        extraClass: card.extra_class || [],
+        containerClass: card.container_class || [],
         content: card.content,
         footnote: card.footnote,
         imageUrl: card.image_url,
@@ -588,6 +590,15 @@
       });
     }
     async _addItem({ node }) {
+      if (this.index?.containerClass != null) {
+        node.containerClass = [...this.index.containerClass, node.containerClass];
+      } else {
+        console.warn("no container class");
+        console.dir(this.index);
+      }
+      if (this.index?.extraClass != null) {
+        node.extraClass = [...this.index.extraClass, node.extraClass];
+      }
       this.content[node.id] = node;
     }
     async _addItems(nodes) {

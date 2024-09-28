@@ -36,6 +36,8 @@ class RealServer{
             toc: serverIndex.toc || [],
             mp3: serverIndex.metadata.mp3,
             audioGuide: serverIndex.metadata.audio_guide,
+            containerClass: serverIndex.metadata.container_class,
+            extraClass: serverIndex.metadata.extra_class,
             updatedAt: new Date(serverIndex?.metadata?.last_update_time?.secs_since_epoch * 1000),
             updatedAtTimestamp: serverIndex?.metadata?.last_update_time?.secs_since_epoch,
         }
@@ -57,8 +59,8 @@ class RealServer{
             id: card.id,
             title: card.title,
             type: card.card_type || "title",
-            extraClass: card.extra_class,
-            containerClass: card.container_class,
+            extraClass: card.extra_class || [],
+            containerClass: card.container_class || [],
 
             content: card.content,
             footnote: card.footnote,
@@ -174,6 +176,21 @@ class Data{
     }
 
     async _addItem({node}){
+        // before we add the item, there's some stuff in the index that we want to apply to every item
+        // for example, the index might say that every item should have a certain container class
+        // so we apply that here
+        if(this.index?.containerClass != null){
+            node.containerClass = [...this.index.containerClass, node.containerClass];
+        }
+        else{
+            console.warn("no container class");
+            console.dir(this.index);
+
+        }
+        if(this.index?.extraClass != null){
+            node.extraClass = [...this.index.extraClass, node.extraClass];
+        }
+
         this.content[node.id] = node;
     }
 

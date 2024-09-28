@@ -6,10 +6,13 @@ description: |
   Whoa, look at all of these bees!
   There sure are a lot of them! Great big **giant** bees! HUGE BEES! As far as the eye can sees!
 image: assets/bee.jpg
+container_class:
+  - wow
+class:
+  - you-guys
 extra_header: |
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&display=swap" rel="stylesheet">
   <style>
     h1, h2, h3, h4, h5, h6{
@@ -17,7 +20,7 @@ extra_header: |
     .textboss{
       height: 100px;
       width: 100%;
-      font-family: "Pixelify Sans", sans-serif;
+      font-family: "Pixelify Sans", sans-serif !important;
       font-optical-sizing: auto;
       padding: 10px;
       box-sizing: border-box;
@@ -28,8 +31,17 @@ extra_header: |
       border-radius: 2px;
     }
     .primary-card {
-        background: linear-gradient(221deg, #6171e8, #4250b8, #ad935a);
-        background-size: 300% 300%;
+      background: linear-gradient(221deg, #6171e8, #4250b8, #ad935a);
+      background-size: 300% 300%;
+    }
+
+    .wow {
+      border: 2px solid black;
+      border-radius: 5px;
+    }
+
+    .you-guys{
+      font-family: Times New Roman, sans-serif;
     }
 
   </style>

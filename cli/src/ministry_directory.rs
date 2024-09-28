@@ -22,9 +22,11 @@ pub struct DeckMetadata{
     pub extra_header: Option<String>,
     pub hidden: bool,
     pub unlisted: bool,
-    pub last_update_time: std::time::SystemTime,
     pub mp3: Option<String>,
     pub audio_guide: bool,
+    pub container_class: Vec<String>,
+    pub extra_class: Vec<String>,
+    pub last_update_time: std::time::SystemTime,
 }
 
 impl DeckMetadata{
@@ -317,6 +319,27 @@ impl MinistryDirectory{
             return Err(anyhow!("Directory root does not match slug - please move the directory to the correct location: {}", author_slug));
         }
 
+        let mut container_class = Vec::new();
+        let default_vec = Vec::new();
+        if doc["container_class"].as_str().is_some(){
+            container_class.push(doc["container_class"].as_str().unwrap().to_string());
+        }
+        for item in doc["container_class"].as_vec().unwrap_or_else(|| &default_vec){
+            if item.as_str().is_some(){
+                container_class.push(item.as_str().unwrap().to_string());
+            }
+        }
+
+        let mut extra_class = Vec::new();
+        if doc["class"].as_str().is_some(){
+            extra_class.push(doc["class"].as_str().unwrap().to_string());
+        }
+        for item in doc["class"].as_vec().unwrap_or_else(|| &default_vec){
+            if item.as_str().is_some(){
+                extra_class.push(item.as_str().unwrap().to_string());
+            }
+        }
+
         let last_update_time = self.get_last_update_time()?;
 
         let dm = DeckMetadata{
@@ -334,7 +357,9 @@ impl MinistryDirectory{
             unlisted: doc["unlisted"].as_bool().unwrap_or(false),
             mp3: doc["mp3"].as_str().map(|s| s.to_string()),
             audio_guide: doc["audio_guide"].as_bool().unwrap_or(false),
-            last_update_time
+            container_class,
+            extra_class,
+            last_update_time,
         };
         Ok(dm)
     }
