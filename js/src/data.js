@@ -180,7 +180,7 @@ class Data{
         // for example, the index might say that every item should have a certain container class
         // so we apply that here
         if(this.index?.containerClass != null){
-            node.containerClass = [...this.index.containerClass, node.containerClass];
+            node.containerClass = [...this.index.containerClass, ...node.containerClass];
         }
         else{
             console.warn("no container class");
@@ -188,7 +188,7 @@ class Data{
 
         }
         if(this.index?.extraClass != null){
-            node.extraClass = [...this.index.extraClass, node.extraClass];
+            node.extraClass = [...this.index.extraClass, ...node.extraClass];
         }
 
         this.content[node.id] = node;
