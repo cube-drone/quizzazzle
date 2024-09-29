@@ -143,10 +143,16 @@ https://aleclownes.com/2017/02/01/crt-display.html
     right: 0;
     background: rgba(18, 16, 16, 0.1);
     opacity: 0;
-    z-index: 2;
+    z-index: 20;
     pointer-events: none;
     animation: flicker 0.15s infinite;
   }
+@keyframes move-those-scanlines {
+    /* i added this nonsense to make the scanlines move */
+    0%{background-position:top}
+    50%{background-position:bottom}
+    100%{background-position:top}
+}
   .crt::before {
     content: " ";
     display: block;
@@ -155,11 +161,14 @@ https://aleclownes.com/2017/02/01/crt-display.html
     left: 0;
     bottom: 0;
     right: 0;
-    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-    z-index: 2;
+    /* this second option's opacity determines how dark the scanlines are going to be: I've lightened it from 0.3 to 0.15 because text was a little too muddy otherwise */
+    background: linear-gradient(rgba(0, 0, 0, 0) 50%, rgba(0, 0, 09, 0.15) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+    animation: move-those-scanlines 600s infinite;
+    z-index: 20;
     background-size: 100% 2px, 3px 100%;
     pointer-events: none;
   }
+
   .crt {
     animation: textShadow 5s infinite;
     position: relative;
