@@ -393,6 +393,13 @@ function BasicTextAnimation({text, next, fps, wave, bounce, jitter, fadeIn, rain
                 index = (index + 1) % (characters.length+1);
                 if(index === 0){
                     clearInterval(animatedTextInterval);
+                    if(cursor){
+                        // once the animation is done, hide the cursor
+                        let cursor = this.base.querySelector('.cursor');
+                        if(cursor){
+                            cursor.style.display = 'none';
+                        }
+                    }
                     next();
                 }
             }, 1000 / fps);

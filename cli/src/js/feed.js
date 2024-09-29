@@ -4476,6 +4476,12 @@ ${content}</tr>
           index = (index + 1) % (characters.length + 1);
           if (index === 0) {
             clearInterval(animatedTextInterval);
+            if (cursor) {
+              let cursor2 = this.base.querySelector(".cursor");
+              if (cursor2) {
+                cursor2.style.display = "none";
+              }
+            }
             next();
           }
         }, 1e3 / fps);
