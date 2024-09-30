@@ -5100,15 +5100,22 @@ ${content}</tr>
       onMenu = () => {
       };
     }
+    let [currentAnimation, setCurrentAnimation] = h2(null);
     const pressAnimation = (thinger) => {
-      anime_es_default({
-        targets: `.nav-${thinger} svg`,
-        scale: 1.3,
-        duration: 200,
-        easing: "easeInOutQuad",
-        direction: "alternate",
-        loop: 1
-      });
+      if (currentAnimation && currentAnimation[thinger]) {
+        currentAnimation[thinger].reset();
+        currentAnimation[thinger].play();
+      } else {
+        let a3 = anime_es_default({
+          targets: `.nav-${thinger} svg`,
+          scale: [1.3],
+          duration: 200,
+          easing: "easeInOutQuad",
+          direction: "alternate"
+        });
+        a3.play();
+        setCurrentAnimation({ ...currentAnimation, [thinger]: a3 });
+      }
     };
     const top = () => {
       pressAnimation("top");

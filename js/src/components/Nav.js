@@ -25,15 +25,26 @@ export default function Nav({onTop, onBottom, onDown, onUp, onMenu }){
         onMenu = () => {};
     }
 
+    // we only ever want to maintain one animation per nav element, so we stash them in here
+    let [currentAnimation, setCurrentAnimation] = useState(null);
+
     const pressAnimation = (thinger) => {
-        anime({
-            targets: `.nav-${thinger} svg`,
-            scale: 1.3,
-            duration: 200,
-            easing: 'easeInOutQuad',
-            direction: 'alternate',
-            loop: 1
-        });
+        if(currentAnimation && currentAnimation[thinger]){
+            currentAnimation[thinger].reset();
+            currentAnimation[thinger].play();
+        }
+        else{
+            let a = anime({
+                targets: `.nav-${thinger} svg`,
+                scale: [1.3],
+                duration: 200,
+                easing: 'easeInOutQuad',
+                direction: 'alternate',
+            });
+            a.play();
+            setCurrentAnimation({...currentAnimation, [thinger]: a});
+        }
+
     }
     const top = () => {
         pressAnimation("top");
