@@ -1,7 +1,7 @@
 [package]
 name = "cardchapter"
 description = "this is a weird one, it's kind of a statically hosted website but for micro-presentations"
-version = "0.1.25"
+version = "0.1.26"
 edition = "2021"
 license = "AGPL-3.0-or-later"
 categories = ["command-line-utilities"]
