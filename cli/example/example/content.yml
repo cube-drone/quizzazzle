@@ -162,7 +162,7 @@ pages:
       <wavy style="font-size: 0.5em;" color="pink">This text is small!</wavy>
       <color value="#ff0000">This text is red!</color>
       <strong>Strong <em>text!</em></strong>
-      <fast>It's got <fade>completely different</fade> animations!</fast>
+      <fast>It's got <fade>completely different</fade> animations! Notice the text-wrap on this one.</fast>
       <faster>It's so faster!</faster>
       <faster>This is unbelievably fast whoa whoa whoa</faster>
       <slow>It's so <slower>slow!</slower></slow>

@@ -4497,6 +4497,9 @@ ${content}</tr>
     if (color) {
       styleExtras += `color: ${color};`;
     }
+    if (cursor) {
+      styleExtras += `display: none;`;
+    }
     if (em) {
       styleExtras += `font-style: italic;`;
     }
@@ -4507,7 +4510,7 @@ ${content}</tr>
       styleExtras += `${style};`;
     }
     let textSeparated = text.split("").map((char, index) => {
-      return html`<span class=${className} style="display: none; opacity: 0;${styleExtras}">${char}</span>`;
+      return html`<span class=${className} style="opacity: 0;${styleExtras}">${char}</span>`;
     });
     let cursy = "";
     if (cursor) {

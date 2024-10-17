@@ -417,6 +417,9 @@ function BasicTextAnimation({text, next, fps, wave, bounce, jitter, fadeIn, rain
     if(color){
         styleExtras += `color: ${color};`;
     }
+    if(cursor){
+        styleExtras += `display: none;`;
+    }
     if(em){
         styleExtras += `font-style: italic;`;
     }
@@ -427,7 +430,7 @@ function BasicTextAnimation({text, next, fps, wave, bounce, jitter, fadeIn, rain
         styleExtras += `${style};`;
     }
 
-    let textSeparated = text.split('').map((char, index) => {return html`<span class=${className} style="display: none; opacity: 0;${styleExtras}">${char}</span>`;});
+    let textSeparated = text.split('').map((char, index) => {return html`<span class=${className} style="opacity: 0;${styleExtras}">${char}</span>`;});
 
     let cursy = '';
     if(cursor){
