@@ -4173,8 +4173,13 @@ ${content}</tr>
       if (!isNaN(card.fadeOut)) {
         delay = card.fadeOut;
       }
-      animStyle.push(`opacity: 1;`);
-      opacity = [1, 0];
+      if (!card.fadeIn) {
+        animStyle.push(`opacity: 1;`);
+      }
+      if (opacity == null) {
+        opacity = [];
+      }
+      opacity = opacity.concat([1, 0]);
     }
     if (card.shake) {
       isAnimation = true;

@@ -127,6 +127,13 @@ pages:
     vertical_jitter: 2000
     amount: 50
     delay: 200
+  - title: Pop
+    id: pop
+    image: assets/owen.png
+    fade_in: 1000
+    fade_out: 1000
+    duration: 2000
+    delay: 200
   - title: Brotate
     id: brotate
     image: assets/owen.png
