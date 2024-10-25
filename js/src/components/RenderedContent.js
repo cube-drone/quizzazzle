@@ -42,6 +42,22 @@ function AnyCard({card, cardType, stackIndex, primary, visible, children}){
     let restrictMaxHeight = true;
     let animStyle = [];
 
+    if(card.wide){
+        restrictMaxWidth = false;
+    }
+    if(card.tall){
+        restrictMaxHeight = false;
+    }
+    if(card.imageUrl){
+        // if the image is intentionally wide, then we don't want to restrict the max width
+        if(card.imageUrl.includes('wide')){
+            restrictMaxWidth = false;
+        }
+        // same for tall images
+        if(card.imageUrl.includes('tall')){
+            restrictMaxHeight = false;
+        }
+    }
     if(card.fadeIn){
         isAnimation = true;
         if(!isNaN(card.fadeIn)){
@@ -144,6 +160,18 @@ function AnyCard({card, cardType, stackIndex, primary, visible, children}){
         amount = card.panUp ?? 400;
         animStyle.push(`${style} transform: translateY(-${amount}px);`);
         restrictMaxHeight = false;
+    }
+    if(card.pushUp){
+        animStyle.push(`${style} transform: translateY(${card.pushUp}px);`);
+    }
+    if(card.pushDown){
+        animStyle.push(`${style} transform: translateY(-${card.pushDown}px);`);
+    }
+    if(card.pushLeft){
+        animStyle.push(`${style} transform: translateX(-${card.pushLeft}px);`);
+    }
+    if(card.pushRight){
+        animStyle.push(`${style} transform: translateX(${card.pushRight}px);`);
     }
     if(card.dollyIn){
         isAnimation = true;

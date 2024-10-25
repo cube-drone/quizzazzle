@@ -524,6 +524,10 @@
         panRight: card.pan_right,
         panUp: card.pan_up,
         panDown: card.pan_down,
+        pushUp: card.push_up,
+        pushDown: card.push_down,
+        pushRight: card.push_right,
+        pushLeft: card.push_left,
         dollyIn: card.dolly_in,
         dollyOut: card.dolly_out,
         spinClockwise: card.spin_clockwise,
@@ -4160,6 +4164,20 @@ ${content}</tr>
     let restrictMaxWidth = true;
     let restrictMaxHeight = true;
     let animStyle = [];
+    if (card.wide) {
+      restrictMaxWidth = false;
+    }
+    if (card.tall) {
+      restrictMaxHeight = false;
+    }
+    if (card.imageUrl) {
+      if (card.imageUrl.includes("wide")) {
+        restrictMaxWidth = false;
+      }
+      if (card.imageUrl.includes("tall")) {
+        restrictMaxHeight = false;
+      }
+    }
     if (card.fadeIn) {
       isAnimation = true;
       if (!isNaN(card.fadeIn)) {
@@ -4260,6 +4278,18 @@ ${content}</tr>
       amount = card.panUp ?? 400;
       animStyle.push(`${style} transform: translateY(-${amount}px);`);
       restrictMaxHeight = false;
+    }
+    if (card.pushUp) {
+      animStyle.push(`${style} transform: translateY(${card.pushUp}px);`);
+    }
+    if (card.pushDown) {
+      animStyle.push(`${style} transform: translateY(-${card.pushDown}px);`);
+    }
+    if (card.pushLeft) {
+      animStyle.push(`${style} transform: translateX(-${card.pushLeft}px);`);
+    }
+    if (card.pushRight) {
+      animStyle.push(`${style} transform: translateX(${card.pushRight}px);`);
     }
     if (card.dollyIn) {
       isAnimation = true;

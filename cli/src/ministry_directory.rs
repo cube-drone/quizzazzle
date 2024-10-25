@@ -71,6 +71,8 @@ pub struct Card{
 
     // image
     pub image_url: Option<String>,
+    pub wide: bool,
+    pub tall: bool,
 
     // video
     pub video_url: Option<String>,
@@ -98,6 +100,10 @@ pub struct Card{
     pub dolly_in: Option<f64>,
     pub dolly_out: Option<f64>,
     pub spin_clockwise: Option<i64>,
+    pub push_up: Option<i64>,
+    pub push_down: Option<i64>,
+    pub push_left: Option<i64>,
+    pub push_right: Option<i64>,
 
     // animation control options
     pub duration: Option<i64>,
@@ -519,6 +525,8 @@ impl MinistryDirectory{
             footnote: doc["footnote"].as_str().map(|s| s.to_string()),
 
             image_url: doc["image"].as_str().map(|s| s.to_string()),
+            wide: doc["wide"].as_bool().unwrap_or(false),
+            tall: doc["tall"].as_bool().unwrap_or(false),
 
             video_url: doc["video"].as_str().map(|s| s.to_string()),
             video_has_sound: doc["video_has_sound"].as_bool().unwrap_or(false),
@@ -539,6 +547,10 @@ impl MinistryDirectory{
             pan_right: doc["pan_right"].as_i64(),
             pan_up: doc["pan_up"].as_i64(),
             pan_down: doc["pan_down"].as_i64(),
+            push_left: doc["push_left"].as_i64(),
+            push_right: doc["push_right"].as_i64(),
+            push_up: doc["push_up"].as_i64(),
+            push_down: doc["push_down"].as_i64(),
             dolly_in,
             dolly_out,
             spin_clockwise: doc["spin_clockwise"].as_i64(),

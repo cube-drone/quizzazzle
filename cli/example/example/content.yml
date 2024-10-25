@@ -177,6 +177,11 @@ pages:
     easing: easeInOutCubic
     loop: true
     image: assets/wow.png?tall
+  - id: just-the-bottom
+    depth: -1
+    tall: true
+    push_down: 400
+    image: assets/wow.png?tall
   - id: wow-2
     depth: 2
     loop: true
@@ -199,6 +204,10 @@ pages:
     delay: 1500
     duration: 3000
     pan_right: 330
+    image: assets/wow-across.png?wide
+  - id: wow-5
+    depth: -1
+    push_left: 330
     image: assets/wow-across.png?wide
   - title: Introduction
     container_class:
