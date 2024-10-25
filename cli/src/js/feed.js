@@ -571,6 +571,9 @@
       let response = await fetch(`${this.serverUrl}/sitemap`, {});
       return await response.json();
     }
+    async boop({ key }) {
+      await fetch(`${this.serverUrl}/boop?content=${key}`, {});
+    }
   };
   var Data = class {
     /*
@@ -581,10 +584,11 @@
             the RealServer/StubServer system is where we go to find out what's ON those nodes,
             but Data is responsible for keeping track of what nodes we've loaded and what nodes we haven't loaded.
     */
-    constructor({ server }) {
+    constructor({ server, uniqueId }) {
       this.server = server;
       this.index = null;
       this.indexId = null;
+      this.uniqueId = uniqueId;
       this.fullyLoadedBakedPotato = false;
       this.content = {};
       this.currentLocation = 0;
@@ -701,6 +705,7 @@
     async setCurrentLocation(n3) {
       this.currentLocation = n3;
       this.currentId = this.index.contentIds[n3];
+      this.boop({ id: this.currentId, n: n3 });
     }
     async getCurrentLocation() {
       return this.currentLocation ?? 0;
@@ -755,10 +760,19 @@
     getSitemap() {
       return this.sitemap;
     }
+    boop({ id, n: n3 }) {
+      let key = `${this.indexId}---${this.uniqueId}---${id}`;
+      let alreadySawThisId = localStorage.getItem(key);
+      if (!alreadySawThisId) {
+        localStorage.setItem(key, "OK");
+        key = `${key}---${n3}`;
+        this.server.boop({ key });
+      }
+    }
   };
-  function initialize({ serverUrl: serverUrl2 } = {}) {
+  function initialize({ serverUrl: serverUrl2, uniqueId } = {}) {
     let server = new RealServer({ serverUrl: serverUrl2 });
-    return new Data({ server });
+    return new Data({ server, uniqueId });
   }
 
   // node_modules/animejs/lib/anime.es.js
@@ -5591,11 +5605,16 @@ ${content}</tr>
     }
   };
   var serverUrl = window.location.origin;
-  var Data2 = initialize({ serverUrl });
   if (!window.location.pathname.endsWith("/")) {
     window.location = `${window.location.origin}${window.location.pathname}/${window.location.hash}`;
   }
   async function main() {
+    let uniqueId = localStorage.getItem("uniqueId");
+    if (!uniqueId) {
+      uniqueId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      localStorage.setItem("uniqueId", uniqueId);
+    }
+    let Data2 = initialize({ serverUrl, uniqueId });
     if (window.location.pathname == "/") {
       let hash = window.location.hash;
       await Data2.loadIndex({ userSlug: null, contentSlug: null, contentId: hash });

@@ -14,6 +14,7 @@ use rocket::fs::FileServer;
 use rocket::http::Status;
 use rocket::State;
 use rocket::serde::json::Json;
+use std::net::IpAddr;
 use indoc::indoc; // this is a macro that allows us to write multi-line strings in a more readable way
 use serde::Serialize;
 use slugify::slugify;
@@ -593,6 +594,12 @@ fn qr_html(link: String, config: &State<Config>) -> content::RawHtml<String> {
 
 }
 
+#[get("/boop?<content>")]
+fn boop(content: String, remote_addr: IpAddr) -> String {
+    println!("Boop: key={} ip={}", content, remote_addr);
+    "OK".to_string()
+}
+
 async fn launch_server(flags: Flags, config: Config) -> Rocket<Build> {
 
     let mut app = rocket::build();
@@ -607,6 +614,7 @@ async fn launch_server(flags: Flags, config: Config) -> Rocket<Build> {
         deck_assets,
         default_assets,
         sitemap,
+        boop,
         qr,
         qr_html,
         robots,

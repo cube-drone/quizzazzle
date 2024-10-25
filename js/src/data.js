@@ -144,6 +144,11 @@ class RealServer{
         return await response.json();
     }
 
+    async boop({key}){
+        // this is a way to keep track of what content the user has seen
+        await fetch(`${this.serverUrl}/boop?content=${key}`, {});
+    }
+
 }
 
 class Data{
@@ -155,10 +160,11 @@ class Data{
             the RealServer/StubServer system is where we go to find out what's ON those nodes,
             but Data is responsible for keeping track of what nodes we've loaded and what nodes we haven't loaded.
     */
-    constructor({server}){
+    constructor({server, uniqueId}){
         this.server = server;
         this.index = null;
         this.indexId = null;
+        this.uniqueId = uniqueId;
         // this.index.contentIds is a list of every ID of a node in the index
 
         // fullyLoadedBakedPotato is set once we have _all_ of the content loaded. At this point there's a lot less work for Data to do.
@@ -337,6 +343,7 @@ class Data{
         // this will be used to determine what content to load next
         this.currentLocation = n;
         this.currentId = this.index.contentIds[n];
+        this.boop({id: this.currentId, n});
     }
 
     async getCurrentLocation(){
@@ -407,10 +414,21 @@ class Data{
         return this.sitemap;
     }
 
+    boop({id, n}){
+        let key = `${this.indexId}---${this.uniqueId}---${id}`;
+        let alreadySawThisId = localStorage.getItem(key);
+        if(!alreadySawThisId){
+            localStorage.setItem(key, "OK");
+            key = `${key}---${n}`;
+
+            this.server.boop({key});
+        }
+    }
+
 }
 
-export function initialize({serverUrl}={}){
+export function initialize({serverUrl, uniqueId}={}){
     let server = new RealServer({serverUrl})
 
-    return new Data({server});
+    return new Data({server, uniqueId});
 }

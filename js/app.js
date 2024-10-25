@@ -265,7 +265,6 @@ class App extends Component {
 }
 
 let serverUrl = window.location.origin;
-let Data = initialize({serverUrl});
 
 // load the index
 // determine where we are in the index, using the hash
@@ -278,6 +277,14 @@ if(!window.location.pathname.endsWith('/')){
 }
 
 async function main(){
+
+    // check if localstorage has a unique ID: if not, generate one
+    let uniqueId = localStorage.getItem('uniqueId');
+    if(!uniqueId){
+        uniqueId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        localStorage.setItem('uniqueId', uniqueId);
+    }
+    let Data = initialize({serverUrl, uniqueId});
 
     if(window.location.pathname == "/"){
         let hash = window.location.hash;
