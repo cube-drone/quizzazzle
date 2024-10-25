@@ -208,6 +208,7 @@ pages:
   - id: wow-5
     depth: -1
     push_left: 330
+    scale: 0.75
     image: assets/wow-across.png?wide
   - title: Introduction
     container_class:

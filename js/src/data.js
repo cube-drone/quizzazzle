@@ -86,13 +86,15 @@ class RealServer{
             panRight: card.pan_right,
             panUp: card.pan_up,
             panDown: card.pan_down,
+            dollyIn: card.dolly_in,
+            dollyOut: card.dolly_out,
+            spinClockwise: card.spin_clockwise,
+
             pushUp: card.push_up,
             pushDown: card.push_down,
             pushRight: card.push_right,
             pushLeft: card.push_left,
-            dollyIn: card.dolly_in,
-            dollyOut: card.dolly_out,
-            spinClockwise: card.spin_clockwise,
+            scale: card.scale,
 
             duration: card.duration,
             amount: card.amount,

@@ -524,13 +524,14 @@
         panRight: card.pan_right,
         panUp: card.pan_up,
         panDown: card.pan_down,
+        dollyIn: card.dolly_in,
+        dollyOut: card.dolly_out,
+        spinClockwise: card.spin_clockwise,
         pushUp: card.push_up,
         pushDown: card.push_down,
         pushRight: card.push_right,
         pushLeft: card.push_left,
-        dollyIn: card.dolly_in,
-        dollyOut: card.dolly_out,
-        spinClockwise: card.spin_clockwise,
+        scale: card.scale,
         duration: card.duration,
         amount: card.amount,
         delay: card.delay,
@@ -4164,6 +4165,8 @@ ${content}</tr>
     let restrictMaxWidth = true;
     let restrictMaxHeight = true;
     let animStyle = [];
+    animStyle.push(style);
+    let animTransforms = [];
     if (card.wide) {
       restrictMaxWidth = false;
     }
@@ -4262,7 +4265,7 @@ ${content}</tr>
       translateX = 0;
       duration = card.duration ?? 5e3;
       amount = card.panRight ?? 300;
-      animStyle.push(`transform: translateX(-${amount}px);`);
+      animTransforms.push(`translateX(-${amount}px)`);
       restrictMaxWidth = false;
     }
     if (card.panDown) {
@@ -4276,20 +4279,8 @@ ${content}</tr>
       translateY = 0;
       duration = card.duration ?? 5e3;
       amount = card.panUp ?? 400;
-      animStyle.push(`${style} transform: translateY(-${amount}px);`);
+      animTransforms.push(`translateY(-${amount}px)`);
       restrictMaxHeight = false;
-    }
-    if (card.pushUp) {
-      animStyle.push(`${style} transform: translateY(${card.pushUp}px);`);
-    }
-    if (card.pushDown) {
-      animStyle.push(`${style} transform: translateY(-${card.pushDown}px);`);
-    }
-    if (card.pushLeft) {
-      animStyle.push(`${style} transform: translateX(-${card.pushLeft}px);`);
-    }
-    if (card.pushRight) {
-      animStyle.push(`${style} transform: translateX(${card.pushRight}px);`);
     }
     if (card.dollyIn) {
       isAnimation = true;
@@ -4302,7 +4293,22 @@ ${content}</tr>
     if (card.spinClockwise) {
       isAnimation = true;
       rotation = card.spinClockwise;
-      animStyle.push(`${style} transform: rotate(${rotation});`);
+      animTransforms.push(`rotate(${rotation})`);
+    }
+    if (card.pushUp) {
+      animTransforms.push(`translateY(${card.pushUp}px)`);
+    }
+    if (card.pushDown) {
+      animTransforms.push(`translateY(-${card.pushDown}px)`);
+    }
+    if (card.pushLeft) {
+      animTransforms.push(`translateX(-${card.pushLeft}px)`);
+    }
+    if (card.pushRight) {
+      animTransforms.push(`translateX(${card.pushRight}px)`);
+    }
+    if (card.scale) {
+      animTransforms.push(`scale(${card.scale})`);
     }
     if (isAnimation) {
       p2(() => {
@@ -4343,6 +4349,9 @@ ${content}</tr>
           }
         }
       }, [primary]);
+    }
+    if (animTransforms.length > 0) {
+      animStyle.push(`transform: ${animTransforms.join(" ")};`);
     }
     let restrictions = [];
     if (restrictMaxWidth) {

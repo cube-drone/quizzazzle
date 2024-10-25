@@ -100,10 +100,12 @@ pub struct Card{
     pub dolly_in: Option<f64>,
     pub dolly_out: Option<f64>,
     pub spin_clockwise: Option<i64>,
+    // non-animated movement (these just apply the transformation up-front without any animation)
     pub push_up: Option<i64>,
     pub push_down: Option<i64>,
     pub push_left: Option<i64>,
     pub push_right: Option<i64>,
+    pub scale: Option<f64>, // scale is just dolly-in but it doesn't move the camera
 
     // animation control options
     pub duration: Option<i64>,
@@ -508,6 +510,13 @@ impl MinistryDirectory{
         else{
             dolly_out = doc["dolly_out"].as_f64();
         }
+        let scale: Option<f64>;
+        if doc["scale"].as_i64().is_some(){
+            scale = Some(doc["scale"].as_i64().unwrap() as f64);
+        }
+        else{
+            scale = doc["scale"].as_f64();
+        }
 
         if card_type == "animated_text"{
             content = content.map(|s| s.replace("\n", "<br />"));
@@ -553,6 +562,7 @@ impl MinistryDirectory{
             push_down: doc["push_down"].as_i64(),
             dolly_in,
             dolly_out,
+            scale,
             spin_clockwise: doc["spin_clockwise"].as_i64(),
 
             duration: doc["duration"].as_i64(),
