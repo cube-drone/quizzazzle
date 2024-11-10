@@ -286,7 +286,7 @@ function MarkdownCard({card, stackIndex, primary, visible}){
 
 function HtmlCard({card, stackIndex, primary, visible}){
     return html`<${AnyCard} card=${card} cardType="html" stackIndex=${stackIndex} primary=${primary} visible=${visible}>
-        <div class="html-content" dangerouslySetInnerHTML=${{ __html: insane(card.content) }}></div>
+        <div class="html-content" dangerouslySetInnerHTML=${{ __html: card.content }}></div>
     </${AnyCard}>`;
 }
 
