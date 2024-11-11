@@ -281,3 +281,6 @@ pages:
       - bump-left-30
     content: |
       Bees are important because they help pollinate plants, which helps plants reproduce.
+  - title: The Common Bee Is Loaded From A Common File Directory
+    id: common-bee
+    image: assets/common-bee.jpg

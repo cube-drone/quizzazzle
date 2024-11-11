@@ -601,13 +601,48 @@ impl MinistryDirectory{
         Ok(deck)
     }
 
-    pub fn get_asset_path(&self, asset_path: std::path::PathBuf) -> PathBuf{
+    pub fn get_asset_path(&self, asset_path: &std::path::PathBuf) -> PathBuf{
         PathBuf::from(&self.directory_root).join("assets").join(asset_path)
     }
 
+    pub fn get_alternate_asset_paths(&self, asset_path: &std::path::PathBuf) -> Vec<PathBuf> {
+        let mut paths = Vec::new();
+        paths.push(self.get_asset_path(asset_path));
+        paths.push(PathBuf::from(&self.directory_root).join("common").join(asset_path));
+        paths.push(PathBuf::from(&self.directory_root).join("../common").join(asset_path));
+        paths.push(PathBuf::from(&self.directory_root).join("../common/assets").join(asset_path));
+        paths.push(PathBuf::from(&self.directory_root).join("../../common").join(asset_path));
+        paths.push(PathBuf::from(&self.directory_root).join("../../common/assets").join(asset_path));
+        paths.push(PathBuf::from("common").join(asset_path));
+        paths.push(PathBuf::from("common").join("assets").join(asset_path));
+        paths
+    }
+
     pub async fn get_named_file(&self, asset_path: std::path::PathBuf, config: &crate::Config, file_directives: &crate::file_modifiers::FileDirectives) -> Result<rocket::fs::NamedFile>{
-        let asset_path = &self.get_asset_path(asset_path);
-        let filename = asset_path.file_name().unwrap_or_else(|| std::ffi::OsStr::new("")).to_str().unwrap_or_else(|| "");
+        let original_asset_path = asset_path.clone();
+        let mut asset_path = self.get_asset_path(&asset_path.clone());
+
+        let filename_asset_path = asset_path.clone();
+
+        let filename = filename_asset_path.file_name().unwrap_or_else(|| std::ffi::OsStr::new("")).to_str().unwrap_or_else(|| "");
+
+        let alternate_paths = self.get_alternate_asset_paths(&original_asset_path.clone());
+
+        let mut path_exists = Path::new(&asset_path).exists();
+
+        if !path_exists {
+            for path in alternate_paths{
+                if Path::new(&path).exists(){
+                    asset_path = path;
+                    path_exists = true;
+                    break;
+                }
+            }
+            if !path_exists {
+                return Err(anyhow!("File not found: {}", asset_path.clone().to_str().unwrap_or("")));
+            }
+        }
+
         let do_not_modify_file = file_directives.unmodified.unwrap_or(false);
 
         if !do_not_modify_file && (filename.ends_with(".jpg") || filename.ends_with(".png") || filename.ends_with(".gif")){
@@ -639,7 +674,8 @@ impl MinistryDirectory{
 
             }
 
-            // if the file already exists, return it
+            // if the file doesn't exist, or if we need to regenerate it,
+            //   then put the webp file in our asset cache directory
             if !Path::new(&webp_path).exists() || regenerate{
                 println!("Converting {} to {}", asset_path.to_str().unwrap_or(""), webp_path);
                 let mut img = ImageReader::open(asset_path)?.decode()?;
